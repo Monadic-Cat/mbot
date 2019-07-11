@@ -1,0 +1,9 @@
+[package]
+name = "mbot"
+version = "0.1.0"
+authors = ["Monadic Cat <greenmonadcat@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+serenity = "0.6.0"
+mice = { git = "https://github.com/Monadic-Cat/mice" }
