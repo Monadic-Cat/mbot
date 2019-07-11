@@ -1,0 +1,20 @@
+dist: trusty
+language: rust
+rust:
+  - stable
+  - beta
+  - nightly
+cache: cargo
+matrix:
+  allow_failures:
+    - rust: nightly
+  include:
+    - env: TARGET=arm-unknown-linux-gnueabihf CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc
+    - env: TARGET=x86_64-unknown-linux-gnu
+before_deploy: ci/before_deploy.sh
+deploy:
+  file: mbot-$TRAVIS_TAG-$TARGET.tar.gz
+  on:
+    tags: true
+  provider: releases
+  skip_cleanup: true
