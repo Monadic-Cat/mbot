@@ -53,8 +53,8 @@ fn roll(ctx: &mut Context, msg: &Message) -> CommandResult {
     //     Ok(x) => reply(ctx, msg, &x.to_string()),
     //     Err(x) => reply(ctx, msg, &format!("{}", x)),
     // }
-    let dice: Vec<(i64, u64)> = match mice::dice_iter(&msg.content["$roll".len()..]) {
-        Ok(x) => x.collect(),
+    let dice: Vec<(i64, u64)> = match mice::dice_vec(&msg.content["$roll".len()..]) {
+        Ok(x) => x,
         Err(x) => return reply(ctx, msg, &format!("{}", x)),
     };
     let mut roll_count = 0;
@@ -69,7 +69,7 @@ fn roll(ctx: &mut Context, msg: &Message) -> CommandResult {
     if roll_count > 10000 {
         reply(ctx, msg, "tried to DOS me.")
     } else {
-        match mice::roll_iter(dice.iter()) {
+        match mice::roll_vec(&dice) {
             Ok(x) => reply(ctx, msg, &x.to_string()),
             Err(x) => reply(ctx, msg, &format!("{}", x)),
         }
