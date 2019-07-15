@@ -58,15 +58,19 @@ fn roll(ctx: &mut Context, msg: &Message) -> CommandResult {
         Err(x) => return reply(ctx, msg, &format!("{}", x)),
     };
     let mut roll_count = 0;
+    // Move to a config at some point
+    let roll_max = 10000;
     for d in dice.iter() {
         if d.1 > 1 {
             roll_count += d.0;
         } else {
             roll_count += 1;
         }
+        if roll_count > roll_max {
+            break;
+        }
     }
-    // Move to a config at some point
-    if roll_count > 10000 {
+    if roll_count > roll_max {
         reply(ctx, msg, "tried to DOS me.")
     } else {
         match mice::roll_vec(&dice) {
@@ -91,15 +95,15 @@ impl EventHandler for Handler {
 
 const TOKEN_NAME: &str = "MBOT_TOKEN";
 fn main() {
-    let token = std::env::var(TOKEN_NAME).expect(&format!("Expected evironment variable: {}", TOKEN_NAME));
+    let token =
+        std::env::var(TOKEN_NAME).expect(&format!("Expected evironment variable: {}", TOKEN_NAME));
     let mut client = Client::new(&token, Handler).expect("Error starting client.");
     client.with_framework(
         StandardFramework::new()
             .configure(|c| c.prefix("$"))
-            .group(&GREEN_GROUP)
+            .group(&GREEN_GROUP),
     );
     if let Err(reason) = client.start() {
         println!("Client errorL {:#?}", reason);
     }
 }
-
