@@ -64,8 +64,12 @@ fn roll(ctx: &mut Context, msg: &Message) -> CommandResult {
         if d.1 > 1 {
             roll_count += d.0;
         } else {
+            // This branch only saves time
+            // in the worst case - when there's
+            // a truly obscene number of terms.
             roll_count += 1;
         }
+        // Prevent worst case performance
         if roll_count > roll_max {
             break;
         }
