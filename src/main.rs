@@ -77,8 +77,8 @@ fn roll(ctx: &mut Context, msg: &Message) -> CommandResult {
     if roll_count > roll_max {
         reply(ctx, msg, "tried to DOS me.")
     } else {
-        match mice::roll_vec(&dice) {
-            Ok(x) => reply(ctx, msg, &x.to_string()),
+        match mice::util::roll_vec_nice(&dice) {
+            Ok(x) => reply(ctx, msg, &x),
             Err(x) => reply(ctx, msg, &format!("{}", x)),
         }
     }
