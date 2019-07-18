@@ -1,0 +1,8 @@
+[package]
+name = "cmice"
+version = "0.1.0"
+authors = ["Monadic Cat <greenmonadcat@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+mice = { git = "https://github.com/Monadic-Cat/mice" }
