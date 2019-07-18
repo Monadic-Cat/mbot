@@ -6,4 +6,4 @@ edition = "2018"
 
 [dependencies]
 serenity = "0.6.0"
-mice = { git = "https://github.com/Monadic-Cat/mice" }
+mice = { git = "https://github.com/Monadic-Cat/mice", branch = "util" }
