@@ -53,34 +53,10 @@ fn roll(ctx: &mut Context, msg: &Message) -> CommandResult {
     //     Ok(x) => reply(ctx, msg, &x.to_string()),
     //     Err(x) => reply(ctx, msg, &format!("{}", x)),
     // }
-    let dice: Vec<(i64, u64)> = match mice::dice_vec(&msg.content["$roll".len()..]) {
-        Ok(x) => x,
-        Err(x) => return reply(ctx, msg, &format!("{}", x)),
-    };
-    let mut roll_count = 0;
-    // Move to a config at some point
-    let roll_max = 10000;
-    for d in dice.iter() {
-        if d.1 > 1 {
-            roll_count += d.0;
-        } else {
-            // This branch only saves time
-            // in the worst case - when there's
-            // a truly obscene number of terms.
-            roll_count += 1;
-        }
-        // Prevent worst case performance
-        if roll_count > roll_max {
-            break;
-        }
-    }
-    if roll_count > roll_max {
-        reply(ctx, msg, "tried to DOS me.")
-    } else {
-        match mice::util::roll_vec_nice(&dice) {
-            Ok(x) => reply(ctx, msg, &x),
-            Err(x) => reply(ctx, msg, &format!("{}", x)),
-        }
+    let expression = &msg.content["$roll".len()..];
+    match mice::util::roll_capped_nice(expression, 10000) {
+        Ok(x) => reply(ctx, msg, &x),
+        Err(x) => reply(ctx, msg, &format!("{}", x)),
     }
 }
 
