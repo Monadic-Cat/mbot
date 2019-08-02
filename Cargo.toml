@@ -5,4 +5,4 @@ authors = ["Monadic Cat <greenmonadcat@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-mice = { git = "https://github.com/Monadic-Cat/mice" }
+mice = "0.2.0"
