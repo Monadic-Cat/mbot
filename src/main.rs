@@ -76,7 +76,7 @@ impl EventHandler for Handler {
 const TOKEN_NAME: &str = "MBOT_TOKEN";
 fn main() {
     let token =
-        std::env::var(TOKEN_NAME).expect(&format!("Expected evironment variable: {}", TOKEN_NAME));
+        std::env::var(TOKEN_NAME).unwrap_or_else(|_| panic!("Expected evironment variable: {}", TOKEN_NAME));
     let mut client = Client::new(&token, Handler).expect("Error starting client.");
     client.with_framework(
         StandardFramework::new()
