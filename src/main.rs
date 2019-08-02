@@ -54,8 +54,8 @@ fn roll(ctx: &mut Context, msg: &Message) -> CommandResult {
     //     Err(x) => reply(ctx, msg, &format!("{}", x)),
     // }
     let expression = &msg.content["$roll".len()..];
-    match mice::util::roll_capped_nice(expression, 10000) {
-        Ok(x) => reply(ctx, msg, &x),
+    match mice::util::roll_capped(expression, 10000) {
+        Ok(x) => reply(ctx, msg, &format!("{}", x)),
         Err(x) => reply(ctx, msg, &format!("{}", x)),
     }
 }
