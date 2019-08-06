@@ -5,4 +5,4 @@ authors = ["Monadic Cat <greenmonadcat@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-mice = "0.2.0"
+mice = "0.2.1"
