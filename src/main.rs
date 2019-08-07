@@ -13,7 +13,7 @@ use serenity::{
 
 fn reply(ctx: &mut Context, msg: &Message, r: &str) -> CommandResult {
     msg.channel_id
-        .say(&ctx.http, format!("{}, {}", msg.author.mention(), r))?;
+        .say(&ctx.http, format!("{} {}", msg.author.mention(), r))?;
     Ok(())
 }
 
