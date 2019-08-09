@@ -1,3 +1,12 @@
+//! # cmice, CLI mice
+//! This is a command line dice expression evaluator.
+//! Usage:
+//! ```sh
+//! cmice <dice expression>
+//! ```
+//! That's it.
+//! The output format is unstable, because
+//! [`mice`](https://crates.io/crates/mice) is unstable.
 use std::env::args;
 use mice::roll;
 
