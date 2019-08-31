@@ -39,7 +39,7 @@ fn literal(ctx: &mut Context, msg: &Message) -> CommandResult {
     reply(
         ctx,
         msg,
-        &format!("Literal {}", &msg.content["literal".len() + 1..]),
+        &format!("Literal {}", &msg.content["$literal".len() + 1..]),
     )
 }
 #[command]
