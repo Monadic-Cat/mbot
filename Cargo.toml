@@ -7,4 +7,4 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 serenity = "0.6.0"
-mice = "0.3.1"
+mice = "0.5.1"

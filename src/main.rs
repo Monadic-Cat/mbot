@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+use mice::{util::roll_capped, FormatOptions as MiceFormat};
 use serenity::{
     framework::{
         standard::{
@@ -54,8 +55,8 @@ fn roll(ctx: &mut Context, msg: &Message) -> CommandResult {
     //     Err(x) => reply(ctx, msg, &format!("{}", x)),
     // }
     let expression = &msg.content["$roll".len()..];
-    match mice::util::roll_capped(expression, 10000) {
-        Ok(x) => reply(ctx, msg, &format!("{}", x)),
+    match roll_capped(expression, 10000) {
+        Ok(x) => reply(ctx, msg, &x.format(MiceFormat::new().total_right())),
         Err(x) => reply(ctx, msg, &format!("{}", x)),
     }
 }
@@ -75,8 +76,8 @@ impl EventHandler for Handler {
 
 const TOKEN_NAME: &str = "MBOT_TOKEN";
 fn main() {
-    let token =
-        std::env::var(TOKEN_NAME).unwrap_or_else(|_| panic!("Expected evironment variable: {}", TOKEN_NAME));
+    let token = std::env::var(TOKEN_NAME)
+        .unwrap_or_else(|_| panic!("Expected evironment variable: {}", TOKEN_NAME));
     let mut client = Client::new(&token, Handler).expect("Error starting client.");
     client.with_framework(
         StandardFramework::new()
@@ -84,6 +85,6 @@ fn main() {
             .group(&GREEN_GROUP),
     );
     if let Err(reason) = client.start() {
-        println!("Client errorL {:#?}", reason);
+        println!("Client error {:#?}", reason);
     }
 }
