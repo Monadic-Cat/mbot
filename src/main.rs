@@ -13,10 +13,7 @@ use serenity::{
 };
 
 fn reply(ctx: &mut Context, msg: &Message, r: &str) -> CommandResult {
-    let instance_name = match option_env!("INSTANCE_MESSAGE_PREFIX") {
-        Some(x) => x,
-        None => "",
-    };
+    let instance_name = std::env::var("INSTANCE_MESSAGE_PREFIX").unwrap_or(String::new());
     msg.channel_id.say(
         &ctx.http,
         format!("{}{} {}", instance_name, msg.author.mention(), r),
