@@ -13,8 +13,14 @@ use serenity::{
 };
 
 fn reply(ctx: &mut Context, msg: &Message, r: &str) -> CommandResult {
-    msg.channel_id
-        .say(&ctx.http, format!("{} {}", msg.author.mention(), r))?;
+    let instance_name = match option_env!("INSTANCE_MESSAGE_PREFIX") {
+        Some(x) => x,
+        None => "",
+    };
+    msg.channel_id.say(
+        &ctx.http,
+        format!("{}{} {}", instance_name, msg.author.mention(), r),
+    )?;
     Ok(())
 }
 
@@ -48,17 +54,30 @@ fn gargamel(ctx: &mut Context, msg: &Message) -> CommandResult {
     reply(ctx, msg, "I think you mean \"Gargalsmell\"!")
 }
 
+fn roll_smart(exp: &str) -> String {
+    match roll_capped(exp, 10000) {
+        Ok(x) => {
+            let first = x.format(MiceFormat::new().total_right());
+            let second;
+            if first.len() < 1900 {
+                first
+            } else if {
+                second = x.format(MiceFormat::new().concise().total_right());
+                second.len() < 1900
+            } {
+                second
+            } else {
+                x.total().to_string()
+            }
+        }
+        Err(x) => format!("{}", x),
+    }
+}
+
 #[command]
 fn roll(ctx: &mut Context, msg: &Message) -> CommandResult {
-    // match roll_dice(&msg.content["$roll".len()..]) {
-    //     Ok(x) => reply(ctx, msg, &x.to_string()),
-    //     Err(x) => reply(ctx, msg, &format!("{}", x)),
-    // }
     let expression = &msg.content["$roll".len()..];
-    match roll_capped(expression, 10000) {
-        Ok(x) => reply(ctx, msg, &x.format(MiceFormat::new().total_right())),
-        Err(x) => reply(ctx, msg, &format!("{}", x)),
-    }
+    reply(ctx, msg, &roll_smart(expression))
 }
 
 group!({
@@ -81,7 +100,7 @@ fn main() {
     let mut client = Client::new(&token, Handler).expect("Error starting client.");
     client.with_framework(
         StandardFramework::new()
-            .configure(|c| c.prefix("$"))
+            .configure(|c| c.prefix("!"))
             .group(&GREEN_GROUP),
     );
     if let Err(reason) = client.start() {
