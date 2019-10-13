@@ -71,16 +71,28 @@ fn roll_smart(exp: &str) -> String {
     }
 }
 
+fn roll_with_reason(exp: &str) -> String {
+    match exp.find("to") {
+        Some(x) => format!("{} {}", roll_smart(&exp[..x]), &exp[x..]),
+        None => roll_smart(exp),
+    }
+}
+
 #[command]
 fn roll(ctx: &mut Context, msg: &Message) -> CommandResult {
     let expression = &msg.content["$roll".len()..];
-    reply(ctx, msg, &roll_smart(expression))
+    reply(ctx, msg, &roll_with_reason(expression))
+}
+#[command]
+fn r(ctx: &mut Context, msg: &Message) -> CommandResult {
+    let expression = &msg.content["!r".len()..];
+    reply(ctx, msg, &roll_with_reason(expression))
 }
 
 group!({
     name: "green",
     options: {},
-    commands: [ping, potatoes, happy, po, literal, gargamel, roll],
+    commands: [ping, potatoes, happy, po, literal, gargamel, roll, r],
 });
 
 struct Handler;
