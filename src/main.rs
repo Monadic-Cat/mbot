@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 use mice::{util::roll_capped, FormatOptions as MiceFormat};
+mod initiative;
+use initiative::pathfinder_initiative;
 use serenity::{
     framework::{
         standard::{
@@ -89,10 +91,16 @@ fn r(ctx: &mut Context, msg: &Message) -> CommandResult {
     reply(ctx, msg, &roll_with_reason(expression))
 }
 
+#[command]
+fn pinit(ctx: &mut Context, msg: &Message) -> CommandResult {
+    let (_, result) = pathfinder_initiative(&msg.content["!pinit".len()..].trim()).unwrap();
+    reply(ctx, msg, &result)
+}
+
 group!({
     name: "green",
     options: {},
-    commands: [ping, potatoes, happy, po, literal, gargamel, roll, r],
+    commands: [ping, potatoes, happy, po, literal, gargamel, roll, r, pinit],
 });
 
 struct Handler;
