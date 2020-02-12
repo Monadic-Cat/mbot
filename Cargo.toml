@@ -6,7 +6,7 @@ edition = "2018"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-serenity = "0.6.0"
+serenity = { version = "0.8.0", features = ["framework", "standard_framework"] }
 mice = { git = "https://github.com/Monadic-Cat/mice", branch = "unstable-features" }
 nom = "5.0"
 rand = "0.7"

@@ -1,4 +1,4 @@
-use mice::unstable::parse::{integer, whitespace, operator, Sign};
+use mice::unstable::parse::{integer, operator, whitespace, Sign};
 use nom::{
     bytes::complete::{tag, take_while1},
     combinator::opt,
@@ -30,8 +30,13 @@ struct Entry<'a> {
 }
 
 fn char_entry(input: &str) -> IResult<&str, Entry> {
-    let (input, (name, _, _, sign, initiative_bonus)) =
-        tuple((char_name, tag(","), many0(whitespace), opt(operator), integer))(input)?;
+    let (input, (name, _, _, sign, initiative_bonus)) = tuple((
+        char_name,
+        tag(","),
+        many0(whitespace),
+        opt(operator),
+        integer,
+    ))(input)?;
     let sign = if let Some(x) = sign {
         x
     } else {
@@ -55,14 +60,16 @@ struct InitiativeList<'a> {
 fn char_entry_list(input: &str) -> IResult<&str, InitiativeList> {
     let (input, list) = many1(tuple((char_entry, opt(tag("\n")))))(input)?;
     let heck = list.into_iter().map(|(a, _)| a).collect();
-    Ok((input, InitiativeList {
-        entries: heck,
-    }))
+    Ok((input, InitiativeList { entries: heck }))
 }
 
 fn roll_init_list(inits: &InitiativeList) -> Vec<i64> {
     let mut rng = thread_rng();
-    inits.entries.iter().map(|x| rng.gen_range(1, 21) + x.initiative_bonus).collect()
+    inits
+        .entries
+        .iter()
+        .map(|x| rng.gen_range(1, 21) + x.initiative_bonus)
+        .collect()
 }
 
 /// Take message string after the command prefix has
@@ -75,15 +82,13 @@ pub fn pathfinder_initiative(input: &str) -> IResult<&str, String> {
     sort_thing.sort_unstable_by(|a, b| {
         let answer = a.1.cmp(&b.1);
         match answer {
-            std::cmp::Ordering::Equal => {
-                a.0.initiative_bonus.cmp(&b.0.initiative_bonus)
-            },
+            std::cmp::Ordering::Equal => a.0.initiative_bonus.cmp(&b.0.initiative_bonus),
             x => x,
         }
     });
     sort_thing.reverse();
     let (list, totals): (Vec<Entry>, Vec<i64>) = sort_thing.into_iter().unzip();
-    
+
     let mut chars_column = Column::new();
     for c in list {
         chars_column.add_row(TableEntry::Borrowed(c.name.0))
@@ -93,12 +98,11 @@ pub fn pathfinder_initiative(input: &str) -> IResult<&str, String> {
         totals_column.add_row(TableEntry::Owned(format!("{}", x)))
     }
     let table = Table {
-        columns: vec![ chars_column, totals_column],
+        columns: vec![chars_column, totals_column],
     };
-    
+
     Ok((input, format!("```{}```", format_table(table))))
 }
-
 
 struct Table<'a> {
     columns: Vec<Column<'a>>,
@@ -160,7 +164,11 @@ impl<'a> From<InitiativeList<'a>> for Table<'a> {
     fn from(l: InitiativeList<'a>) -> Table<'a> {
         let mut left_column = Column::new();
         let mut right_column = Column::new();
-        for Entry { name, initiative_bonus } in l.entries {
+        for Entry {
+            name,
+            initiative_bonus,
+        } in l.entries
+        {
             left_column.add_row(TableEntry::Borrowed(name.0));
             right_column.add_row(TableEntry::Owned(format!("{}", initiative_bonus)));
         }
@@ -171,7 +179,11 @@ impl<'a> From<InitiativeList<'a>> for Table<'a> {
 }
 
 fn format_table(table: Table) -> String {
-    let row_count = table.columns.iter().map(|c| c.cells.len()).fold(0, |a, x| if x > a { x } else { a });
+    let row_count = table
+        .columns
+        .iter()
+        .map(|c| c.cells.len())
+        .fold(0, |a, x| if x > a { x } else { a });
     let mut rows = Vec::with_capacity(row_count);
     for column in table.columns {
         for (r, cell) in column.cells.into_iter().enumerate() {
@@ -185,7 +197,10 @@ fn format_table(table: Table) -> String {
             row.push_str(&right_pad(&format!("{}", cell), column.min_width));
         }
     }
-    rows.into_iter().map(|x| x + " |").collect::<Vec<_>>().join("\n")
+    rows.into_iter()
+        .map(|x| x + " |")
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn right_pad(string: &str, length: usize) -> String {

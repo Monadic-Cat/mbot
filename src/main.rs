@@ -3,19 +3,16 @@ use mice::{util::roll_capped, FormatOptions as MiceFormat};
 mod initiative;
 use initiative::pathfinder_initiative;
 use serenity::{
-    framework::{
-        standard::{
-            macros::{command, group},
-            CommandResult,
-        },
-        StandardFramework,
+    framework::standard::{
+        macros::{command, group},
+        CommandResult, StandardFramework,
     },
     model::{channel::Message, gateway::Ready},
     prelude::*,
 };
 
 fn reply(ctx: &mut Context, msg: &Message, r: &str) -> CommandResult {
-    let instance_name = std::env::var("INSTANCE_MESSAGE_PREFIX").unwrap_or(String::new());
+    let instance_name = std::env::var("INSTANCE_MESSAGE_PREFIX").unwrap_or_default();
     msg.channel_id.say(
         &ctx.http,
         format!("{}{} {}", instance_name, msg.author.mention(), r),
@@ -97,11 +94,14 @@ fn pinit(ctx: &mut Context, msg: &Message) -> CommandResult {
     reply(ctx, msg, &result)
 }
 
-group!({
-    name: "green",
-    options: {},
-    commands: [ping, potatoes, happy, po, literal, gargamel, roll, r, pinit],
-});
+#[command]
+fn goodnight(ctx: &mut Context, msg: &Message) -> CommandResult {
+    reply(ctx, msg, "Sleep is for the weak, but goodnight.")
+}
+
+#[group]
+#[commands(ping, potatoes, happy, po, literal, gargamel, roll, r, pinit)]
+struct Green;
 
 struct Handler;
 impl EventHandler for Handler {
