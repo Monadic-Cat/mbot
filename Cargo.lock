@@ -588,8 +588,8 @@ checksum = "3197e20c7edb283f87c071ddfc7a2cca8f8e0b888c242959846a6fce03c72223"
 
 [[package]]
 name = "mice"
-version = "0.6.0"
-source = "git+https://github.com/Monadic-Cat/mice?branch=unstable-features#63fb90f03a5a1b85935810d8f9de298eef7f95a6"
+version = "0.7.0"
+source = "git+https://github.com/Monadic-Cat/mice?branch=unstable-features#98dce289129983f842b789ad2b2b9c36fce24801"
 dependencies = [
  "mice-macro-lib",
  "nom 5.1.0",
@@ -601,7 +601,7 @@ dependencies = [
 [[package]]
 name = "mice-macro-lib"
 version = "0.1.0"
-source = "git+https://github.com/Monadic-Cat/mice?branch=unstable-features#63fb90f03a5a1b85935810d8f9de298eef7f95a6"
+source = "git+https://github.com/Monadic-Cat/mice?branch=unstable-features#98dce289129983f842b789ad2b2b9c36fce24801"
 dependencies = [
  "quote",
  "syn",
