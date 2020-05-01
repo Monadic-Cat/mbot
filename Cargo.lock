@@ -71,9 +71,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.2.0"
+version = "3.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f359dc14ff8911330a51ef78022d376f25ed00248912803b58f00cb1c27f742"
+checksum = "12ae9db68ad7fac5fe51304d20f016c911539251075a214f8e663babefa35187"
 
 [[package]]
 name = "byte-tools"
@@ -147,9 +147,9 @@ dependencies = [
 
 [[package]]
 name = "command_attr"
-version = "0.1.7"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b61098146d3e0ad56c4918ae30ab9f32a7222cc859fc65fbc2a8475c1e48b336"
+checksum = "e7604666121e3ddd46988ce27d98053a51324f2b571a381a2e24f2da4b92d42f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -840,9 +840,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.2"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053a8c8bcc71fcce321828dc897a98ab9760bef03a4fc36693c231e5b3216cfe"
+checksum = "4c1f4b0efa5fc5e8ceb705136bfee52cfdb6a4e3509f770b478cd6ed434232a7"
 dependencies = [
  "proc-macro2",
 ]
