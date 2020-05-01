@@ -6,6 +6,7 @@ use serenity::{
     framework::standard::{
         macros::{command, group},
         CommandResult, StandardFramework,
+        Args,
     },
     model::{channel::Message, gateway::Ready},
     prelude::*,
@@ -38,11 +39,11 @@ fn po(ctx: &mut Context, msg: &Message) -> CommandResult {
     reply(ctx, msg, "tatoes")
 }
 #[command]
-fn literal(ctx: &mut Context, msg: &Message) -> CommandResult {
+fn literal(ctx: &mut Context, msg: &Message, arg: Args) -> CommandResult {
     reply(
         ctx,
         msg,
-        &format!("Literal {}", &msg.content["$literal".len() + 1..]),
+        &format!("Literal {}", arg.message().trim()),
     )
 }
 #[command]
@@ -78,19 +79,15 @@ fn roll_with_reason(exp: &str) -> String {
 }
 
 #[command]
-fn roll(ctx: &mut Context, msg: &Message) -> CommandResult {
-    let expression = &msg.content["$roll".len()..];
-    reply(ctx, msg, &roll_with_reason(expression))
-}
-#[command]
-fn r(ctx: &mut Context, msg: &Message) -> CommandResult {
-    let expression = &msg.content["!r".len()..];
+#[aliases("r")]
+fn roll(ctx: &mut Context, msg: &Message, arg: Args) -> CommandResult {
+    let expression = &arg.message().to_ascii_lowercase();
     reply(ctx, msg, &roll_with_reason(expression))
 }
 
 #[command]
-fn pinit(ctx: &mut Context, msg: &Message) -> CommandResult {
-    let (_, result) = pathfinder_initiative(&msg.content["!pinit".len()..].trim()).unwrap();
+fn pinit(ctx: &mut Context, msg: &Message, arg: Args) -> CommandResult {
+    let (_, result) = pathfinder_initiative(arg.message().trim()).unwrap();
     reply(ctx, msg, &result)
 }
 
@@ -100,7 +97,7 @@ fn goodnight(ctx: &mut Context, msg: &Message) -> CommandResult {
 }
 
 #[group]
-#[commands(ping, potatoes, happy, po, literal, gargamel, roll, r, pinit)]
+#[commands(ping, potatoes, happy, po, literal, gargamel, roll, pinit)]
 struct Green;
 
 struct Handler;
