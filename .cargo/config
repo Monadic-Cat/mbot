@@ -1,0 +1,2 @@
+[build]
+rustflags = ["--cfg=mice_semver_exempt"]
