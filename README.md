@@ -5,12 +5,14 @@ This is a discord bot for personal usage- it will accrue features
 as I want them.
 
 # Building
-```sh
-. .pub_env
-cargo build
-```
+This project builds like any Cargo binary crate.
+Use the Cargo build commands.
 
 # Running
-Set the environment variable `MBOT_TOKEN` to the bot token you're using, then run `mbot`
+Set the environment variable `MBOT_TOKEN` to the bot token you're using,
+then run it like any Cargo binary.
 
-That's it.
+You may also set the `INSTANCE_MESSAGE_PREFIX` environment variable,
+which will add the given prefix to all replies the bot sends.
+I may change that variable name sometime,
+probably to something like `MBOT_INSTANCE_MESSAGE_PREFIX`.

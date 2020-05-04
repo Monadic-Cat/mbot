@@ -1,3 +1,0 @@
-#!/bin/sh
-
-export RUSTFLAGS="--cfg=mice_semver_exempt"
