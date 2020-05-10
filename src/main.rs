@@ -73,7 +73,7 @@ fn roll_smart(exp: &str) -> String {
 
 fn roll_with_reason(exp: &str) -> String {
     match exp.find("to") {
-        Some(x) => format!("{} {}", roll_smart(&exp[..x]), &exp[x..]),
+        Some(x) => format!("{} {}", roll_smart(&exp[..x]).to_ascii_lowercase(), &exp[x..]),
         None => roll_smart(exp),
     }
 }
@@ -81,8 +81,7 @@ fn roll_with_reason(exp: &str) -> String {
 #[command]
 #[aliases("r")]
 fn roll(ctx: &mut Context, msg: &Message, arg: Args) -> CommandResult {
-    let expression = &arg.message().to_ascii_lowercase();
-    reply(ctx, msg, &roll_with_reason(expression))
+    reply(ctx, msg, &roll_with_reason(arg.message()))
 }
 
 #[command]
