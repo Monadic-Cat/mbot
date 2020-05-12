@@ -89,8 +89,10 @@ fn roll(ctx: &mut Context, msg: &Message, arg: Args) -> CommandResult {
 
 #[command]
 fn pinit(ctx: &mut Context, msg: &Message, arg: Args) -> CommandResult {
-    let (_, result) = pathfinder_initiative(arg.message().trim()).unwrap();
-    reply(ctx, msg, &result)
+    match pathfinder_initiative(arg.message().trim()) {
+        Ok((_, x)) => reply(ctx, msg, &x),
+        Err(_) => reply(ctx, msg, "invalid initiative bonus listing."),
+    }
 }
 
 #[command]
