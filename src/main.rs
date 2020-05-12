@@ -51,29 +51,29 @@ fn gargamel(ctx: &mut Context, msg: &Message) -> CommandResult {
     reply(ctx, msg, "I think you mean \"Gargalsmell\"!")
 }
 
-fn roll_smart(exp: &str) -> String {
+fn roll_smart(exp: &str) -> Result<String, mice::util::UtilError> {
     match roll_capped(exp, 10000) {
         Ok(x) => {
             let first = x.format(MiceFormat::new().total_right());
             let second;
             if first.len() < 1900 {
-                first
+                Ok(first)
             } else if {
                 second = x.format(MiceFormat::new().concise().total_right());
                 second.len() < 1900
             } {
-                second
+                Ok(second)
             } else {
-                x.total().to_string()
+                Ok(x.total().to_string())
             }
         }
-        Err(x) => format!("{}", x),
+        Err(x) => Err(x),
     }
 }
 
-fn roll_with_reason(exp: &str) -> String {
+fn roll_with_reason(exp: &str) -> Result<String, mice::util::UtilError> {
     match exp.find("to") {
-        Some(x) => format!("{} {}", roll_smart(&exp[..x]).to_ascii_lowercase(), &exp[x..]),
+        Some(x) => Ok(format!("{} {}", roll_smart(&exp[..x])?.to_ascii_lowercase(), &exp[x..])),
         None => roll_smart(exp),
     }
 }
@@ -81,7 +81,10 @@ fn roll_with_reason(exp: &str) -> String {
 #[command]
 #[aliases("r")]
 fn roll(ctx: &mut Context, msg: &Message, arg: Args) -> CommandResult {
-    reply(ctx, msg, &roll_with_reason(arg.message()))
+    match roll_with_reason(arg.message()) {
+        Ok(x) => reply(ctx, msg, &x),
+        Err(x) => reply(ctx, msg, &format!("{}", x)),
+    }
 }
 
 #[command]
