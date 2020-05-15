@@ -1,24 +1,24 @@
 #![forbid(unsafe_code)]
-use mice::{FormatOptions as MiceFormat};
+use mice::FormatOptions as MiceFormat;
 mod initiative;
 use initiative::pathfinder_initiative;
 use serenity::{
     framework::standard::{
         macros::{command, group},
-        CommandResult, StandardFramework,
-        Args,
+        Args, CommandResult, StandardFramework,
     },
     model::{channel::Message, gateway::Ready},
     prelude::*,
-    async_trait,
 };
 
 async fn reply(ctx: &Context, msg: &Message, r: &str) -> CommandResult {
     let instance_name = std::env::var("INSTANCE_MESSAGE_PREFIX").unwrap_or_default();
-    msg.channel_id.say(
-        &ctx.http,
-        format!("{}{} {}", instance_name, msg.author.mention(), r),
-    ).await?;
+    msg.channel_id
+        .say(
+            &ctx.http,
+            format!("{}{} {}", instance_name, msg.author.mention(), r),
+        )
+        .await?;
     Ok(())
 }
 
@@ -41,11 +41,7 @@ async fn po(ctx: &Context, msg: &Message) -> CommandResult {
 }
 #[command]
 async fn literal(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
-    reply(
-        ctx,
-        msg,
-        &format!("Literal {}", arg.message().trim()),
-    ).await
+    reply(ctx, msg, &format!("Literal {}", arg.message().trim())).await
 }
 #[command]
 async fn gargamel(ctx: &Context, msg: &Message) -> CommandResult {
@@ -76,8 +72,8 @@ enum MaybeReasonedDice {
 }
 
 fn reasoned_dice(input: &str) -> nom::IResult<&str, MaybeReasonedDice> {
-    use nom::{bytes::complete::tag, multi::many1, branch::alt};
     use mice::unstable::parse;
+    use nom::{branch::alt, bytes::complete::tag, multi::many1};
     let (i, dice) = parse::dice(input)?;
     let a = many1(parse::whitespace)(i).and_then(|(i, _)| {
         let _ = alt((tag("to"), tag("for"), tag("because"), tag("#")))(i)?;
@@ -111,11 +107,11 @@ async fn roll(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
                         } else {
                             reply(ctx, msg, &resp).await
                         }
-                    },
+                    }
                     Err(x) => reply(ctx, msg, &format!("{}", x)).await,
                 }
             }
-        },
+        }
         Ok((post_text, MaybeReasonedDice::Unreasoned(dice))) => {
             if post_text.trim() != "" {
                 reply(ctx, msg, "you've specified an invalid dice expression").await
@@ -126,8 +122,8 @@ async fn roll(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
                     Err(x) => reply(ctx, msg, &format!("{}", x)).await,
                 }
             }
-        },
-        Err(_) => { reply(ctx, msg, "you've specified an invalid dice expression").await },
+        }
+        Err(_) => reply(ctx, msg, "you've specified an invalid dice expression").await,
     }
 }
 
@@ -149,7 +145,7 @@ async fn goodnight(ctx: &Context, msg: &Message) -> CommandResult {
 struct Green;
 
 struct Handler;
-#[async_trait]
+#[serenity::async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
