@@ -11,3 +11,7 @@ tokio = { version = "0.2", features = ["full"] }
 mice = { git = "https://github.com/Monadic-Cat/mice", branch = "unstable-features" }
 nom = "5.0"
 rand = "0.7"
+
+[features]
+static_token = []
+
