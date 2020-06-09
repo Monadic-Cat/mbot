@@ -152,11 +152,18 @@ impl EventHandler for Handler {
     }
 }
 
+#[cfg(not(feature = "static_token"))]
 const TOKEN_NAME: &str = "MBOT_TOKEN";
+#[cfg(feature = "static_token")]
+const TOKEN: &str = env!("MBOT_TOKEN");
+
 #[tokio::main]
 async fn main() {
+    #[cfg(not(feature = "static_token"))]
     let token = std::env::var(TOKEN_NAME)
         .unwrap_or_else(|_| panic!("Expected evironment variable: {}", TOKEN_NAME));
+    #[cfg(feature = "static_token")]
+    let token = TOKEN;
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("!"))
         .group(&GREEN_GROUP);
