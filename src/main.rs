@@ -135,7 +135,7 @@ async fn pinit(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
     }
 }
 
-fn roll_fate(bonus: i64) -> FateResult {
+fn roll_fate(bonus: Option<i64>) -> FateResult {
     use rand::Rng;
     let mut rng = rand::thread_rng();
     let mut results: [i64; 4] = [0; 4];
@@ -148,13 +148,13 @@ fn roll_fate(bonus: i64) -> FateResult {
     FateResult {
         dice: results,
         bonus: bonus,
-        sum: sum + bonus,
+        sum: sum + bonus.or(Some(0)).unwrap(),
     }
 }
 
 struct FateResult {
     dice: [i64; 4],
-    bonus: i64,
+    bonus: Option<i64>,
     sum: i64,
 }
 use core::fmt;
@@ -169,15 +169,23 @@ impl fmt::Display for FateResult {
             }
             write!(f, " ")?
         }
-        write!(f, "+ {} = {}", self.bonus, self.sum)
+        if let Some(bonus) = self.bonus {
+            write!(f, "+ {} = {}", bonus, self.sum)
+        } else {
+            write!(f, "= {}", self.sum)
+        }
     }
 }
 
 #[command]
 async fn fate(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
     match arg.parse::<i64>() {
-        Ok(x) => reply(ctx, msg, &format!("{}", roll_fate(x))).await,
-        Err(_) => reply(ctx, msg, "invalid bonus").await,
+        Ok(x) => reply(ctx, msg, &format!("{}", roll_fate(Some(x)))).await,
+        Err(_) => if arg.message().len() == 0 {
+            reply(ctx, msg, &format!("{}", roll_fate(None))).await
+        } else {
+            reply(ctx, msg, "invalid bonus").await
+        },
     }
 }
 
