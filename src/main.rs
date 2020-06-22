@@ -135,13 +135,59 @@ async fn pinit(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
     }
 }
 
+fn roll_fate(bonus: i64) -> FateResult {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let mut results: [i64; 4] = [0; 4];
+    let mut sum = 0;
+    (1..4).map(|_| rng.gen_range(-1, 2)).fold(0, |a, x| {
+        sum += x;
+        results[a] = x;
+        a + 1
+    });
+    FateResult {
+        dice: results,
+        bonus: bonus,
+        sum: sum + bonus,
+    }
+}
+
+struct FateResult {
+    dice: [i64; 4],
+    bonus: i64,
+    sum: i64,
+}
+use core::fmt;
+impl fmt::Display for FateResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for x in &self.dice {
+            match x {
+                -1 => write!(f, "+ (-1)")?,
+                0 => write!(f, "+ (0)")?,
+                1 => write!(f, "+ (+1)")?,
+                _ => unreachable!(),
+            }
+            write!(f, " ")?
+        }
+        write!(f, "+ {} = {}", self.bonus, self.sum)
+    }
+}
+
+#[command]
+async fn fate(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
+    match arg.parse::<i64>() {
+        Ok(x) => reply(ctx, msg, &format!("{}", roll_fate(x))).await,
+        Err(_) => reply(ctx, msg, "invalid bonus").await,
+    }
+}
+
 #[command]
 async fn goodnight(ctx: &Context, msg: &Message) -> CommandResult {
     reply(ctx, msg, "Sleep is for the weak, but goodnight.").await
 }
 
 #[group]
-#[commands(ping, potatoes, happy, po, literal, gargamel, roll, pinit)]
+#[commands(ping, potatoes, happy, po, literal, gargamel, roll, pinit, goodnight, fate)]
 struct Green;
 
 struct Handler;
