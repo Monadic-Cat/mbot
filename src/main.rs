@@ -2,12 +2,21 @@
 use mice::FormatOptions as MiceFormat;
 mod initiative;
 use initiative::pathfinder_initiative;
+#[cfg(feature = "cli_control")]
+mod cmd;
+#[cfg(feature = "cli_control")]
+use cmd::command_loop;
+mod turns;
 use serenity::{
     framework::standard::{
-        macros::{command, group},
-        Args, CommandResult, StandardFramework,
+        macros::{check, command, group},
+        Args, CheckResult, CommandError, CommandOptions, CommandResult, Reason, StandardFramework,
     },
-    model::{channel::Message, gateway::Ready},
+    model::{
+        channel::Message,
+        gateway::Ready,
+        id::{ChannelId, GuildId, MessageId},
+    },
     prelude::*,
 };
 
@@ -181,11 +190,13 @@ impl fmt::Display for FateResult {
 async fn fate(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
     match arg.parse::<i64>() {
         Ok(x) => reply(ctx, msg, &format!("{}", roll_fate(Some(x)))).await,
-        Err(_) => if arg.message().len() == 0 {
-            reply(ctx, msg, &format!("{}", roll_fate(None))).await
-        } else {
-            reply(ctx, msg, "invalid bonus").await
-        },
+        Err(_) => {
+            if arg.message().len() == 0 {
+                reply(ctx, msg, &format!("{}", roll_fate(None))).await
+            } else {
+                reply(ctx, msg, "invalid bonus").await
+            }
+        }
     }
 }
 
@@ -194,15 +205,184 @@ async fn goodnight(ctx: &Context, msg: &Message) -> CommandResult {
     reply(ctx, msg, "Sleep is for the weak, but goodnight.").await
 }
 
+#[check]
+#[name = "in_dev_server"]
+async fn in_dev_server(
+    _: &Context,
+    msg: &Message,
+    _: &mut Args,
+    opts: &CommandOptions,
+) -> CheckResult {
+    if msg.guild_id == Some(GuildId(579886740097990657)) {
+        CheckResult::Success
+    } else {
+        CheckResult::Failure(Reason::Log(format!(
+            "attempted to use {} outside dev server",
+            opts.names[0]
+        )))
+    }
+}
+
+#[cfg(feature = "bot_commands")]
 #[group]
-#[commands(ping, potatoes, happy, po, literal, gargamel, roll, pinit, goodnight, fate)]
+#[commands(
+    ping, potatoes, happy, po, literal, gargamel, roll, pinit, goodnight, fate
+)]
 struct Green;
+
+#[command]
+#[only_in(guilds)]
+#[aliases("start_game", "sg")]
+async fn gm_start_game(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
+    match msg.guild_id {
+        Some(x) => match turns::create_game(x) {
+            Ok(()) => reply(ctx, msg, "succesfully created the game!").await?,
+            Err(_) => reply(ctx, msg, "game already exists.").await?,
+        },
+        None => (),
+    };
+    Ok(())
+}
+#[command]
+#[only_in(guilds)] // some `.unwrap()`s in this function rely on this.
+#[min_args(2)]
+#[max_args(3)]
+#[aliases("manage_channel", "mc")]
+async fn gm_manage_channel(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let channel: ChannelId = args.single()?;
+    let control_state: turns::PostingControls = args.single()?;
+    let game_mode: Option<turns::GameMode> = match args.current() {
+        Some(x) => {
+            let a = Some(x.parse()?);
+            args.advance();
+            a
+        }
+        None => None,
+    };
+    if msg
+        .guild(&ctx.cache)
+        .await
+        .unwrap() // only_in(guilds)
+        .read()
+        .await
+        .channels
+        .contains_key(&channel)
+    {
+        match turns::manage_channel(msg.guild_id.unwrap(), channel, control_state, game_mode) {
+            Ok(x) => reply(ctx, msg, "channel configured").await,
+            Err(e) => reply(ctx, msg, &format!("{}", e)).await,
+        }
+    } else {
+        reply(ctx, msg, "no such channel in this server").await
+    }
+}
+#[command]
+#[only_in(guilds)]
+#[num_args(1)]
+#[aliases("add_player", "ap")]
+async fn gm_add_player(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let user = args.single()?;
+    match turns::add_player(msg.guild_id.unwrap(), user) {
+        Ok(()) => reply(ctx, msg, "added player").await,
+        Err(e) => reply(ctx, msg, &format!("{}", e)).await,
+    }
+}
+#[command]
+#[only_in(guilds)]
+#[aliases("extend_turn", "et")]
+async fn gm_extend_turn(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
+    unimplemented!("turn extensions")
+}
+#[command]
+#[only_in(guilds)]
+#[aliases("round_unordered", "ru")]
+async fn gm_round_unordered(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
+    unimplemented!("starting unordered rounds")
+}
+#[command]
+#[only_in(guilds)]
+#[aliases("round_ordered", "ro")]
+async fn gm_round_ordered(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
+    unimplemented!("starting ordered rounds")
+}
+
+// TODO: figure out what kind of controls we'll want for manually skipping turns.
+#[command]
+#[only_in(guilds)]
+#[aliases("skip_turn", "st")]
+async fn gm_skip_turn(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
+    unimplemented!("turn skipping")
+}
+
+#[command]
+#[only_in(guilds)]
+#[aliases("set_notification_channel", "snc")]
+async fn gm_set_notification_channel(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
+    unimplemented!("notification channel")
+}
+
+#[command]
+#[aliases("skip")]
+async fn player_skip_turn(_ctx: &Context, _: &Message, _: Args) -> CommandResult {
+    unimplemented!("player turn skipping")
+}
+
+#[command]
+#[only_in(guilds)]
+#[aliases("notify")]
+async fn player_notify(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let yes_no: turns::YesNo = args.single()?;
+    unimplemented!("player notification");
+    reply(ctx, msg, &format!("will notify: {:?}", yes_no)).await
+}
+
+#[group]
+#[prefix("gm")]
+#[commands(
+    gm_start_game,
+    gm_manage_channel,
+    gm_add_player,
+    gm_extend_turn,
+    gm_round_unordered,
+    gm_round_ordered,
+    gm_skip_turn,
+    gm_set_notification_channel
+)]
+#[checks(in_dev_server)]
+#[allowed_roles("GM")]
+struct GMTools;
+
+#[group]
+#[commands(player_skip_turn, player_notify)]
+#[checks(in_dev_server)]
+struct PlayerTools;
 
 struct Handler;
 #[serenity::async_trait]
 impl EventHandler for Handler {
+    #[allow(unused_variables)]
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
+        #[cfg(feature = "cli_control")]
+        command_loop(ctx, ready).await;
+    }
+    // for turn tracking
+    async fn message(&self, ctx: Context, msg: Message) {}
+    // for turn tracking
+    async fn message_delete(&self, ctx: Context, channel_id: ChannelId, deleted_msg_id: MessageId) {
+        let pmsgs = match channel_id
+            .messages(ctx.http, |b| b.after(deleted_msg_id).limit(1))
+            .await
+        {
+            Ok(x) => x,
+            Err(e) => {
+                println!("failed to fetch succeeding messages");
+                return;
+            }
+        };
+        if pmsgs.len() == 0 {
+            unimplemented!("turn rollbacks")
+        }
     }
 }
 
@@ -218,12 +398,19 @@ async fn main() {
         .unwrap_or_else(|_| panic!("Expected evironment variable: {}", TOKEN_NAME));
     #[cfg(feature = "static_token")]
     let token = TOKEN;
+
+    #[cfg(feature = "bot_commands")]
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("!"))
-        .group(&GREEN_GROUP);
+        .group(&GREEN_GROUP)
+        .group(&GMTOOLS_GROUP)
+        .group(&PLAYERTOOLS_GROUP);
     let client = Client::new(&token).event_handler(Handler);
 
+    #[cfg(feature = "bot_commands")]
     let client = client.framework(framework);
+    #[cfg(not(feature = "bot_commands"))]
+    let client = client.framework(StandardFramework::new());
 
     let mut client = client.await.expect("Error starting client.");
 
