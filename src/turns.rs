@@ -25,9 +25,15 @@ use chrono::{DateTime, Duration, Utc};
 ///   until they post or reacquire their turn by communication with the GM.
 ///   Such a dropped player may post after the end of any round without consuming a turn.
 ///   They will then be reinserted into the round player count.
+/// If a round exits without any posts, the channel is STALE.
+/// Certain kinds of round might auto create a new one following themselves,
+/// and some might not. This should be included in the round creation command.
+/// If a round goes STALE, however, such auto creation should be cancelled.
+/// In addition, a notification will be placed in the notifications channel for the game.
 use serenity::model::id::{ChannelId, GuildId, UserId};
 // Trying these out in this module.
 use fehler::{throw as yeet, throws as yeets};
+use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
@@ -43,117 +49,6 @@ enum Presence {
     Present,
     PartiallyAbsent,
     FullyAbsent,
-}
-
-struct PastTurn {
-    player: PlayerId,
-    order_pos: usize,
-    time: DateTime<Utc>,
-}
-
-struct UpcomingTurn {
-    player: PlayerId,
-    order_pos: usize,
-}
-
-enum Round {
-    Ordered(OrderedRound),
-    Unordered(UnorderedRound),
-}
-trait Turn {
-    fn players(&self) -> &[PlayerId];
-    // fn start_date(&self) -> NaiveDateTime;
-    fn can_skip(&self) -> bool;
-    fn complete(&mut self, player: PlayerId) -> Result<(), ()>;
-}
-struct OrderedTurn {
-    player: PlayerId,
-    start_time: DateTime<Utc>,
-}
-impl Turn for OrderedTurn {
-    fn players(&self) -> &[PlayerId] {
-        core::slice::from_ref(&self.player)
-    }
-    fn can_skip(&self) -> bool {
-        Utc::now() - self.start_time > Duration::hours(24)
-    }
-    #[yeets(())]
-    fn complete(&mut self, player: PlayerId) {
-        if self.player != player {
-            yeet!(())
-        }
-    }
-}
-struct UnorderedTurn {}
-impl Round {
-    fn next_turn(&self) -> Option<impl Turn> {
-        // TODO: do something real here
-        Some(OrderedTurn {
-            player: PlayerId { user_id: UserId(0) },
-            start_time: Utc::now(),
-        })
-    }
-}
-
-struct UnorderedRound {
-    start_time: DateTime<Utc>, // required for clean rollbacks
-    acted: BTreeSet<PlayerId>,
-    unacted: BTreeSet<PlayerId>,
-}
-
-/// Error: A turn order is empty.
-struct EmptyTurnOrder;
-
-struct OrderedRound {
-    start_time: DateTime<Utc>, // required for clean rollbacks
-    ordering: Vec<PlayerId>,
-    last_turn: Option<PastTurn>,
-    skipped: BTreeSet<PlayerId>,
-}
-impl OrderedRound {
-    #[yeets(EmptyTurnOrder)]
-    fn next_player(&self) -> UpcomingTurn {
-        if self.ordering.len() == 0 {
-            yeet!(EmptyTurnOrder)
-        }
-        if let Some(ref turn) = self.last_turn {
-            // We're going to assume that we never have more than usize::MAX - 1 players here.
-            let npos = if turn.order_pos + 1 < self.ordering.len() {
-                turn.order_pos + 1
-            } else {
-                0
-            };
-            UpcomingTurn {
-                player: self.ordering[npos],
-                order_pos: npos,
-            }
-        } else {
-            UpcomingTurn {
-                // This is infallible because we know
-                // that there's at least one player by this point.
-                // Otherwise, an error return would have happened first.
-                player: self.ordering[0],
-                order_pos: 0,
-            }
-        }
-    }
-    /// Skip currently upcoming turn.
-    fn skip_turn(&mut self) -> PlayerId {
-        unimplemented!("turn skipping")
-    }
-    #[yeets(PlayerAlreadyPresent)]
-    fn append_player(&mut self, player: PlayerId) {
-        // Note that this performs a linear search
-        // and may become slow with large numbers of players.
-        // It is unlikely that I could manage a game
-        // with so many players that this would become
-        // noticeable, however.
-        if self.ordering.contains(&player) {
-            yeet!(PlayerAlreadyPresent)
-        } else {
-            self.ordering.push(player)
-        }
-    }
 }
 
 struct PlayerAlreadyPresent;
@@ -200,6 +95,39 @@ impl core::str::FromStr for PostingControls {
     }
 }
 
+/// Represents a turn a player has taken.
+/// We store the post time to enable clean rollbacks.
+#[derive(Clone)]
+struct UnorderedTurn(PlayerId, DateTime<Utc>);
+
+/// Represents a turn a player has taken.
+/// We store the post/skip time to enable clean rollbacks.
+#[derive(Clone)]
+enum OrderedTurn {
+    Posted(PlayerId, DateTime<Utc>),
+    Skipped(PlayerId, DateTime<Utc>),
+}
+
+#[derive(Clone)]
+enum Round {
+    Unordered {
+        start_time: DateTime<Utc>, // required for clean rollbacks
+        acted: IndexMap<PlayerId, UnorderedTurn>,
+        unacted: BTreeSet<PlayerId>,
+        // can't be more than this because BTreeSet can't contain more elements
+        remaining_turns: usize,
+    },
+    Ordered {
+        start_time: DateTime<Utc>, // required for clean rollbacks
+        ordering: Vec<PlayerId>,
+        // required for clean rollbacks in the presence of deletion of far preceding posts
+        used: Vec<OrderedTurn>,
+        // note that we can restore a player's turn in two ways:
+        //  - roll back to it and undo the skip
+        //  - insert a new turn for them to use in the current round's ordering
+    },
+}
+
 struct ChannelData {
     default_game_mode: GameMode,
     control_state: PostingControls,
@@ -230,12 +158,24 @@ impl Game {
 /// This should use a Tokio synchronization thing if
 /// any applicable locks are held across `.await` points.
 // TODO: support multiple games per server
+// Note that the RwLock here isn't fine grained enough
+// for the majority of cases.
+// To reduce contention of usage between servers,
+// we really should use Mutexes or RwLocks inside `Game`
+// so that the majority of uses can take a shared reference
+// to the global map. Currently, essentially all uses
+// require a unique reference, which makes it no better than a Mutex.
+// Ideally, the only two user facing operations that should require
+// a unique reference to the global map are game creation and game deletion.
+// TODO: add inner locks
+// TODO: initialize from SQLite db
 static SERVER_GAMES_MAP: Lazy<RwLock<HashMap<GuildId, Game>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Error, Debug)]
 #[error("game already exists")]
 pub(crate) struct GameAlreadyExists;
+
 #[yeets(GameAlreadyExists)]
 pub(crate) fn create_game(server: GuildId) {
     let mut map = SERVER_GAMES_MAP.write().unwrap();
@@ -257,13 +197,25 @@ pub(crate) fn manage_channel(
 ) {
     let mut map_lock = SERVER_GAMES_MAP.write().unwrap();
     let game = map_lock.get_mut(&server).ok_or(NonexistentGameError)?;
-    let round = game.channels.get(&channel).and_then(|c| c.round);
-    let channel_mode = ChannelData {
-        default_game_mode: mode.map_or(game.default_mode, |x| x),
-        round,
-        control_state,
-    };
-    game.channels.insert(channel, channel_mode);
+    use std::collections::hash_map::Entry;
+    let chan_entry = game.channels.entry(channel);
+    match chan_entry {
+        Entry::Vacant(e) => {
+            e.insert(ChannelData {
+                default_game_mode: mode.map_or(game.default_mode, |x| x),
+                round: None,
+                control_state,
+            });
+        }
+        Entry::Occupied(mut e) => {
+            let chan = e.get_mut();
+            match mode {
+                Some(x) => chan.default_game_mode = x,
+                None => (),
+            }
+            chan.control_state = control_state;
+        }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -300,4 +252,73 @@ impl core::str::FromStr for YesNo {
             _ => yeet!(ParseYesNoError),
         }
     }
+}
+
+#[derive(Error, Debug)]
+#[error("not your turn")]
+pub(crate) struct OffTurnMessage;
+/// If game does not exist, does nothing.
+/// If game exists, but does not contain the channel, does nothing.
+/// If game exists and contains the given channel, tries using turn.
+/// If message is off turn, does not advance round and returns error.
+// Note that enforcing this even in weird situations
+// requires keeping a stack of the used turns in the current round.
+#[yeets(OffTurnMessage)]
+pub(crate) fn receive_message(
+    server: GuildId,
+    channel: ChannelId,
+    player: UserId,
+    message: String,
+) {
+    let map_lock = SERVER_GAMES_MAP.write().unwrap();
+    let game = match map_lock.get(&server) {
+        Some(x) => x,
+        None => return,
+    };
+}
+
+use crate::POOL;
+
+#[derive(Debug, Copy, Clone)]
+pub(crate) struct TurnErrInfo {
+    notify_channel: Option<ChannelId>,
+}
+
+impl TurnErrInfo {
+    pub(crate) fn notify_channel(&self) -> Option<ChannelId>  {
+        self.notify_channel
+    }
+}
+
+#[derive(Error, Debug)]
+pub(crate) enum TurnError {
+    #[error("not in this game")]
+    NotInGame(TurnErrInfo),
+    #[error("not in this round")]
+    NotInRound(TurnErrInfo),
+    #[error("not your turn")]
+    WrongTurn(TurnErrInfo),
+    #[error("{0}")]
+    SqlxError(#[from] sqlx::Error),
+}
+
+impl TurnError {
+    pub(crate) fn notify_channel(&self) -> Option<ChannelId> {
+        use TurnError::*;
+        match self {
+            NotInGame(info) | NotInRound(info) | WrongTurn(info) => info.notify_channel(),
+            _ => None,
+        }
+    }
+}
+
+use sqlx::query;
+
+#[yeets(TurnError)]
+pub(crate) async fn attempt_turn(player: i64, channel: i64, time: DateTime<Utc>) {
+    let mut conn = POOL.begin().await?;
+    let game_id = query!("SELECT GameID FROM Channels WHERE ID = ?", channel)
+        .fetch_one(&mut conn)
+        .await?;
+    println!("Row: {:?}", game_id);
 }

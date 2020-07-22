@@ -6,19 +6,30 @@ use initiative::pathfinder_initiative;
 mod cmd;
 #[cfg(feature = "cli_control")]
 use cmd::command_loop;
+#[cfg(feature = "control_socket")]
+mod control_socket;
+#[cfg(feature = "turns_db")]
 mod turns;
+#[cfg(feature = "turns_db")]
+use serenity::model::{channel::GuildChannel, id::MessageId};
 use serenity::{
     framework::standard::{
         macros::{check, command, group},
-        Args, CheckResult, CommandError, CommandOptions, CommandResult, Reason, StandardFramework,
+        Args,
+        CheckResult, // CommandError,
+        CommandOptions,
+        CommandResult,
+        Reason,
+        StandardFramework,
     },
     model::{
         channel::Message,
         gateway::Ready,
-        id::{ChannelId, GuildId, MessageId},
+        id::{ChannelId, GuildId},
     },
     prelude::*,
 };
+// use tokio::task;
 
 async fn reply(ctx: &Context, msg: &Message, r: &str) -> CommandResult {
     let instance_name = std::env::var("INSTANCE_MESSAGE_PREFIX").unwrap_or_default();
@@ -230,19 +241,35 @@ async fn in_dev_server(
 )]
 struct Green;
 
+#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("start_game", "sg")]
 async fn gm_start_game(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
-    match msg.guild_id {
-        Some(x) => match turns::create_game(x) {
-            Ok(()) => reply(ctx, msg, "succesfully created the game!").await?,
-            Err(_) => reply(ctx, msg, "game already exists.").await?,
+    use sqlx::{query, Done};
+    let guild_id = match msg.guild_id {
+        Some(x) => x.0 as i64,
+        None => {
+            return reply(ctx, msg, "no").await;
         },
-        None => (),
     };
+    let player_id = msg.author.id.0 as i64;
+    let mut transaction = POOL.begin().await?;
+    query!("INSERT INTO Servers (ID) VALUES (?)", guild_id).execute(&mut transaction).await;
+    match query!("SELECT ID FROM Games WHERE ServerID = ?", guild_id).fetch_one(&mut transaction).await {
+        Ok(_) => reply(ctx, msg, "game already exists.").await?,
+        Err(sqlx::Error::RowNotFound) => {
+            query!("INSERT INTO Games (ServerID, GameMaster)
+                    VALUES (?, ?)", guild_id, player_id).execute(&mut transaction).await?;
+            reply(ctx, msg, "successfully created the game!").await?;
+        },
+        Err(e) => return Err(e.into()),
+    }
+    transaction.commit().await?;
     Ok(())
 }
+
+#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)] // some `.unwrap()`s in this function rely on this.
 #[min_args(2)]
@@ -263,19 +290,22 @@ async fn gm_manage_channel(ctx: &Context, msg: &Message, mut args: Args) -> Comm
         .guild(&ctx.cache)
         .await
         .unwrap() // only_in(guilds)
-        .read()
-        .await
         .channels
         .contains_key(&channel)
     {
+        use sqlx::query;
+        // let game = query!("SELECT GameID FROM Games WHERE ");
+        // query!("INSERT INTO Channels (ID, GameID, ControlState, DefaultGameMode)
+        //         VALUES (?, ?, ?, ?) UPSERT");
         match turns::manage_channel(msg.guild_id.unwrap(), channel, control_state, game_mode) {
-            Ok(x) => reply(ctx, msg, "channel configured").await,
+            Ok(_) => reply(ctx, msg, "channel configured").await,
             Err(e) => reply(ctx, msg, &format!("{}", e)).await,
         }
     } else {
         reply(ctx, msg, "no such channel in this server").await
     }
 }
+#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[num_args(1)]
@@ -287,18 +317,21 @@ async fn gm_add_player(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
         Err(e) => reply(ctx, msg, &format!("{}", e)).await,
     }
 }
+#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("extend_turn", "et")]
 async fn gm_extend_turn(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
     unimplemented!("turn extensions")
 }
+#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("round_unordered", "ru")]
 async fn gm_round_unordered(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
     unimplemented!("starting unordered rounds")
 }
+#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("round_ordered", "ro")]
@@ -307,6 +340,7 @@ async fn gm_round_ordered(_ctx: &Context, _msg: &Message, _args: Args) -> Comman
 }
 
 // TODO: figure out what kind of controls we'll want for manually skipping turns.
+#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("skip_turn", "st")]
@@ -314,6 +348,7 @@ async fn gm_skip_turn(_ctx: &Context, _msg: &Message, _args: Args) -> CommandRes
     unimplemented!("turn skipping")
 }
 
+#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("set_notification_channel", "snc")]
@@ -321,12 +356,14 @@ async fn gm_set_notification_channel(_ctx: &Context, _msg: &Message, _args: Args
     unimplemented!("notification channel")
 }
 
+#[cfg(feature = "turns_db")]
 #[command]
 #[aliases("skip")]
 async fn player_skip_turn(_ctx: &Context, _: &Message, _: Args) -> CommandResult {
     unimplemented!("player turn skipping")
 }
 
+#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("notify")]
@@ -336,6 +373,7 @@ async fn player_notify(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
     reply(ctx, msg, &format!("will notify: {:?}", yes_no)).await
 }
 
+#[cfg(feature = "turns_db")]
 #[group]
 #[prefix("gm")]
 #[commands(
@@ -352,10 +390,63 @@ async fn player_notify(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
 #[allowed_roles("GM")]
 struct GMTools;
 
+#[cfg(feature = "turns_db")]
 #[group]
 #[commands(player_skip_turn, player_notify)]
 #[checks(in_dev_server)]
 struct PlayerTools;
+
+// TODO: generalize this
+// a lot.
+fn lookup_recipient(name: &str) -> Result<ChannelId, ()> {
+    match name {
+        "ooc" => Ok(ChannelId(695085555511197719)),
+        "monad" => Ok(ChannelId(550726052650156054)),
+        "cough" => Ok(ChannelId(732325356673040484)),
+        _ => Err(()),
+    }
+}
+
+#[command]
+#[aliases("msg")]
+async fn anon_msg(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    use foretry::async_try;
+    use thiserror::Error;
+    #[derive(Error, Debug)]
+    enum InternalError {
+        #[error("no channel argument provided")]
+        NoChannel,
+        #[error("invalid recipient name")]
+        InvalidRecipient,
+        #[error("empty message")]
+        EmptyMessage,
+        #[error("failed to send message")]
+        FailedMessage,
+    }
+    let http = ctx.http.clone();
+    async_try! {(), InternalError | {
+        let channel = lookup_recipient(args.current().ok_or(InternalError::NoChannel)?)
+            .map_err(|_| InternalError::InvalidRecipient)?;
+        args.advance();
+        let message = args.remains().ok_or(InternalError::EmptyMessage)?;
+        let instance_name = std::env::var("INSTANCE_MESSAGE_PREFIX").unwrap_or_default();
+        channel.say(http, &format!("{}Anon: {}", instance_name, message)).await
+            .map_err(|_| InternalError::FailedMessage)?;
+        match reply(ctx, msg, "message sent.").await {
+            Ok(x) => x,
+            Err(e) => log::warn!("couldn't send message: {:?}", e),
+        }
+    } catch (e) {
+        reply(ctx, msg, &format!("{}", e)).await?;
+    }};
+
+    Ok(())
+}
+
+#[group]
+#[commands(anon_msg)]
+#[only_in(dm)]
+struct DMCommands;
 
 struct Handler;
 #[serenity::async_trait]
@@ -365,10 +456,40 @@ impl EventHandler for Handler {
         println!("{} is connected!", ready.user.name);
         #[cfg(feature = "cli_control")]
         command_loop(ctx, ready).await;
+        #[cfg(feature = "control_socket")]
+        control_socket::control_loop("/home/jmn/mbot.socket").await;
     }
     // for turn tracking
-    async fn message(&self, ctx: Context, msg: Message) {}
+    #[cfg(feature = "turns_db")]
+    async fn message(&self, ctx: Context, msg: Message) {
+        use foretry::{async_try, try_block};
+        use sqlx::query;
+        let guild_id = msg.guild_id.unwrap().0 as i64;
+        match turns::attempt_turn(
+            msg.author.id.0 as i64,
+            msg.channel_id.0 as i64,
+            msg.timestamp.into(),
+        )
+        .await
+        {
+            Ok(_) => (),
+            Err(e @ turns::TurnError::NotInGame(_))
+            | Err(e @ turns::TurnError::NotInRound(_))
+            | Err(e @ turns::TurnError::WrongTurn(_)) => match e.notify_channel() {
+                Some(c) => match c
+                    .say(ctx.http, format!("{}: {}", msg.author.mention(), e))
+                    .await
+                {
+                    Ok(_) => (),
+                    Err(e2) => log::error!("{} AFTER {}", e2, e),
+                },
+                None => log::error!("{}", e),
+            },
+            Err(turns::TurnError::SqlxError(e)) => log::error!("sqlx: {}", e),
+        }
+    }
     // for turn tracking
+    #[cfg(feature = "turns_db")]
     async fn message_delete(&self, ctx: Context, channel_id: ChannelId, deleted_msg_id: MessageId) {
         let pmsgs = match channel_id
             .messages(ctx.http, |b| b.after(deleted_msg_id).limit(1))
@@ -384,6 +505,21 @@ impl EventHandler for Handler {
             unimplemented!("turn rollbacks")
         }
     }
+    #[cfg(feature = "turns_db")]
+    async fn channel_delete(&self, ctx: Context, channel: &GuildChannel) {
+        use foretry::async_try;
+        use sqlx::query;
+        let channel_id = channel.id.0 as i64;
+        async_try! { _, sqlx::Error | {
+            let mut transaction = POOL.begin().await?;
+            query!("DELETE FROM Channels WHERE ID = ?", channel_id)
+                .fetch_one(&mut transaction)
+                .await?;
+            transaction.commit().await?
+        } catch (e) {
+            log::error!("sqlx error: {}", e);
+        }};
+    }
 }
 
 #[cfg(not(feature = "static_token"))]
@@ -391,8 +527,21 @@ const TOKEN_NAME: &str = "MBOT_TOKEN";
 #[cfg(feature = "static_token")]
 const TOKEN: &str = env!("MBOT_TOKEN");
 
+#[cfg(feature = "turns_db")]
+use sqlx::{SqliteConnection, SqlitePool};
+
+#[cfg(feature = "turns_db")]
+use once_cell::sync::Lazy;
+
+#[cfg(feature = "turns_db")]
+/// This will be set exactly once, right there in the `main` functions.
+/// It therefore does not require synchronization.
+/// `SqlitePool` does its own synchronization, and is used via shared references.
+static POOL: Lazy<SqlitePool> = Lazy::new(|| SqlitePool::connect_lazy("sqlite://dev.db").unwrap());
+
 #[tokio::main]
 async fn main() {
+    env_logger::init();
     #[cfg(not(feature = "static_token"))]
     let token = std::env::var(TOKEN_NAME)
         .unwrap_or_else(|_| panic!("Expected evironment variable: {}", TOKEN_NAME));
@@ -400,11 +549,20 @@ async fn main() {
     let token = TOKEN;
 
     #[cfg(feature = "bot_commands")]
-    let framework = StandardFramework::new()
-        .configure(|c| c.prefix("!"))
-        .group(&GREEN_GROUP)
-        .group(&GMTOOLS_GROUP)
-        .group(&PLAYERTOOLS_GROUP);
+    let framework = {
+        let f = StandardFramework::new()
+            .configure(|c| c.prefix("!"))
+            .group(&GREEN_GROUP)
+            .group(&DMCOMMANDS_GROUP);
+        #[cfg(feature = "turns_db")]
+        {
+            f.group(&GMTOOLS_GROUP).group(&PLAYERTOOLS_GROUP)
+        }
+        #[cfg(not(feature = "turns_db"))]
+        {
+            f
+        }
+    };
     let client = Client::new(&token).event_handler(Handler);
 
     #[cfg(feature = "bot_commands")]
@@ -413,6 +571,12 @@ async fn main() {
     let client = client.framework(StandardFramework::new());
 
     let mut client = client.await.expect("Error starting client.");
+
+    #[cfg(feature = "turns_db")]
+    {
+        let mut conn = POOL.acquire().await.unwrap();
+        println!("sqlite connection initialized");
+    };
 
     if let Err(reason) = client.start().await {
         println!("Client error {:#?}", reason);
