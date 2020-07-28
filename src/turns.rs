@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 /// Rules:
 /// The game is composed of rounds.
 /// A round is a collection of turns.
@@ -285,7 +285,7 @@ pub(crate) struct TurnErrInfo {
 }
 
 impl TurnErrInfo {
-    pub(crate) fn notify_channel(&self) -> Option<ChannelId>  {
+    pub(crate) fn notify_channel(&self) -> Option<ChannelId> {
         self.notify_channel
     }
 }
@@ -312,7 +312,7 @@ impl TurnError {
     }
 }
 
-use sqlx::query;
+use sqlx::{query, query_as};
 
 #[yeets(TurnError)]
 pub(crate) async fn attempt_turn(player: i64, channel: i64, time: DateTime<Utc>) {
@@ -321,4 +321,66 @@ pub(crate) async fn attempt_turn(player: i64, channel: i64, time: DateTime<Utc>)
         .fetch_one(&mut conn)
         .await?;
     println!("Row: {:?}", game_id);
+}
+
+#[derive(Error, Debug)]
+pub(crate) enum InferenceError {
+    #[error("no game found")]
+    NoGame,
+    #[error("sqlx error: {0}")]
+    SqlxError(#[from] ::sqlx::Error),
+}
+
+/// Attempt to use available information to figure out
+/// which game a user is trying to manipulate.
+///
+/// Take care not to give this information that would
+/// produce surprising results for the user.
+// This may want to take a transaction parameter.
+pub(crate) async fn infer_game(
+    guild_id: i64,
+    channel_id: Option<i64>,
+    game_name: Option<String>,
+) -> Result<i64, InferenceError> {
+    let mut conn = POOL.acquire().await?;
+    match game_name {
+        Some(n) => match query!(
+            "SELECT ID FROM Games WHERE ServerID = ? AND GameName = ?",
+            guild_id,
+            n
+        )
+        .fetch_one(&mut conn)
+        .await
+        {
+            Ok(x) => Ok(x.ID),
+            Err(sqlx::Error::RowNotFound) => Err(InferenceError::NoGame),
+            Err(e) => Err(e.into()),
+        },
+        None => match (
+            query!("SELECT ID FROM Games WHERE ServerID = ? LIMIT 2", guild_id)
+                .fetch_all(&mut conn)
+                .await,
+            channel_id,
+        ) {
+            (Ok(games), _) if games.len() == 1 => Ok(games[0].ID),
+            // attempt channel inference if available
+            (Ok(games), Some(chan)) => {
+                struct Channel {
+                    GameID: Option<i64>,
+                }
+                match query_as!(Channel, "SELECT GameID FROM Channels WHERE ID = ?", chan)
+                    .fetch_one(&mut conn)
+                    .await
+                {
+                    Ok(Channel { GameID: Some(x) }) => Ok(x),
+                    Ok(_) => Err(InferenceError::NoGame),
+                    Err(sqlx::Error::RowNotFound) => Err(InferenceError::NoGame),
+                    Err(e) => Err(e.into()),
+                }
+            }
+            (Ok(games), None) => Err(InferenceError::NoGame),
+            (Err(sqlx::Error::RowNotFound), _) => Err(InferenceError::NoGame),
+            (Err(e), _) => Err(e.into()),
+        },
+    }
 }

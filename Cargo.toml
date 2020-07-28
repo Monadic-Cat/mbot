@@ -19,6 +19,7 @@ indexmap = "1.4"
 log = "0.4.8"
 foretry = { path = "/home/jmn/Projects/mprojects/foretry" }
 env_logger = "0.7"
+comfy-table = { version = "1", optional = true }
 [dependencies.sqlx]
 git = "https://github.com/launchbadge/sqlx.git"
 default-features = false
@@ -28,7 +29,7 @@ optional = true
 [features]
 default = ["bot_commands", "turns_db"]
 bot_commands = []
-turns_db = ["sqlx", "fehler"]
+turns_db = ["sqlx", "fehler", "comfy-table"]
 control_socket = []
 
 # I believe some parts of the `cli_control` feature may violate

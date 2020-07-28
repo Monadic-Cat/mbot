@@ -224,13 +224,14 @@ async fn in_dev_server(
     _: &mut Args,
     opts: &CommandOptions,
 ) -> CheckResult {
-    if msg.guild_id == Some(GuildId(579886740097990657)) {
-        CheckResult::Success
-    } else {
-        CheckResult::Failure(Reason::Log(format!(
+    match msg.guild_id {
+        Some(GuildId(579886740097990657)) | Some(GuildId(695085554940772432)) => {
+            CheckResult::Success
+        }
+        _ => CheckResult::Failure(Reason::Log(format!(
             "attempted to use {} outside dev server",
             opts.names[0]
-        )))
+        ))),
     }
 }
 
@@ -248,7 +249,10 @@ struct Green;
 #[max_args(1)]
 #[aliases("start_game", "sg")]
 async fn gm_start_game(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    use sqlx::{query, query_as, Done};
+    use sqlx::{
+        query,
+        query_as, // Done
+    };
     let guild_id = msg.guild_id.unwrap().0 as i64; // only_in(guilds)
     let player_id = msg.author.id.0 as i64;
     let game_name: Option<String> = args.single().ok();
@@ -257,6 +261,7 @@ async fn gm_start_game(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
         .execute(&mut transaction)
         .await;
     struct GameID {
+        #[allow(non_snake_case)]
         ID: i64,
     }
     // Unfortunately, SQLite (and many others) treat NULLs as distinct from each other.
@@ -310,8 +315,32 @@ async fn gm_start_game(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
 #[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
-async fn list_games(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
-    unimplemented!()
+#[aliases("list_games", "lg")]
+async fn gm_list_games(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
+    use sqlx::query;
+    let guild_id = msg.guild_id.unwrap().0 as i64;
+    let mut connection = POOL.acquire().await?;
+    let games = match query!("SELECT * FROM Games where ServerID = ?", guild_id)
+        .fetch_all(&mut connection)
+        .await
+    {
+        Ok(x) => x,
+        Err(e) => {
+            log::error!("sqlx: {}", e);
+            return Err(e.into());
+        }
+    };
+    use comfy_table::Table;
+    let mut table = Table::new();
+    table.set_header(vec!["Game ID", "Game Name"]);
+    table.force_no_tty();
+    for x in games.into_iter() {
+        table.add_row(vec![
+            format!("{}", x.ID),
+            x.GameName.map_or(String::new(), |n| format!("{}", n)),
+        ]);
+    }
+    reply(ctx, msg, &format!("```{}```", table)).await
 }
 
 #[cfg(feature = "turns_db")]
@@ -365,14 +394,55 @@ async fn gm_manage_channel(ctx: &Context, msg: &Message, mut args: Args) -> Comm
 #[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
-#[num_args(1)]
+#[min_args(1)]
+#[max_args(2)]
 #[aliases("add_player", "ap")]
 async fn gm_add_player(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let user = args.single()?;
-    match turns::add_player(msg.guild_id.unwrap(), user) {
-        Ok(()) => reply(ctx, msg, "added player").await,
-        Err(e) => reply(ctx, msg, &format!("{}", e)).await,
+    use foretry::async_try;
+    use sqlx::query;
+    use thiserror::Error;
+    let guild_id = msg.guild_id.unwrap().0 as i64;
+    let user = args.single::<serenity::model::id::UserId>()?.0 as i64;
+    let game_name: Option<String> = match args.current() {
+        Some(x) => {
+            let a = Some(x.parse()?);
+            args.advance();
+            a
+        }
+        None => None,
+    };
+    let mut transaction = POOL.begin().await?;
+    let game_id: i64 =
+        match turns::infer_game(guild_id, Some(msg.channel_id.0 as i64), game_name).await {
+            Ok(x) => x,
+            Err(turns::InferenceError::NoGame) => return reply(ctx, msg, "no game found.").await,
+            Err(turns::InferenceError::SqlxError(e)) => return Ok(log::error!("sqlx: {}", e)),
+        };
+    match query!(
+        "INSERT INTO Players (ID, GameID) VALUES (?, ?)",
+        user,
+        game_id
+    )
+    .execute(&mut transaction)
+    .await
+    {
+        Ok(_) => reply(ctx, msg, "added player").await?,
+        // https://sqlite.org/rescode.html#constraint
+        // Search "1555". That's the SQLite extended error code for violating
+        // the uniqueness constraint here.
+        Err(sqlx::Error::Database(e)) if e.code() == Some("1555".into()) => {
+            reply(ctx, msg, "player already added").await?
+        }
+        Err(e) => {
+            log::error!("sqlx: {}", e);
+            return Err(e.into());
+        }
+    };
+    match transaction.commit().await {
+        Ok(_) => (),
+        Err(e) => log::error!("sqlx: {}", e),
     }
+    Ok(())
 }
 #[cfg(feature = "turns_db")]
 #[command]
@@ -435,6 +505,7 @@ async fn player_notify(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
 #[prefix("gm")]
 #[commands(
     gm_start_game,
+    gm_list_games,
     gm_manage_channel,
     gm_add_player,
     gm_extend_turn,
@@ -519,8 +590,6 @@ impl EventHandler for Handler {
     // for turn tracking
     #[cfg(feature = "turns_db")]
     async fn message(&self, ctx: Context, msg: Message) {
-        use foretry::{async_try, try_block};
-        use sqlx::query;
         let guild_id = msg.guild_id.unwrap().0 as i64;
         match turns::attempt_turn(
             msg.author.id.0 as i64,
@@ -542,6 +611,7 @@ impl EventHandler for Handler {
                 },
                 None => log::error!("{}", e),
             },
+            // TODO: suppress SQLx errors from when we don't find a server/game/channel
             Err(turns::TurnError::SqlxError(e)) => log::error!("sqlx: {}", e),
         }
     }
@@ -585,7 +655,7 @@ const TOKEN_NAME: &str = "MBOT_TOKEN";
 const TOKEN: &str = env!("MBOT_TOKEN");
 
 #[cfg(feature = "turns_db")]
-use sqlx::{SqliteConnection, SqlitePool};
+use sqlx::SqlitePool;
 
 #[cfg(feature = "turns_db")]
 use once_cell::sync::Lazy;
