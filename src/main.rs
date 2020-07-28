@@ -244,29 +244,74 @@ struct Green;
 #[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
+#[min_args(0)]
+#[max_args(1)]
 #[aliases("start_game", "sg")]
-async fn gm_start_game(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
-    use sqlx::{query, Done};
-    let guild_id = match msg.guild_id {
-        Some(x) => x.0 as i64,
-        None => {
-            return reply(ctx, msg, "no").await;
-        },
-    };
+async fn gm_start_game(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    use sqlx::{query, query_as, Done};
+    let guild_id = msg.guild_id.unwrap().0 as i64; // only_in(guilds)
     let player_id = msg.author.id.0 as i64;
+    let game_name: Option<String> = args.single().ok();
     let mut transaction = POOL.begin().await?;
-    query!("INSERT INTO Servers (ID) VALUES (?)", guild_id).execute(&mut transaction).await;
-    match query!("SELECT ID FROM Games WHERE ServerID = ?", guild_id).fetch_one(&mut transaction).await {
+    query!("INSERT INTO Servers (ID) VALUES (?)", guild_id)
+        .execute(&mut transaction)
+        .await;
+    struct GameID {
+        ID: i64,
+    }
+    // Unfortunately, SQLite (and many others) treat NULLs as distinct from each other.
+    // Our UNIQUE constraint does not prevent inserting multiple rows with the same
+    // ServerID and NULL GameName.
+    // See https://www.sqlite.org/nulls.html for more information.
+    // So, we enforce it here.
+    // We will also need to enforce it for any game renaming functionality
+    // we provide.
+    let preexisting = match game_name {
+        Some(ref name) => {
+            query_as!(
+                GameID,
+                "SELECT ID FROM Games WHERE ServerID = ? AND GameName = ?",
+                guild_id,
+                name
+            )
+            .fetch_one(&mut transaction)
+            .await
+        }
+        None => {
+            query_as!(
+                GameID,
+                "SELECT ID FROM Games WHERE ServerID = ? AND GameName IS NULL",
+                guild_id
+            )
+            .fetch_one(&mut transaction)
+            .await
+        }
+    };
+    match preexisting {
         Ok(_) => reply(ctx, msg, "game already exists.").await?,
         Err(sqlx::Error::RowNotFound) => {
-            query!("INSERT INTO Games (ServerID, GameMaster)
-                    VALUES (?, ?)", guild_id, player_id).execute(&mut transaction).await?;
+            query!(
+                "INSERT INTO Games (ServerID, GameMaster, GameName)
+                    VALUES (?, ?, ?)",
+                guild_id,
+                player_id,
+                game_name
+            )
+            .execute(&mut transaction)
+            .await?;
             reply(ctx, msg, "successfully created the game!").await?;
-        },
+        }
         Err(e) => return Err(e.into()),
     }
     transaction.commit().await?;
     Ok(())
+}
+
+#[cfg(feature = "turns_db")]
+#[command]
+#[only_in(guilds)]
+async fn list_games(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
+    unimplemented!()
 }
 
 #[cfg(feature = "turns_db")]
@@ -286,15 +331,27 @@ async fn gm_manage_channel(ctx: &Context, msg: &Message, mut args: Args) -> Comm
         }
         None => None,
     };
+    let guild_id = msg.guild_id.unwrap().0 as i64; // only_in(guilds)
     if msg
         .guild(&ctx.cache)
         .await
-        .unwrap() // only_in(guilds)
+        .unwrap()
         .channels
         .contains_key(&channel)
     {
         use sqlx::query;
-        // let game = query!("SELECT GameID FROM Games WHERE ");
+        let mut transaction = POOL.begin().await.unwrap();
+        let game = match query!("SELECT ID FROM Games WHERE ServerID = ? LIMIT 2", guild_id)
+            .fetch_all(&mut transaction)
+            .await
+        {
+            Ok(x) => match x.as_slice() {
+                [x] => x.ID,
+                _ => unimplemented!(), // complain that you weren't specific enough
+            },
+            Err(e) => unimplemented!(), // this server has no games
+        };
+        println!("game: {}", game);
         // query!("INSERT INTO Channels (ID, GameID, ControlState, DefaultGameMode)
         //         VALUES (?, ?, ?, ?) UPSERT");
         match turns::manage_channel(msg.guild_id.unwrap(), channel, control_state, game_mode) {

@@ -6,8 +6,8 @@ PRAGMA foreign_keys = ON;
 INSERT INTO Servers (ID)
 VALUES (695085554940772432); -- The Arrival
 
-INSERT INTO Games (ServerID)
-VALUES (695085554940772432); -- The Arrival's Game
+INSERT INTO Games (ServerID, GameName)
+VALUES (695085554940772432, "ta"); -- The Arrival's Game
 -- SELECT last_insert_rowid()
 -- to get the autoincrement ID
 
