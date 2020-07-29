@@ -21,7 +21,8 @@ foretry = { path = "/home/jmn/Projects/mprojects/foretry" }
 env_logger = "0.7"
 comfy-table = { version = "1", optional = true }
 [dependencies.sqlx]
-git = "https://github.com/launchbadge/sqlx.git"
+git = "https://github.com/Monadic-Cat/sqlx.git"
+branch = "sqlite-code-owo"
 default-features = false
 features = [ "runtime-tokio", "macros", "sqlite" ]
 optional = true

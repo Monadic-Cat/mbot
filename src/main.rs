@@ -430,7 +430,14 @@ async fn gm_add_player(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
         // https://sqlite.org/rescode.html#constraint
         // Search "1555". That's the SQLite extended error code for violating
         // the uniqueness constraint here.
-        Err(sqlx::Error::Database(e)) if e.code() == Some("1555".into()) => {
+        // Considering the sqlstatus codes aren't portable,
+        // I don't mind downcasting to SqliteError here.
+        // Much of the SQL I've been doing isn't portable, anyhow.
+        // If I move to another DB, it will be a chore.
+        // So be it.
+        Err(sqlx::Error::Database(e))
+            if e.downcast_ref::<sqlx::sqlite::SqliteError>().sqlite_code() == 1555 =>
+        {
             reply(ctx, msg, "player already added").await?
         }
         Err(e) => {
