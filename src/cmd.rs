@@ -1,10 +1,4 @@
-use std::io;
-use std::io::{BufRead, Write};
 use mice::unstable::parse::{integer, is_dec_digit};
-use serenity::{
-    model::{channel::Message, gateway::Ready, id::ChannelId},
-    prelude::*,
-};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while1},
@@ -14,6 +8,13 @@ use nom::{
     sequence::tuple,
     IResult,
 };
+use serenity::{
+    model::{channel::Message, gateway::Ready, id::ChannelId},
+    prelude::*,
+};
+use std::io;
+use std::io::{BufRead, Write};
+use std::sync::Arc;
 
 fn whitespace(input: &str) -> IResult<&str, &str> {
     alt((tag(" "), tag("\t"), tag("\n")))(input)
@@ -32,8 +33,8 @@ enum ParseError {
 }
 
 fn parse_command<'a>(input: &'a str) -> Result<Command<'a>, ParseError> {
-    use nom::Err::Failure;
     use nom::error::ErrorKind::TooLarge;
+    use nom::Err::Failure;
     alt((
         |i| {
             let (i, _) = alt((tag("!"), tag("say")))(i)?;
@@ -55,7 +56,9 @@ fn parse_command<'a>(input: &'a str) -> Result<Command<'a>, ParseError> {
             Ok((i, Command::ListGuilds))
         },
         |i| tag("shutdown")(i).map(|(i, _)| (i, Command::Shutdown)),
-    ))(input).map_err(|_| ParseError::InvalidCommand).map(|(_, x)| x)
+    ))(input)
+    .map_err(|_| ParseError::InvalidCommand)
+    .map(|(_, x)| x)
 }
 
 pub(crate) enum Error {
@@ -76,6 +79,30 @@ impl From<ParseError> for Error {
 /// When the `!` type is stabilized, replace this with it.
 pub(crate) enum Never {}
 
+use ::thiserror::Error;
+#[derive(Error, Debug)]
+enum ReadlineError {
+    #[error("{0}")]
+    Join(#[from] ::tokio::task::JoinError),
+    #[error("{0}")]
+    IO(#[from] io::Error),
+}
+
+async fn areadline(stdin: Arc<io::Stdin>) -> Result<String, ReadlineError> {
+    let output: Result<Result<_, io::Error>, _> = ::tokio::task::spawn_blocking(move || {
+        let mut input = String::new();
+        stdin.read_line(&mut input)?;
+        Ok(input)
+    })
+    .await;
+    let output = match output {
+        Ok(Ok(x)) => Ok(x),
+        Ok(Err(e)) => Err(e.into()),
+        Err(e) => Err(e.into()),
+    };
+    output
+}
+
 /// A terminal command loop.
 /// This reads lines from STDIN and acts on them with
 /// the given Serenity context.
@@ -85,27 +112,22 @@ pub(crate) async fn command_loop(ctx: Context, ready: Ready) -> Result<Never, Er
         ($out:ident) => {
             let _ = write!($out, "mbot~$ ");
             let _ = $out.flush();
-        }
+        };
     }
-    let stdin = io::stdin();
+    let stdin = Arc::new(io::stdin());
     let mut stdout = io::stdout();
     let mut current_channel: Option<ChannelId> = None;
 
     prompt!(stdout);
 
-    let readline = || -> Result<String, io::Error> {
-        let mut input = String::new();
-        stdin.read_line(&mut input)?;
-        Ok(input)
-    };
-    while let Ok(line) = readline() {
+    while let Ok(line) = areadline(stdin.clone()).await {
         let cmd = match parse_command(&line) {
             Ok(x) => x,
             Err(_) => {
                 println!("[ERROR]: Invalid Command");
                 prompt!(stdout);
-                continue
-            },
+                continue;
+            }
         };
         match cmd {
             Command::Say(id, text) => {
@@ -113,7 +135,7 @@ pub(crate) async fn command_loop(ctx: Context, ready: Ready) -> Result<Never, Er
                     Ok(_) => (),
                     Err(x) => println!("[ERROR]: {}", x),
                 };
-            },
+            }
             Command::SayImplicitChannel(text) => {
                 if let Some(current_channel) = current_channel {
                     match current_channel.say(&ctx.http, text).await {
@@ -123,23 +145,21 @@ pub(crate) async fn command_loop(ctx: Context, ready: Ready) -> Result<Never, Er
                 } else {
                     println!("[ERROR]: No channel selected!");
                 }
-            },
+            }
             Command::SelectChannel(id) => {
                 current_channel = Some(id);
-            },
+            }
             Command::ListGuilds => {
                 let guilds = ready.user.guilds(&ctx.http).await;
                 match guilds {
                     Ok(x) => {
                         let list = x.into_iter().map(|x| x.name).collect::<Vec<_>>();
                         println!("{:?}", list);
-                    },
+                    }
                     Err(x) => println!("[ERROR]: {:#?}", x),
                 }
-            },
-            Command::Shutdown => {
-                std::process::exit(0)
             }
+            Command::Shutdown => std::process::exit(0),
         };
 
         prompt!(stdout);
