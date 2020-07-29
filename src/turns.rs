@@ -298,6 +298,8 @@ pub(crate) enum TurnError {
     NotInRound(TurnErrInfo),
     #[error("not your turn")]
     WrongTurn(TurnErrInfo),
+    #[error("no game in this channel")]
+    NoGameHere,
     #[error("{0}")]
     SqlxError(#[from] sqlx::Error),
 }
@@ -317,10 +319,15 @@ use sqlx::{query, query_as};
 #[yeets(TurnError)]
 pub(crate) async fn attempt_turn(player: i64, channel: i64, time: DateTime<Utc>) {
     let mut conn = POOL.begin().await?;
-    let game_id = query!("SELECT GameID FROM Channels WHERE ID = ?", channel)
+    let game_id = match query!("SELECT GameID FROM Channels WHERE ID = ?", channel)
         .fetch_one(&mut conn)
-        .await?;
+        .await
+    {
+        Err(sqlx::Error::RowNotFound) => yeet!(TurnError::NoGameHere),
+        x => x?,
+    };
     println!("Row: {:?}", game_id);
+    unimplemented!("actually taking turns, lol")
 }
 
 #[derive(Error, Debug)]

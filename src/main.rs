@@ -618,6 +618,11 @@ impl EventHandler for Handler {
                 },
                 None => log::error!("{}", e),
             },
+            // This isn't really an error.
+            // It's just someone posting in a channel we see that
+            // has no games associated with it.
+            // Therefore, do no response and no logging.
+            Err(turns::TurnError::NoGameHere) => (),
             // TODO: suppress SQLx errors from when we don't find a server/game/channel
             Err(turns::TurnError::SqlxError(e)) => log::error!("sqlx: {}", e),
         }
