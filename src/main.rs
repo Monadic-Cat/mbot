@@ -456,6 +456,10 @@ async fn gm_add_player(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
 #[only_in(guilds)]
 #[aliases("extend_turn", "et")]
 async fn gm_extend_turn(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
+    // This is actually not supported by the DB as is.
+    // This can either be handled by tacking on an extra turn,
+    // or by letting turns span multiple messages.
+    // Neither is completely trivial.
     unimplemented!("turn extensions")
 }
 #[cfg(feature = "turns_db")]
