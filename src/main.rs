@@ -27,8 +27,10 @@ use serenity::{
         gateway::Ready,
         id::{ChannelId, GuildId},
     },
+    client::bridge::gateway::ShardManager,
     prelude::*,
 };
+use std::sync::Arc;
 // use tokio::task;
 
 async fn reply(ctx: &Context, msg: &Message, r: &str) -> CommandResult {
@@ -682,6 +684,22 @@ use once_cell::sync::Lazy;
 /// `SqlitePool` does its own synchronization, and is used via shared references.
 static POOL: Lazy<SqlitePool> = Lazy::new(|| SqlitePool::connect_lazy("sqlite://dev.db").unwrap());
 
+use once_cell::sync::OnceCell;
+static SHARDS: OnceCell<Arc<Mutex<ShardManager>>> = OnceCell::new();
+
+/// Perform a clean shutdown of the process,
+/// closing up outside handles and such before doing so.
+pub(crate) async fn shutdown() {
+    println!("Shutting down...");
+    match SHARDS.get() {
+        Some(shards) => shards.lock().await.shutdown_all().await,
+        None => (),
+    }
+    #[cfg(feature = "turns_db")]
+    POOL.close().await;
+    std::process::exit(0);
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -714,6 +732,8 @@ async fn main() {
     let client = client.framework(StandardFramework::new());
 
     let mut client = client.await.expect("Error starting client.");
+    // We store this because we need it to shut everything down.
+    SHARDS.set(client.shard_manager.clone()).expect("error setting up shutdown handler");
 
     #[cfg(feature = "turns_db")]
     {

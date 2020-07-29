@@ -159,7 +159,7 @@ pub(crate) async fn command_loop(ctx: Context, ready: Ready) -> Result<Never, Er
                     Err(x) => println!("[ERROR]: {:#?}", x),
                 }
             }
-            Command::Shutdown => std::process::exit(0),
+            Command::Shutdown => crate::shutdown().await,
         };
 
         prompt!(stdout);
