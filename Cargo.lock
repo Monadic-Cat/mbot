@@ -498,6 +498,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "foretry"
 version = "0.1.0"
+source = "git+https://github.com/Monadic-Cat/foretry.git#98e17a3f7d9596c1458840af5db609a6809b2eaf"
 dependencies = [
  "foretry-impl",
 ]
@@ -505,6 +506,7 @@ dependencies = [
 [[package]]
 name = "foretry-impl"
 version = "0.1.0"
+source = "git+https://github.com/Monadic-Cat/foretry.git#98e17a3f7d9596c1458840af5db609a6809b2eaf"
 
 [[package]]
 name = "fuchsia-cprng"

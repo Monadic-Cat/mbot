@@ -17,7 +17,7 @@ fehler = { version = "1", optional = true }
 thiserror = "1"
 indexmap = "1.4"
 log = "0.4.8"
-foretry = { path = "/home/jmn/Projects/mprojects/foretry" }
+foretry = { git = "https://github.com/Monadic-Cat/foretry.git" }
 env_logger = "0.7"
 comfy-table = { version = "1", optional = true }
 [dependencies.sqlx]
