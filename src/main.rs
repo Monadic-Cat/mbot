@@ -15,6 +15,12 @@ fn main() {
     let mut a = args();
     a.next();
     let input = a.fold(String::new(), |a, x| a + " " + &x);
-    let result = roll(&input).unwrap();
-    println!("{}", result.format(default_format))
+    let result = match roll(&input) {
+        Ok(x) => x,
+        Err(_) => {
+            println!("That's an invalid dice expression.");
+            ::std::process::exit(1)
+        },
+    };
+    println!("{}", result.format(default_format));
 }
