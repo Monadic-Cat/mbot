@@ -362,6 +362,7 @@ async fn gm_manage_channel(ctx: &Context, msg: &Message, mut args: Args) -> Comm
         }
         None => None,
     };
+    // TODO: take game name argument
     let guild_id = msg.guild_id.unwrap().0 as i64; // only_in(guilds)
     if msg
         .guild(&ctx.cache)
@@ -372,17 +373,8 @@ async fn gm_manage_channel(ctx: &Context, msg: &Message, mut args: Args) -> Comm
     {
         use sqlx::query;
         let mut transaction = POOL.begin().await.unwrap();
-        let game = match query!("SELECT ID FROM Games WHERE ServerID = ? LIMIT 2", guild_id)
-            .fetch_all(&mut transaction)
-            .await
-        {
-            Ok(x) => match x.as_slice() {
-                [x] => x.ID,
-                _ => unimplemented!(), // complain that you weren't specific enough
-            },
-            Err(e) => unimplemented!(), // this server has no games
-        };
-        println!("game: {}", game);
+        let game = turns::infer_game(guild_id, None, None).await;
+        println!("game: {:?}", game);
         // query!("INSERT INTO Channels (ID, GameID, ControlState, DefaultGameMode)
         //         VALUES (?, ?, ?, ?) UPSERT");
         match turns::manage_channel(msg.guild_id.unwrap(), channel, control_state, game_mode) {
