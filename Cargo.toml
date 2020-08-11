@@ -6,12 +6,47 @@ edition = "2018"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-serenity = { git = "https://github.com/Lakelezz/serenity.git", branch = "await", features = ["framework", "standard_framework"] }
+serenity = { git = "https://github.com/acdenisSK/serenity.git", branch = "await_next", features = ["framework", "standard_framework"] }
 tokio = { version = "0.2", features = ["full"] }
 mice = { git = "https://github.com/Monadic-Cat/mice", branch = "unstable-features" }
 nom = "5.0"
 rand = "0.7"
+once_cell = "1.4"
+chrono = "0.4.11"
+fehler = { version = "1", optional = true }
+thiserror = "1"
+indexmap = "1.4"
+log = "0.4.8"
+foretry = { git = "https://github.com/Monadic-Cat/foretry.git" }
+env_logger = "0.7"
+comfy-table = { version = "1", optional = true }
+[dependencies.sqlx]
+git = "https://github.com/Monadic-Cat/sqlx.git"
+branch = "sqlite-code-owo"
+default-features = false
+features = [ "runtime-tokio", "macros", "sqlite" ]
+optional = true
 
 [features]
+default = ["bot_commands", "cli_control"]
+bot_commands = []
+# This feature is incomplete.
+turns_db = ["sqlx", "fehler", "comfy-table"]
+# This feature is incomplete.
+control_socket = []
+
+# I believe some parts of the cli_control feature may violate
+# the Discord Terms of Service, so tread with care.
+# However, configuration at runtime is in no way disallowed,
+# so I believe this feature to have some merit.
+# In addition, this and the pending control_socket feature
+# will likely be the only ways to cleanly shutdown the SQLx
+# database connection pool run by the turns_db feature.
+cli_control = []
 static_token = []
 
+[profile.release]
+# panic = "abort" # Remove some panic unwinding machinery.
+lto = true # Link Time Optimization
+# opt-level = "z" # Optimize for size. Default is "3".
+codegen-units = 1 # Make less parallel permit more optimizations. Default is 16.
