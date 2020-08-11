@@ -28,15 +28,20 @@ features = [ "runtime-tokio", "macros", "sqlite" ]
 optional = true
 
 [features]
-default = ["bot_commands", "turns_db"]
+default = ["bot_commands", "cli_control"]
 bot_commands = []
+# This feature is incomplete.
 turns_db = ["sqlx", "fehler", "comfy-table"]
+# This feature is incomplete.
 control_socket = []
 
-# I believe some parts of the `cli_control` feature may violate
+# I believe some parts of the cli_control feature may violate
 # the Discord Terms of Service, so tread with care.
 # However, configuration at runtime is in no way disallowed,
 # so I believe this feature to have some merit.
+# In addition, this and the pending control_socket feature
+# will likely be the only ways to cleanly shutdown the SQLx
+# database connection pool run by the turns_db feature.
 cli_control = []
 static_token = []
 
