@@ -588,7 +588,10 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
         #[cfg(feature = "cli_control")]
-        command_loop(ctx, ready).await;
+        match command_loop(ctx, ready).await {
+            Ok(_) => (),
+            Err(e) => log::error!("{}", e),
+        }
         #[cfg(feature = "control_socket")]
         control_socket::control_loop("/home/jmn/mbot.socket").await;
     }

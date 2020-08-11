@@ -1,19 +1,16 @@
-use mice::unstable::parse::{integer, is_dec_digit};
+use mice::unstable::parse::is_dec_digit;
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_until, take_while1},
-    character::complete::one_of,
-    combinator::{opt, peek},
-    multi::{many0, many1},
-    sequence::tuple,
+    bytes::complete::{tag, take_while1},
+    multi::many1,
     IResult,
 };
 use serenity::{
-    model::{channel::Message, gateway::Ready, id::ChannelId},
+    model::{gateway::Ready, id::ChannelId},
     prelude::*,
 };
 use std::io;
-use std::io::{BufRead, Write};
+use std::io::Write;
 use std::sync::Arc;
 
 fn whitespace(input: &str) -> IResult<&str, &str> {
@@ -21,7 +18,7 @@ fn whitespace(input: &str) -> IResult<&str, &str> {
 }
 
 enum Command<'a> {
-    Say(ChannelId, &'a str),
+    // Say(ChannelId, &'a str),
     SayImplicitChannel(&'a str),
     SelectChannel(ChannelId),
     ListGuilds,
@@ -60,9 +57,12 @@ fn parse_command<'a>(input: &'a str) -> Result<Command<'a>, ParseError> {
     .map_err(|_| ParseError::InvalidCommand)
     .map(|(_, x)| x)
 }
-
+use ::thiserror::Error;
+#[derive(Error, Debug)]
 pub(crate) enum Error {
+    #[error("cmdline io error")]
     IO,
+    #[error("error parsing command")]
     CmdParse,
 }
 impl From<io::Error> for Error {
@@ -79,7 +79,6 @@ impl From<ParseError> for Error {
 /// When the `!` type is stabilized, replace this with it.
 pub(crate) enum Never {}
 
-use ::thiserror::Error;
 #[derive(Error, Debug)]
 enum ReadlineError {
     #[error("{0}")]
@@ -130,12 +129,12 @@ pub(crate) async fn command_loop(ctx: Context, ready: Ready) -> Result<Never, Er
             }
         };
         match cmd {
-            Command::Say(id, text) => {
-                match id.say(&ctx.http, text).await {
-                    Ok(_) => (),
-                    Err(x) => println!("[ERROR]: {}", x),
-                };
-            }
+            // Command::Say(id, text) => {
+            //     match id.say(&ctx.http, text).await {
+            //         Ok(_) => (),
+            //         Err(x) => println!("[ERROR]: {}", x),
+            //     };
+            // }
             Command::SayImplicitChannel(text) => {
                 if let Some(current_channel) = current_channel {
                     match current_channel.say(&ctx.http, text).await {
