@@ -1,4 +1,3 @@
-use mice::unstable::parse::is_dec_digit;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
@@ -41,7 +40,7 @@ fn parse_command<'a>(input: &'a str) -> Result<Command<'a>, ParseError> {
         |i| {
             let (i, _) = tag("select")(i)?;
             let (i, _) = many1(whitespace)(i)?;
-            let (i, s) = take_while1(is_dec_digit)(i)?;
+            let (i, s) = take_while1(|c: char| c.is_digit(10))(i)?;
             let n = match s.parse::<u64>() {
                 Ok(x) => ChannelId(x),
                 Err(_) => Err(Failure((i, TooLarge)))?,
