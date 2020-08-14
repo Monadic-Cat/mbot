@@ -982,23 +982,12 @@ checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 
 [[package]]
 name = "mice"
-version = "0.7.0"
-source = "git+https://github.com/Monadic-Cat/mice?branch=unstable-features#0a22cdd7269a460aa29cb56303c10100528af035"
+version = "0.8.0"
+source = "git+https://github.com/Monadic-Cat/mice?branch=rework#425355c63a72b83b8bfee815a2eb6e043fc4a05b"
 dependencies = [
- "mice-macro-lib",
  "nom",
  "rand 0.7.3",
  "thiserror",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "mice-macro-lib"
-version = "0.1.0"
-source = "git+https://github.com/Monadic-Cat/mice?branch=unstable-features#0a22cdd7269a460aa29cb56303c10100528af035"
-dependencies = [
- "quote",
- "syn",
 ]
 
 [[package]]

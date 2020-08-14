@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 use mice::FormatOptions as MiceFormat;
+use ::mice::util::ExpressionExt;
 mod initiative;
 use initiative::pathfinder_initiative;
 #[cfg(feature = "cli_control")]
@@ -89,21 +90,31 @@ fn format_smart(exp: mice::ExpressionResult) -> String {
 
 #[derive(Debug)]
 enum MaybeReasonedDice {
-    Reasoned(Vec<mice::unstable::parse::Expr>),
-    Unreasoned(Vec<mice::unstable::parse::Expr>),
+    Reasoned(mice::parse::Expression),
+    Unreasoned(mice::parse::Expression),
 }
 
-fn reasoned_dice(input: &str) -> nom::IResult<&str, MaybeReasonedDice> {
-    use mice::unstable::parse;
+macro_rules! tript {
+    ($tup:expr) => {
+        match $tup {
+            Ok((i, Ok(x))) => (i, x),
+            Ok((i, Err(e))) => return Ok((i, Err(e))),
+            Err(e) => return Err(e),
+        }
+    }
+}
+
+fn reasoned_dice(input: &str) -> nom::IResult<&str, Result<MaybeReasonedDice, mice::parse::InvalidDie>> {
+    use mice::parse;
     use nom::{branch::alt, bytes::complete::tag, multi::many1};
-    let (i, dice) = parse::dice(input)?;
+    let (i, dice) = tript!(parse::dice(input));
     let a = many1(parse::whitespace)(i).and_then(|(i, _)| {
         let _ = alt((tag("to"), tag("for"), tag("because"), tag("#")))(i)?;
         Ok((i, ()))
     });
     match a {
-        Ok((i, _)) => Ok((i, MaybeReasonedDice::Reasoned(dice))),
-        Err(_) => Ok((i, MaybeReasonedDice::Unreasoned(dice))),
+        Ok((i, _)) => Ok((i, Ok(MaybeReasonedDice::Reasoned(dice)))),
+        Err(_) => Ok((i, Ok(MaybeReasonedDice::Unreasoned(dice)))),
     }
 }
 
@@ -112,13 +123,21 @@ const ROLL_CAP: i64 = 10000;
 #[command]
 #[aliases("r")]
 async fn roll(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
-    use mice::unstable::util::roll_exp_capped;
-    match reasoned_dice(arg.message()) {
+    let dice = match reasoned_dice(arg.message()) {
+        Ok((_, Err(e))) => return reply(ctx, msg, &format!("{}", e)).await,
+        Ok((i, Ok(x))) => Ok((i, x)),
+        Err(e) => Err(e),
+    };
+    match dice {
         Ok((reason, MaybeReasonedDice::Reasoned(dice))) => {
             if reason.len() > MAX_REPLY_LENGTH {
                 reply(ctx, msg, "reason given is too long.").await
             } else {
-                let res = roll_exp_capped(dice, ROLL_CAP);
+                let res = if !dice.exceeds_cap(ROLL_CAP) {
+                    dice.roll()
+                } else {
+                    return reply(ctx, msg, "tried to DOS me.").await
+                };
                 match res {
                     Ok(x) => {
                         let dice_msg = format_smart(x);
@@ -138,7 +157,11 @@ async fn roll(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
             if post_text.trim() != "" {
                 reply(ctx, msg, "you've specified an invalid dice expression").await
             } else {
-                let res = roll_exp_capped(dice, ROLL_CAP);
+                let res = if !dice.exceeds_cap(ROLL_CAP) {
+                    dice.roll()
+                } else {
+                    return reply(ctx, msg, "tried to DOS me.").await
+                };
                 match res {
                     Ok(x) => reply(ctx, msg, &format!("{}", format_smart(x))).await,
                     Err(x) => reply(ctx, msg, &format!("{}", x)).await,

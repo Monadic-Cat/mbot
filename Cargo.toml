@@ -8,7 +8,7 @@ license = "AGPL-3.0-or-later"
 [dependencies]
 serenity = { git = "https://github.com/acdenisSK/serenity.git", branch = "await_next", features = ["framework", "standard_framework"] }
 tokio = { version = "0.2", features = ["full"] }
-mice = { git = "https://github.com/Monadic-Cat/mice", branch = "unstable-features" }
+mice = { git = "https://github.com/Monadic-Cat/mice", branch = "rework" }
 nom = "5.0"
 rand = "0.7"
 once_cell = "1.4"

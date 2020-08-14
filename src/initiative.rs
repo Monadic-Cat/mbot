@@ -1,4 +1,4 @@
-use mice::unstable::parse::{integer, operator, whitespace, Sign};
+use mice::parse::{integer, sign, whitespace, Sign};
 use nom::{
     bytes::complete::{tag, take_while1},
     combinator::opt,
@@ -34,7 +34,7 @@ fn char_entry(input: &str) -> IResult<&str, Entry> {
         char_name,
         tag(","),
         many0(whitespace),
-        opt(operator),
+        opt(sign),
         integer,
     ))(input)?;
     let sign = if let Some(x) = sign {
