@@ -46,6 +46,14 @@ enum InternalError {
     FromUtf8(#[from] FromUtf8Error),
 }
 
+// Shutdown Behavior:
+//  1. Stop accepting new connections to the control socket.
+//  2. Finalize all existing connections to the control socket.
+//  3. Shutdown all Discord Shards.
+//  4. Close SQLx connection pool.
+//    a. Stop accepting new connections.
+//    b. Finalize all existing connections.
+//  5. Exit the process.
 pub(crate) async fn control_loop<T: AsRef<Path>>(p: T) -> Result<(), io::Error> {
     let mut listener = DropSocket::bind(p)?;
     println!("Heya");
