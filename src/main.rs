@@ -3,6 +3,7 @@ use mice::FormatOptions as MiceFormat;
 use ::mice::util::ExpressionExt;
 mod initiative;
 use initiative::pathfinder_initiative;
+mod internal_rolls;
 #[cfg(feature = "cli_control")]
 mod cmd;
 #[cfg(feature = "cli_control")]
