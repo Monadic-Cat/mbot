@@ -39,6 +39,13 @@ impl ParsedMessage {
     }
 }
 
+/// Create right shifted valid UTF-8 slice reference.
+fn shrunk_slice(input: &str) -> Option<&str> {
+    let mut iter = input.char_indices();
+    iter.next();
+    iter.next().map(|(idx, _)| &input[idx..])
+}
+
 /// *All* messages are valid.
 ///
 /// *Some* messages contain rolls for us to handle.
@@ -59,18 +66,17 @@ pub(crate) fn message(input: &str) -> ParsedMessage {
             // The current place is not a syntactically valid internal roll command.
             // That does not make this message invalid.
             // Just move forward one step.
-            // Note that this can panic by creating an invalid UTF-8 slice.
-            // We should probably change the dice parsers,
-            // which do not inherently require valid UTF-8 input.
-            // That change would essentially be the replacement of
-            // `&str` with `&[u8]` in a number of places.
-            // It may also be useful to make an iterator
-            // for the creation of shrinking slices across our input.
             Err(::nom::Err::Failure((_, ::nom::error::ErrorKind::TooLarge))) => {
-                place = &place[1..];
                 info.rolls.push(Err(InvalidDie));
+                place = match shrunk_slice(place) {
+                    Some(x) => x,
+                    None => break,
+                };
             },
-            _ => place = &place[1..],
+            _ => place = match shrunk_slice(place) {
+                Some(x) => x,
+                None => break,
+            },
         }
     }
     info
