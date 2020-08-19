@@ -28,12 +28,13 @@ features = [ "runtime-tokio", "macros", "sqlite" ]
 optional = true
 
 [features]
-default = ["bot_commands", "cli_control"]
+default = ["bot_commands", "cli_control", "internal_rolls"]
 bot_commands = []
 # This feature is incomplete.
 turns_db = ["sqlx", "fehler", "comfy-table"]
 # This feature is incomplete.
 control_socket = []
+internal_rolls  = []
 
 # I believe some parts of the cli_control feature may violate
 # the Discord Terms of Service, so tread with care.
