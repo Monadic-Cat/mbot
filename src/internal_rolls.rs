@@ -16,25 +16,13 @@ fn internal_roll(input: &str) -> IResult<&str, Result<Expression, InvalidDie>> {
 }
 
 #[derive(Debug)]
-struct FoundRolls {
-    rolls: Vec<Result<Expression, InvalidDie>>,
-}
-impl FoundRolls {
-    fn new() -> Self {
-        Self { rolls: Vec::new() }
-    }
-    fn push(&mut self, val: Result<Expression, InvalidDie>) {
-        self.rolls.push(val)
-    }
-}
-#[derive(Debug)]
 pub(crate) struct ParsedMessage {
-    rolls: FoundRolls,
+    rolls: Vec<Result<Expression, InvalidDie>>,
 }
 impl ParsedMessage {
     fn new() -> Self {
         Self {
-            rolls: FoundRolls::new(),
+            rolls: Vec::new(),
         }
     }
 }
