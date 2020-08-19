@@ -3,6 +3,8 @@ use mice::FormatOptions as MiceFormat;
 use ::mice::util::ExpressionExt;
 mod initiative;
 use initiative::pathfinder_initiative;
+#[cfg(feature = "internal_rolls")]
+mod internal_rolls;
 #[cfg(feature = "cli_control")]
 mod cmd;
 #[cfg(feature = "cli_control")]
@@ -618,37 +620,45 @@ impl EventHandler for Handler {
         #[cfg(feature = "control_socket")]
         control_socket::control_loop("/home/jmn/mbot.socket").await;
     }
-    // for turn tracking
-    #[cfg(feature = "turns_db")]
+    #[cfg(any(feature = "internal_rolls", feature = "turns_db"))]
     async fn message(&self, ctx: Context, msg: Message) {
-        let guild_id = msg.guild_id.unwrap().0 as i64;
-        match turns::attempt_turn(
-            msg.author.id.0 as i64,
-            msg.channel_id.0 as i64,
-            msg.timestamp.into(),
-        )
-        .await
-        {
-            Ok(_) => (),
-            Err(e @ turns::TurnError::NotInGame(_))
-            | Err(e @ turns::TurnError::NotInRound(_))
-            | Err(e @ turns::TurnError::WrongTurn(_)) => match e.notify_channel() {
-                Some(c) => match c
-                    .say(ctx.http, format!("{}: {}", msg.author.mention(), e))
-                    .await
-                {
-                    Ok(_) => (),
-                    Err(e2) => log::error!("{} AFTER {}", e2, e),
-                },
-                None => log::error!("{}", e),
-            },
-            // This isn't really an error.
-            // It's just someone posting in a channel we see that
-            // has no games associated with it.
-            // Therefore, do no response and no logging.
-            Err(turns::TurnError::NoGameHere) => (),
-            // TODO: suppress SQLx errors from when we don't find a server/game/channel
-            Err(turns::TurnError::SqlxError(e)) => log::error!("sqlx: {}", e),
+        #[cfg(feature = "internal_rolls")] {
+            match internal_rolls::response_for(&msg.content) {
+                Some(x) => { reply(&ctx, &msg, &format!("\n{}", x)).await; },
+                None => (),
+            }
+        }
+        // for turn tracking
+        #[cfg(feature = "turns_db")] {
+            let guild_id = msg.guild_id.unwrap().0 as i64;
+            match turns::attempt_turn(
+                msg.author.id.0 as i64,
+                msg.channel_id.0 as i64,
+                msg.timestamp.into(),
+            )
+                .await
+            {
+                Ok(_) => (),
+                Err(e @ turns::TurnError::NotInGame(_))
+                    | Err(e @ turns::TurnError::NotInRound(_))
+                    | Err(e @ turns::TurnError::WrongTurn(_)) => match e.notify_channel() {
+                        Some(c) => match c
+                            .say(ctx.http, format!("{}: {}", msg.author.mention(), e))
+                            .await
+                        {
+                            Ok(_) => (),
+                            Err(e2) => log::error!("{} AFTER {}", e2, e),
+                        },
+                        None => log::error!("{}", e),
+                    },
+                // This isn't really an error.
+                // It's just someone posting in a channel we see that
+                // has no games associated with it.
+                // Therefore, do no response and no logging.
+                Err(turns::TurnError::NoGameHere) => (),
+                // TODO: suppress SQLx errors from when we don't find a server/game/channel
+                Err(turns::TurnError::SqlxError(e)) => log::error!("sqlx: {}", e),
+            }
         }
     }
     // for turn tracking

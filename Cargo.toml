@@ -6,7 +6,7 @@ edition = "2018"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-serenity = { git = "https://github.com/acdenisSK/serenity.git", branch = "await_next", features = ["framework", "standard_framework"] }
+serenity = { git = "https://github.com/serenity-rs/serenity", branch = "current", features = ["framework", "standard_framework"] }
 tokio = { version = "0.2", features = ["full"] }
 mice = { git = "https://github.com/Monadic-Cat/mice", branch = "rework" }
 nom = "5.0"
@@ -28,12 +28,13 @@ features = [ "runtime-tokio", "macros", "sqlite" ]
 optional = true
 
 [features]
-default = ["bot_commands", "cli_control"]
+default = ["bot_commands", "cli_control", "internal_rolls"]
 bot_commands = []
 # This feature is incomplete.
 turns_db = ["sqlx", "fehler", "comfy-table"]
 # This feature is incomplete.
 control_socket = []
+internal_rolls  = []
 
 # I believe some parts of the cli_control feature may violate
 # the Discord Terms of Service, so tread with care.
