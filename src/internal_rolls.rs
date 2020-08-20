@@ -2,7 +2,7 @@
 //! 
 //! in the form of "...normal text...(roll: &lt;dice expression>)...normal text..."
 use ::mice::parse::{dice, whitespace, Expression, InvalidDie};
-use ::mice::ExpressionResult;
+use ::mice::{ExpressionResult, FormatOptions};
 use ::nom::{bytes::complete::tag, multi::many0, sequence::tuple, IResult};
 
 fn internal_roll(input: &str) -> IResult<&str, Result<Expression, InvalidDie>> {
@@ -81,7 +81,7 @@ pub(crate) fn response_for(input: &str) -> Option<String> {
                 Err(InvalidDie) => Err(::mice::Error::InvalidDie),
             }).collect();
         Some(results.into_iter().map(|x| match x {
-            Ok(x) => format!("{}", x),
+            Ok(x) => x.format(FormatOptions::new().total_right()),
             Err(e) => format!("{}", e),
         }).collect::<Vec<_>>().join("\n"))
     } else {
