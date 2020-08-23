@@ -955,8 +955,8 @@ checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 
 [[package]]
 name = "mice"
-version = "0.8.0"
-source = "git+https://github.com/Monadic-Cat/mice?branch=rework#5294530b4eaa95f684cf66519834f6d07b959294"
+version = "0.9.0"
+source = "git+https://github.com/Monadic-Cat/mice#264dd2d713e232709588bac3ad3ffef0aeb7eb2c"
 dependencies = [
  "nom",
  "rand 0.7.3",

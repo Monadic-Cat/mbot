@@ -3,11 +3,11 @@
 //! in the form of "...normal text...(roll: &lt;dice expression>)...normal text..."
 use ::mice::parse::{dice, whitespace, Expression, InvalidDie};
 use ::mice::{ExpressionResult, FormatOptions};
-use ::nom::{bytes::complete::tag, multi::many0, sequence::tuple, IResult};
+use ::nom::{bytes::complete::tag, multi::many0, sequence::tuple, branch::alt, IResult};
 
 fn internal_roll(input: &str) -> IResult<&str, Result<Expression, InvalidDie>> {
     let (input, (_, _, res, _, _)) = tuple((
-        tag("(roll:"),
+        alt((tag("(roll:"), tag("(r:"))),
         many0(whitespace),
         dice,
         many0(whitespace),
