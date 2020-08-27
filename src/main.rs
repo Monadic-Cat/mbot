@@ -1,4 +1,3 @@
-#![feature(or_patterns)]
 #![forbid(unsafe_code)]
 use mice::FormatOptions as MiceFormat;
 use ::mice::util::ExpressionExt;
