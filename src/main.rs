@@ -717,6 +717,7 @@ static SHARDS: OnceCell<Arc<Mutex<ShardManager>>> = OnceCell::new();
 
 /// Perform a clean shutdown of the process,
 /// closing up outside handles and such before doing so.
+#[cfg(any(feature = "cli_control", feature = "control_socket"))]
 pub(crate) async fn shutdown() {
     println!("Shutting down...");
     match SHARDS.get() {
