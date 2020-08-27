@@ -1,3 +1,4 @@
+#![feature(or_patterns)]
 #![forbid(unsafe_code)]
 use mice::FormatOptions as MiceFormat;
 use ::mice::util::ExpressionExt;
@@ -624,7 +625,10 @@ impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         #[cfg(feature = "internal_rolls")] {
             match internal_rolls::response_for(&msg.content) {
-                Some(x) => { reply(&ctx, &msg, &format!("\n{}", x)).await; },
+                Some(x) => match reply(&ctx, &msg, &format!("\n{}", x)).await {
+                    Ok(()) => (),
+                    Err(e) => log::error!("{}", e),
+                },
                 None => (),
             }
         }

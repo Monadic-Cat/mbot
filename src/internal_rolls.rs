@@ -4,6 +4,7 @@
 use ::mice::parse::{dice, whitespace, Expression, InvalidDie};
 use ::mice::{ExpressionResult, FormatOptions};
 use ::nom::{bytes::complete::tag, multi::many0, sequence::tuple, branch::alt, IResult};
+use pulldown_cmark as cmark;
 
 fn internal_roll(input: &str) -> IResult<&str, Result<Expression, InvalidDie>> {
     let (input, (_, _, res, _, _)) = tuple((
@@ -35,37 +36,67 @@ fn shrunk_slice(input: &str) -> Option<&str> {
     iter.next().map(|(idx, _)| &input[idx..])
 }
 
+#[derive(Clone, Copy)]
+enum ParseState {
+    Normal,
+    InCodeBlock,
+}
+
 /// *All* messages are valid.
 ///
 /// *Some* messages contain rolls for us to handle.
 ///
 /// *Some* messages contain syntactically valid rolls that have no valid evaluation tactic.
 pub(crate) fn message(input: &str) -> ParsedMessage {
-    // Time to scroll across the thing uwu
-    let mut place = input;
     let mut info = ParsedMessage::new();
-    while place.len() > 1 {
-        match internal_roll(place) {
-            // The current place is a valid internal roll command.
-            // Store the parsed result of that, and scroll past.
-            Ok((input, res)) => {
-                info.rolls.push(res);
-                place = input;
-            }
-            // The current place is not a syntactically valid internal roll command.
-            // That does not make this message invalid.
-            // Just move forward one step.
-            Err(::nom::Err::Failure((_, ::nom::error::ErrorKind::TooLarge))) => {
-                info.rolls.push(Err(InvalidDie));
-                place = match shrunk_slice(place) {
+    let mut paragraph = |mut place: &str| {
+        // Time to scroll across the thing uwu
+        while place.len() > 1 {
+            match internal_roll(place) {
+                // The current place is a valid internal roll command.
+                // Store the parsed result of that, and scroll past.
+                Ok((input, res)) => {
+                    info.rolls.push(res);
+                    place = input;
+                }
+                // The current place is not a syntactically valid internal roll command.
+                // That does not make this message invalid.
+                // Just move forward one step.
+
+                // For this particular case, it would make sense to scroll all the way to the end,
+                // but mice::dice backs out early from dice expressions like this.
+                // Considering all the work it does to construct dice when they are valid,
+                // it should actually be faster to scroll one by one across from this loop,
+                // because the tag we use will never show up in a dice expression, so
+                // the parser will back out faster.
+                // (As opposed to making mice::dice more tolerant of these errors.)
+                // If we ever want to report the error in more detail, though,
+                // we'll want to consume the whole thing and keep spans.
+                Err(::nom::Err::Failure((_, ::nom::error::ErrorKind::TooLarge))) => {
+                    info.rolls.push(Err(InvalidDie));
+                    place = match shrunk_slice(place) {
+                        Some(x) => x,
+                        None => break,
+                    };
+                },
+                _ => place = match shrunk_slice(place) {
                     Some(x) => x,
                     None => break,
-                };
-            },
-            _ => place = match shrunk_slice(place) {
-                Some(x) => x,
-                None => break,
-            },
+                },
+            }
+        }
+    };
+    let parser = cmark::Parser::new(input);
+    let mut state = ParseState::Normal;
+    for event in parser {
+        use ParseState::{Normal, InCodeBlock};
+        use cmark::{Event, Tag};
+        match (state, event) {
+            (Normal, Event::Text(text) | Event::Html(text)) => paragraph(&text),
+            (Normal, Event::Code(_)) => (),
+            (Normal, Event::Start(Tag::CodeBlock(_))) => state = InCodeBlock,
+            (InCodeBlock, Event::End(Tag::CodeBlock(_))) => state = Normal,
+            _ => (),
         }
     }
     info
