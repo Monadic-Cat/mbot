@@ -92,7 +92,7 @@ pub(crate) fn message(input: &str) -> ParsedMessage {
         use ParseState::{Normal, InCodeBlock};
         use cmark::{Event, Tag};
         match (state, event) {
-            (Normal, Event::Text(text)) | (Normal, Event::Html(text)) => paragraph(&text),
+            (Normal, Event::Text(text)) => paragraph(&text),
             (Normal, Event::Code(_)) => (),
             (Normal, Event::Start(Tag::CodeBlock(_))) => state = InCodeBlock,
             (InCodeBlock, Event::End(Tag::CodeBlock(_))) => state = Normal,

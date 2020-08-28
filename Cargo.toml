@@ -20,7 +20,7 @@ log = "0.4.8"
 foretry = { git = "https://github.com/Monadic-Cat/foretry.git" }
 env_logger = "0.7"
 comfy-table = { version = "1", optional = true }
-pulldown-cmark = { version = "0.7", optional = true }
+pulldown-cmark = { git = "https://github.com/Monadic-Cat/pulldown-discordmark.git", optional = true }
 [dependencies.sqlx]
 git = "https://github.com/Monadic-Cat/sqlx.git"
 branch = "sqlite-code-owo"
