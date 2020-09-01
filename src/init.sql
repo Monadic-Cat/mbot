@@ -55,7 +55,7 @@ CREATE TABLE Players (
        FOREIGN KEY(GameID) REFERENCES Games(ID) ON DELETE CASCADE
 );
 
--- This is how we'd store channel specific preferences for each players.
+-- This is how we'd store channel specific preferences for each player.
 -- Not needed for anything else, but we can keep it.
 CREATE TABLE ChannelPlayers (
        PlayerID INTEGER NOT NULL,
