@@ -638,8 +638,7 @@ impl EventHandler for Handler {
                 msg.author.id.0 as i64,
                 msg.channel_id.0 as i64,
                 msg.timestamp.into(),
-            )
-                .await
+            ).await
             {
                 Ok(_) => (),
                 Err(e @ turns::TurnError::NotInGame(_))
