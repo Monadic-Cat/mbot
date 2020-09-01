@@ -29,6 +29,7 @@ use serenity::{
         channel::Message,
         gateway::Ready,
         id::{ChannelId, GuildId},
+        guild::{PartialGuild, Guild},
     },
     client::bridge::gateway::ShardManager,
     prelude::*,
@@ -694,6 +695,19 @@ impl EventHandler for Handler {
         } catch (e) {
             log::error!("sqlx error: {}", e);
         }};
+    }
+    #[cfg(feature = "turns_db")]
+    async fn guild_delete(&self, ctx: Context, incomplete: PartialGuild, full: Option<Guild>) {
+        use sqlx::query;
+        use foretry::async_try;
+        let guild_id = incomplete.id.0 as i64;
+        async_try! { _, sqlx::Error | {
+            let mut transaction = POOL.begin().await.unwrap();
+            query!("DELETE FROM Servers WHERE ID = ?", guild_id)
+                .execute(&mut transaction).await.unwrap();
+        } catch (e) {
+            log::error!("sqlx error: {}", e);
+        }}
     }
 }
 
