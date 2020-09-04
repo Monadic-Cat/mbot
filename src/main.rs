@@ -58,6 +58,10 @@ async fn potatoes(ctx: &Context, msg: &Message) -> CommandResult {
     reply(ctx, msg, "tatoes").await
 }
 #[command]
+async fn to(ctx: &Context, msg: &Message) -> CommandResult {
+    reply(ctx, msg, "matoes").await
+}
+#[command]
 async fn happy(ctx: &Context, msg: &Message) -> CommandResult {
     reply(ctx, msg, "La la la la la la! Sing the happy song!").await
 }
