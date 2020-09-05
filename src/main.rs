@@ -270,7 +270,7 @@ async fn in_dev_server(
 #[cfg(feature = "bot_commands")]
 #[group]
 #[commands(
-    ping, potatoes, happy, po, literal, gargamel, roll, pinit, goodnight, fate
+    ping, potatoes, happy, po, to, literal, gargamel, roll, pinit, goodnight, fate
 )]
 struct Green;
 
