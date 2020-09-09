@@ -1,3 +1,5 @@
+//! Masks game specific tools.
+
 use ::serenity::framework::standard::{macros::{command, group}, CommandResult};
 use ::serenity::client::Context;
 use ::serenity::model::channel::Message;
