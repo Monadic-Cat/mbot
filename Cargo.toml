@@ -43,7 +43,6 @@ turns_db = ["sqlx", "fehler", "comfy-table"]
 # This feature is incomplete.
 control_socket = []
 internal_rolls  = ["pulldown-cmark"]
-# This feature is incomplete.
 # This feature implies the bot_commands feature,
 # because all it does is provide bot commands.
 # Integration of some Maddie features.
