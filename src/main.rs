@@ -13,6 +13,9 @@ use cmd::command_loop;
 mod control_socket;
 #[cfg(feature = "turns_db")]
 mod turns;
+#[cfg(feature = "maddie_tools")]
+mod masks;
+
 #[cfg(feature = "turns_db")]
 use serenity::model::{channel::GuildChannel, id::MessageId};
 use serenity::{
@@ -764,6 +767,8 @@ async fn main() {
             .configure(|c| c.prefix("!"))
             .group(&GREEN_GROUP)
             .group(&DMCOMMANDS_GROUP);
+        #[cfg(feature = "maddie_tools")]
+        let f = f.group(&masks::MADDIETOOLS_GROUP);
         #[cfg(feature = "turns_db")]
         {
             f.group(&GMTOOLS_GROUP).group(&PLAYERTOOLS_GROUP)

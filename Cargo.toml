@@ -28,14 +28,28 @@ default-features = false
 features = [ "runtime-tokio", "macros", "sqlite" ]
 optional = true
 
+[build-dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+quote = "1"
+proc-macro2 = "1"
+
 [features]
-default = ["bot_commands", "cli_control", "internal_rolls"]
+default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools"]
 bot_commands = []
 # This feature is incomplete.
 turns_db = ["sqlx", "fehler", "comfy-table"]
 # This feature is incomplete.
 control_socket = []
 internal_rolls  = ["pulldown-cmark"]
+# This feature is incomplete.
+# This feature implies the bot_commands feature,
+# because all it does is provide bot commands.
+# Integration of some Maddie features.
+# In particular, Masks Move commands.
+# Maddie Repo: https://github.com/harkano/maddie
+maddie_tools = ["bot_commands"]
 
 # I believe some parts of the cli_control feature may violate
 # the Discord Terms of Service, so tread with care.

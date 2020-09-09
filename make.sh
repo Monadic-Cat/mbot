@@ -23,6 +23,15 @@ else
     cat "$project_root/src/init.sql" | sqlite3 "$project_root/dev.db"
     
     if [ $# -gt 0 ] ; then
-        cargo $@
+        # This is a maintainer only flag.
+        # I use it to update our version of Maddie's Masks data.
+        # Since it's committed to Git, a regular contributor
+        # doesn't need to worry about this.
+        if [ "$1" = "vendor-data" ] ; then
+            curl "https://raw.githubusercontent.com/harkano/maddie/master/data.json" \
+                 -o "$project_root/data/maddie.json"
+        else
+            cargo $@
+        fi
     fi
 fi
