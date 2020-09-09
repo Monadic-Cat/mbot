@@ -37,6 +37,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b602bfe940d21c130f3895acd65221e8a61270debe89d628b9cb4e3ccb8569b"
+
+[[package]]
 name = "arc-swap"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -939,6 +945,7 @@ checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 name = "mbot"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "comfy-table",
  "env_logger",
@@ -949,8 +956,12 @@ dependencies = [
  "mice",
  "nom",
  "once_cell",
+ "proc-macro2",
  "pulldown-cmark 0.7.2",
+ "quote",
  "rand 0.7.3",
+ "serde",
+ "serde_json",
  "serenity",
  "sqlx",
  "thiserror",
