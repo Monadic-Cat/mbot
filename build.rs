@@ -44,38 +44,18 @@ fn move_command(m: &Move) -> proc_macro2::TokenStream {
     let desc = &m.description;
     let phrase = &m.phrase;
     let capital = &m.capital;
-    let args = match m.needs_roll {
-        true => quote::quote! { , mut args: Args },
-        false => quote::quote! {},
-    };
-    let roll = match m.needs_roll {
+    match m.needs_roll {
         true => quote::quote! {
-            let label: i8 = args.single().unwrap_or(0);
-            let (r1, r2) = {
-                use ::rand::Rng;
-                let mut rng = ::rand::thread_rng();
-                (rng.gen_range(1, 7), rng.gen_range(1, 7))
-            };
-            let rstr = format!("Dice **{}** + **{}**, Label **{}**", r1, r2, label);
-            let rtot = r1 + r2 + label as i16;
+            #[command]
+            async fn #cmd_ident(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+                move_with_roll(ctx, msg, args, #phrase, #desc, #capital).await
+            }
         },
-        false => quote::quote! {},
-    };
-    let dice = match m.needs_roll {
-        true => quote::quote! {.field("Calculation", rstr, false).field("Result", rtot, false)},
-        false => quote::quote! {},
-    };
-    quote::quote! {
-        #[command]
-        async fn #cmd_ident(ctx: &Context, msg: &Message #args) -> CommandResult {
-            let id = msg.channel_id;
-            let author_line = format!("{} {}", msg.author.name, #phrase);
-            #roll
-            let description = format!("**Description**\n{}", #desc);
-            id.send_message(ctx.http.clone(), |m| m.embed(|e| {
-                e.description(description).author(|a| a.name(author_line)).title(#capital) #dice
-            })).await?;
-            Ok(())
+        false => quote::quote! {
+            #[command]
+            async fn #cmd_ident(ctx: &Context, msg: &Message) -> CommandResult {
+                move_without_roll(ctx, msg, #phrase, #desc, #capital).await
+            }
         }
     }
 }
