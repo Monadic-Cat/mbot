@@ -1,4 +1,5 @@
 use ::std::io::Write;
+use ::std::collections::HashMap;
 use serde::Deserialize;
 
 /// A Masks move.
@@ -79,6 +80,17 @@ fn move_command(m: &Move) -> proc_macro2::TokenStream {
     }
 }
 
+fn playbook_command(name: &str, moves: &[&str]) -> proc_macro2::TokenStream {
+    let cmd_ident = quote::format_ident!("{}", name);
+    let msg = moves.join(", ");
+    quote::quote! {
+        #[command]
+        async fn #cmd_ident(ctx: &Context, msg: &Message) -> CommandResult {
+            reply(ctx, msg, #msg).await
+        }
+    }
+}
+
 fn command_group(name: &str, commands: Vec<&str>) -> proc_macro2::TokenStream {
     use ::quote::TokenStreamExt;
     let mut idents = proc_macro2::TokenStream::new();
@@ -97,9 +109,18 @@ fn main() -> anyhow::Result<()> {
     let data: MaddieData = ::serde_json::from_reader(::std::fs::File::open("data/maddie.json")?)?;
     let mut maddie = ::std::fs::File::create(opath)?;
     let mut commands: Vec<&str> = Vec::new();
+    let mut playbook_moves: HashMap<&str, Vec<&str>> = HashMap::new();
     for mv in data.moves.iter() {
         write!(maddie, "{}\n", move_command(mv))?;
         commands.push(&mv.short_name);
+
+        let playbook_entry = playbook_moves.entry(&mv.playbook);
+        let cvec: &mut Vec<&str> = playbook_entry.or_insert(Vec::with_capacity(1));
+        cvec.push(&mv.short_name);
+    }
+    for (playbook, moves) in playbook_moves.iter() {
+        write!(maddie, "{}\n", playbook_command(playbook, moves))?;
+        commands.push(playbook);
     }
     write!(maddie, "{}", command_group("MaddieTools", commands))?;
     Ok(())
