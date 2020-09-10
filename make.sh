@@ -28,7 +28,7 @@ else
         # Since it's committed to Git, a regular contributor
         # doesn't need to worry about this.
         if [ "$1" = "vendor-data" ] ; then
-            curl "https://raw.githubusercontent.com/harkano/maddie/master/data.json" \
+            curl "https://raw.githubusercontent.com/harkano/maddie/master/language_files/en.json" \
                  -o "$project_root/data/maddie.json"
         else
             cargo $@
