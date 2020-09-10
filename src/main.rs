@@ -17,7 +17,7 @@ mod turns;
 mod masks;
 
 #[cfg(feature = "turns_db")]
-use serenity::model::{channel::GuildChannel, id::MessageId};
+use serenity::model::{channel::GuildChannel, id::MessageId, guild::{PartialGuild, Guild}};
 use serenity::{
     framework::standard::{
         macros::{check, command, group},
@@ -32,7 +32,6 @@ use serenity::{
         channel::Message,
         gateway::Ready,
         id::{ChannelId, GuildId},
-        guild::{PartialGuild, Guild},
     },
     client::bridge::gateway::ShardManager,
     prelude::*,
