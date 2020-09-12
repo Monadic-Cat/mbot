@@ -9,6 +9,3 @@ matrix:
   allow_failures:
     - rust: nightly
   fast_finish: true
-env:
-  - RUSTFLAGS=--cfg=mice_semver_exempt
-
