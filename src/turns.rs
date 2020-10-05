@@ -1,3 +1,5 @@
+use crate::reply;
+use crate::IN_DEV_SERVER_CHECK;
 use chrono::{DateTime, Utc};
 /// Rules:
 /// The game is composed of rounds.
@@ -30,11 +32,21 @@ use chrono::{DateTime, Utc};
 /// and some might not. This should be included in the round creation command.
 /// If a round goes STALE, however, such auto creation should be cancelled.
 /// In addition, a notification will be placed in the notifications channel for the game.
-use serenity::model::id::{ChannelId, GuildId, UserId};
 // Trying these out in this module.
 use fehler::{throw as yeet, throws as yeets};
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
+use serenity::{
+    framework::standard::{
+        macros::{command, group},
+        Args, CommandResult,
+    },
+    model::{
+        channel::Message,
+        id::{ChannelId, GuildId, UserId},
+    },
+    prelude::*,
+};
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -391,3 +403,287 @@ pub(crate) async fn infer_game(
         },
     }
 }
+
+#[cfg(feature = "turns_db")]
+#[command]
+#[only_in(guilds)]
+#[min_args(0)]
+#[max_args(1)]
+#[aliases("start_game", "sg")]
+async fn gm_start_game(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    use sqlx::{
+        query,
+        query_as, // Done
+    };
+    let guild_id = msg.guild_id.unwrap().0 as i64; // only_in(guilds)
+    let player_id = msg.author.id.0 as i64;
+    let game_name: Option<String> = args.single().ok();
+    let mut transaction = POOL.begin().await?;
+    query!("INSERT INTO Servers (ID) VALUES (?)", guild_id)
+        .execute(&mut transaction)
+        .await;
+    struct GameID {
+        #[allow(non_snake_case)]
+        ID: i64,
+    }
+    // Unfortunately, SQLite (and many others) treat NULLs as distinct from each other.
+    // Our UNIQUE constraint does not prevent inserting multiple rows with the same
+    // ServerID and NULL GameName.
+    // See https://www.sqlite.org/nulls.html for more information.
+    // So, we enforce it here.
+    // We will also need to enforce it for any game renaming functionality
+    // we provide.
+    let preexisting = match game_name {
+        Some(ref name) => {
+            query_as!(
+                GameID,
+                "SELECT ID FROM Games WHERE ServerID = ? AND GameName = ?",
+                guild_id,
+                name
+            )
+            .fetch_one(&mut transaction)
+            .await
+        }
+        None => {
+            query_as!(
+                GameID,
+                "SELECT ID FROM Games WHERE ServerID = ? AND GameName IS NULL",
+                guild_id
+            )
+            .fetch_one(&mut transaction)
+            .await
+        }
+    };
+    match preexisting {
+        Ok(_) => reply(ctx, msg, "game already exists.").await?,
+        Err(sqlx::Error::RowNotFound) => {
+            query!(
+                "INSERT INTO Games (ServerID, GameMaster, GameName)
+                    VALUES (?, ?, ?)",
+                guild_id,
+                player_id,
+                game_name
+            )
+            .execute(&mut transaction)
+            .await?;
+            reply(ctx, msg, "successfully created the game!").await?;
+        }
+        Err(e) => return Err(e.into()),
+    }
+    transaction.commit().await?;
+    Ok(())
+}
+
+#[cfg(feature = "turns_db")]
+#[command]
+#[only_in(guilds)]
+#[aliases("list_games", "lg")]
+async fn gm_list_games(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
+    use sqlx::query;
+    let guild_id = msg.guild_id.unwrap().0 as i64;
+    let mut connection = POOL.acquire().await?;
+    let games = match query!("SELECT * FROM Games where ServerID = ?", guild_id)
+        .fetch_all(&mut connection)
+        .await
+    {
+        Ok(x) => x,
+        Err(e) => {
+            log::error!("sqlx: {}", e);
+            return Err(e.into());
+        }
+    };
+    use comfy_table::Table;
+    let mut table = Table::new();
+    table.set_header(vec!["Game ID", "Game Name"]);
+    table.force_no_tty();
+    for x in games.into_iter() {
+        table.add_row(vec![
+            format!("{}", x.ID),
+            x.GameName.map_or(String::new(), |n| format!("{}", n)),
+        ]);
+    }
+    reply(ctx, msg, &format!("```{}```", table)).await
+}
+
+#[cfg(feature = "turns_db")]
+#[command]
+#[only_in(guilds)] // some `.unwrap()`s in this function rely on this.
+#[min_args(2)]
+#[max_args(3)]
+#[aliases("manage_channel", "mc")]
+async fn gm_manage_channel(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let channel: ChannelId = args.single()?;
+    let control_state: PostingControls = args.single()?;
+    let game_mode: Option<GameMode> = match args.current() {
+        Some(x) => {
+            let a = Some(x.parse()?);
+            args.advance();
+            a
+        }
+        None => None,
+    };
+    // TODO: take game name argument
+    let guild_id = msg.guild_id.unwrap().0 as i64; // only_in(guilds)
+    if msg
+        .guild(&ctx.cache)
+        .await
+        .unwrap()
+        .channels
+        .contains_key(&channel)
+    {
+        use sqlx::query;
+        let mut transaction = POOL.begin().await.unwrap();
+        let game = infer_game(guild_id, None, None).await;
+        println!("game: {:?}", game);
+        // query!("INSERT INTO Channels (ID, GameID, ControlState, DefaultGameMode)
+        //         VALUES (?, ?, ?, ?) UPSERT");
+        match manage_channel(msg.guild_id.unwrap(), channel, control_state, game_mode) {
+            Ok(_) => reply(ctx, msg, "channel configured").await,
+            Err(e) => reply(ctx, msg, &format!("{}", e)).await,
+        }
+    } else {
+        reply(ctx, msg, "no such channel in this server").await
+    }
+}
+#[cfg(feature = "turns_db")]
+#[command]
+#[only_in(guilds)]
+#[min_args(1)]
+#[max_args(2)]
+#[aliases("add_player", "ap")]
+async fn gm_add_player(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    use foretry::async_try;
+    use sqlx::query;
+    use thiserror::Error;
+    let guild_id = msg.guild_id.unwrap().0 as i64;
+    let user = args.single::<serenity::model::id::UserId>()?.0 as i64;
+    let game_name: Option<String> = match args.current() {
+        Some(x) => {
+            let a = Some(x.parse()?);
+            args.advance();
+            a
+        }
+        None => None,
+    };
+    let mut transaction = POOL.begin().await?;
+    let game_id: i64 = match infer_game(guild_id, Some(msg.channel_id.0 as i64), game_name).await {
+        Ok(x) => x,
+        Err(InferenceError::NoGame) => return reply(ctx, msg, "no game found.").await,
+        Err(InferenceError::SqlxError(e)) => return Ok(log::error!("sqlx: {}", e)),
+    };
+    match query!(
+        "INSERT INTO Players (ID, GameID) VALUES (?, ?)",
+        user,
+        game_id
+    )
+    .execute(&mut transaction)
+    .await
+    {
+        Ok(_) => reply(ctx, msg, "added player").await?,
+        // https://sqlite.org/rescode.html#constraint
+        // Search "1555". That's the SQLite extended error code for violating
+        // the uniqueness constraint here.
+        // Considering the sqlstatus codes aren't portable,
+        // I don't mind downcasting to SqliteError here.
+        // Much of the SQL I've been doing isn't portable, anyhow.
+        // If I move to another DB, it will be a chore.
+        // So be it.
+        Err(sqlx::Error::Database(e))
+            if e.downcast_ref::<sqlx::sqlite::SqliteError>().sqlite_code() == 1555 =>
+        {
+            reply(ctx, msg, "player already added").await?
+        }
+        Err(e) => {
+            log::error!("sqlx: {}", e);
+            return Err(e.into());
+        }
+    };
+    match transaction.commit().await {
+        Ok(_) => (),
+        Err(e) => log::error!("sqlx: {}", e),
+    }
+    Ok(())
+}
+#[cfg(feature = "turns_db")]
+#[command]
+#[only_in(guilds)]
+#[aliases("extend_turn", "et")]
+async fn gm_extend_turn(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
+    // This is actually not supported by the DB as is.
+    // This can either be handled by tacking on an extra turn,
+    // or by letting turns span multiple messages.
+    // Neither is completely trivial.
+    unimplemented!("turn extensions")
+}
+#[cfg(feature = "turns_db")]
+#[command]
+#[only_in(guilds)]
+#[aliases("round_unordered", "ru")]
+async fn gm_round_unordered(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
+    unimplemented!("starting unordered rounds")
+}
+#[cfg(feature = "turns_db")]
+#[command]
+#[only_in(guilds)]
+#[aliases("round_ordered", "ro")]
+async fn gm_round_ordered(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
+    unimplemented!("starting ordered rounds")
+}
+
+// TODO: figure out what kind of controls we'll want for manually skipping turns.
+#[cfg(feature = "turns_db")]
+#[command]
+#[only_in(guilds)]
+#[aliases("skip_turn", "st")]
+async fn gm_skip_turn(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
+    unimplemented!("turn skipping")
+}
+
+#[cfg(feature = "turns_db")]
+#[command]
+#[only_in(guilds)]
+#[aliases("set_notification_channel", "snc")]
+async fn gm_set_notification_channel(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
+    unimplemented!("notification channel")
+}
+
+#[cfg(feature = "turns_db")]
+#[command]
+#[aliases("skip")]
+async fn player_skip_turn(_ctx: &Context, _: &Message, _: Args) -> CommandResult {
+    unimplemented!("player turn skipping")
+}
+
+#[cfg(feature = "turns_db")]
+#[command]
+#[only_in(guilds)]
+#[aliases("notify")]
+async fn player_notify(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let yes_no: YesNo = args.single()?;
+    unimplemented!("player notification");
+    reply(ctx, msg, &format!("will notify: {:?}", yes_no)).await
+}
+
+#[cfg(feature = "turns_db")]
+#[group]
+#[prefix("gm")]
+#[commands(
+    gm_start_game,
+    gm_list_games,
+    gm_manage_channel,
+    gm_add_player,
+    gm_extend_turn,
+    gm_round_unordered,
+    gm_round_ordered,
+    gm_skip_turn,
+    gm_set_notification_channel
+)]
+#[checks(in_dev_server)]
+#[allowed_roles("GM")]
+struct GMTools;
+
+#[cfg(feature = "turns_db")]
+#[group]
+#[commands(player_skip_turn, player_notify)]
+#[checks(in_dev_server)]
+struct PlayerTools;
