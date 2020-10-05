@@ -404,7 +404,6 @@ pub(crate) async fn infer_game(
     }
 }
 
-#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[min_args(0)]
@@ -474,7 +473,6 @@ async fn gm_start_game(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
     Ok(())
 }
 
-#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("list_games", "lg")]
@@ -505,7 +503,6 @@ async fn gm_list_games(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
     reply(ctx, msg, &format!("```{}```", table)).await
 }
 
-#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)] // some `.unwrap()`s in this function rely on this.
 #[min_args(2)]
@@ -545,7 +542,7 @@ async fn gm_manage_channel(ctx: &Context, msg: &Message, mut args: Args) -> Comm
         reply(ctx, msg, "no such channel in this server").await
     }
 }
-#[cfg(feature = "turns_db")]
+
 #[command]
 #[only_in(guilds)]
 #[min_args(1)]
@@ -604,7 +601,6 @@ async fn gm_add_player(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
     }
     Ok(())
 }
-#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("extend_turn", "et")]
@@ -615,14 +611,12 @@ async fn gm_extend_turn(_ctx: &Context, _msg: &Message, _args: Args) -> CommandR
     // Neither is completely trivial.
     unimplemented!("turn extensions")
 }
-#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("round_unordered", "ru")]
 async fn gm_round_unordered(_ctx: &Context, _msg: &Message, _args: Args) -> CommandResult {
     unimplemented!("starting unordered rounds")
 }
-#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("round_ordered", "ro")]
@@ -631,7 +625,6 @@ async fn gm_round_ordered(_ctx: &Context, _msg: &Message, _args: Args) -> Comman
 }
 
 // TODO: figure out what kind of controls we'll want for manually skipping turns.
-#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("skip_turn", "st")]
@@ -639,7 +632,6 @@ async fn gm_skip_turn(_ctx: &Context, _msg: &Message, _args: Args) -> CommandRes
     unimplemented!("turn skipping")
 }
 
-#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("set_notification_channel", "snc")]
@@ -647,14 +639,12 @@ async fn gm_set_notification_channel(_ctx: &Context, _msg: &Message, _args: Args
     unimplemented!("notification channel")
 }
 
-#[cfg(feature = "turns_db")]
 #[command]
 #[aliases("skip")]
 async fn player_skip_turn(_ctx: &Context, _: &Message, _: Args) -> CommandResult {
     unimplemented!("player turn skipping")
 }
 
-#[cfg(feature = "turns_db")]
 #[command]
 #[only_in(guilds)]
 #[aliases("notify")]
@@ -664,7 +654,6 @@ async fn player_notify(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
     reply(ctx, msg, &format!("will notify: {:?}", yes_no)).await
 }
 
-#[cfg(feature = "turns_db")]
 #[group]
 #[prefix("gm")]
 #[commands(
@@ -682,7 +671,6 @@ async fn player_notify(ctx: &Context, msg: &Message, mut args: Args) -> CommandR
 #[allowed_roles("GM")]
 struct GMTools;
 
-#[cfg(feature = "turns_db")]
 #[group]
 #[commands(player_skip_turn, player_notify)]
 #[checks(in_dev_server)]
