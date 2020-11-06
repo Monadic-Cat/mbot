@@ -13,6 +13,8 @@ use cmd::command_loop;
 mod control_socket;
 #[cfg(feature = "turns_db")]
 mod turns;
+#[cfg(feature = "db")]
+mod db;
 #[cfg(feature = "maddie_tools")]
 mod masks;
 
@@ -444,10 +446,7 @@ use sqlx::SqlitePool;
 use once_cell::sync::Lazy;
 
 #[cfg(feature = "turns_db")]
-/// This will be set exactly once, right there in the `main` functions.
-/// It therefore does not require synchronization.
-/// `SqlitePool` does its own synchronization, and is used via shared references.
-static POOL: Lazy<SqlitePool> = Lazy::new(|| SqlitePool::connect_lazy("sqlite://dev.db").unwrap());
+use db::POOL;
 
 use once_cell::sync::OnceCell;
 static SHARDS: OnceCell<Arc<Mutex<ShardManager>>> = OnceCell::new();
@@ -461,8 +460,8 @@ pub(crate) async fn shutdown() {
         Some(shards) => shards.lock().await.shutdown_all().await,
         None => (),
     }
-    #[cfg(feature = "turns_db")]
-    POOL.close().await;
+    #[cfg(feature = "db")]
+    db::shutdown().await;
     std::process::exit(0);
 }
 
@@ -503,11 +502,13 @@ async fn main() {
     // We store this because we need it to shut everything down.
     SHARDS.set(client.shard_manager.clone()).expect("error setting up shutdown handler");
 
-    #[cfg(feature = "turns_db")]
-    {
-        let mut conn = POOL.acquire().await.unwrap();
+    #[cfg(feature = "db")]
+    if let Ok(()) = db::initialize().await {
         println!("sqlite connection initialized");
-    };
+    } else {
+        println!("Failure to initialize database connection.");
+        ::std::process::exit(1);
+    }
 
     if let Err(reason) = client.start().await {
         println!("Client error {:#?}", reason);

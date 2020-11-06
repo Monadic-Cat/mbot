@@ -37,10 +37,11 @@ proc-macro2 = "1"
 titlecase = "1.1.0"
 
 [features]
-default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools"]
+default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools", "db"]
 bot_commands = []
+db = ["sqlx"]
 # This feature is incomplete.
-turns_db = ["sqlx", "fehler", "comfy-table"]
+turns_db = ["db", "fehler", "comfy-table"]
 # This feature is incomplete.
 control_socket = []
 internal_rolls  = ["pulldown-cmark"]
