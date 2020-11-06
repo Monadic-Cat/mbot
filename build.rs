@@ -32,10 +32,30 @@ struct Move {
     needs_roll: bool,
 }
 
+#[derive(Deserialize, Debug)]
+struct Playbook {
+    id: u64,
+    name: String,
+    #[serde(rename = "mot")]
+    moment_of_truth: String,
+    #[serde(rename = "img")]
+    image: String,
+    source: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct Source {
+    id: u64,
+    source: String,
+    name: String,
+}
+
 /// Top level of Maddie data JSON.
 #[derive(Deserialize, Debug)]
 struct MaddieData {
     moves: Vec<Move>,
+    playbooks: Vec<Playbook>,
+    sources: Vec<Source>,
 }
 
 fn move_command(m: &Move) -> proc_macro2::TokenStream {
@@ -71,6 +91,47 @@ fn playbook_command(name: &str, moves: &[&str]) -> proc_macro2::TokenStream {
     }
 }
 
+fn playbook_list_command(playbooks: &[Playbook], sources: &[Source]) -> proc_macro2::TokenStream {
+    let mut source_playbooks = std::collections::HashMap::new();
+    let mut source_keys = std::collections::HashMap::new();
+    for (idx, source) in sources.iter().enumerate() {
+        source_playbooks.insert(&source.source, Vec::new());
+        source_keys.insert(&source.source, idx);
+    }
+    for book in playbooks {
+        let vec = source_playbooks.get_mut(&book.source).expect("every playbook has a real source");
+        vec.push(&book.name);
+    }
+    let mut list: Vec<_> = source_playbooks.into_iter().collect();
+    list.sort_by(|(a, _), (b, _)| {
+        sources[source_keys[a]].id.cmp(&sources[source_keys[b]].id)
+    });
+    let mut body = String::new();
+    for (source, vec) in list {
+        write!(body, "**{}**\n", sources[source_keys[source]].name).unwrap();
+        use std::fmt::Write;
+        for (idx, book) in vec.iter().enumerate() {
+            let book = ::titlecase::titlecase(book);
+            if idx < vec.len() - 1 {
+                write!(body, "{}, ", book).unwrap();
+            } else {
+                write!(body, "{}\n", book).unwrap();
+            }
+        }
+    }
+    quote::quote! {
+        #[command]
+        async fn playbooks(ctx: &Context, msg: &Message) -> CommandResult {
+            let id = msg.channel_id;
+            let author_line = "Available Playbooks are -";
+            id.send_message(&ctx.http, |m| m.embed(|e| {
+                e.author(|a| a.name(author_line)).title("Playbooks").description(#body)
+            })).await?;
+            Ok(())
+        }
+    }
+}
+
 fn command_group(name: &str, commands: Vec<&str>) -> proc_macro2::TokenStream {
     use ::quote::TokenStreamExt;
     let mut idents = proc_macro2::TokenStream::new();
@@ -102,6 +163,8 @@ fn main() -> anyhow::Result<()> {
         write!(maddie, "{}\n", playbook_command(playbook, moves))?;
         commands.push(playbook);
     }
+    write!(maddie, "{}\n", playbook_list_command(&data.playbooks, &data.sources))?;
+    commands.push("playbooks");
     write!(maddie, "{}", command_group("MaddieTools", commands))?;
     ::auditable_build::collect_dependency_list();
     Ok(())

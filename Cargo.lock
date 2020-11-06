@@ -940,6 +940,7 @@ dependencies = [
  "serenity",
  "sqlx",
  "thiserror",
+ "titlecase",
  "tokio",
 ]
 
@@ -952,7 +953,7 @@ checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 [[package]]
 name = "mice"
 version = "0.9.0"
-source = "git+https://github.com/Monadic-Cat/mice?branch=master#264dd2d713e232709588bac3ad3ffef0aeb7eb2c"
+source = "git+https://github.com/Monadic-Cat/mice#264dd2d713e232709588bac3ad3ffef0aeb7eb2c"
 dependencies = [
  "nom",
  "rand",
@@ -1872,6 +1873,16 @@ name = "tinyvec"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "238ce071d267c5710f9d31451efec16c5ee22de34df17cc05e56cbc92e967117"
+
+[[package]]
+name = "titlecase"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f565e410cfc24c2f2a89960b023ca192689d7f77d3f8d4f4af50c2d8affe1117"
+dependencies = [
+ "lazy_static",
+ "regex",
+]
 
 [[package]]
 name = "tokio"
