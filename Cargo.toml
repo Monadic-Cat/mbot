@@ -21,7 +21,6 @@ foretry = { git = "https://github.com/Monadic-Cat/foretry.git" }
 env_logger = "0.7"
 comfy-table = { version = "1", optional = true }
 pulldown-cmark = { git = "https://github.com/Monadic-Cat/pulldown-discordmark.git", optional = true }
-auditable = { version = "0.1", optional = true }
 [dependencies.sqlx]
 git = "https://github.com/Monadic-Cat/sqlx.git"
 branch = "sqlite-code-owo"
@@ -35,7 +34,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 quote = "1"
 proc-macro2 = "1"
-auditable-build = "0.1"
 titlecase = "1.1.0"
 
 [features]
@@ -62,9 +60,6 @@ maddie_tools = ["bot_commands"]
 # database connection pool run by the turns_db feature.
 cli_control = []
 static_token = []
-# Embed our exact dependencies in the binary, so we can
-# check later if there are problems.
-auditable-data = ["auditable"]
 
 [profile.release]
 # panic = "abort" # Remove some panic unwinding machinery.

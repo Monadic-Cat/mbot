@@ -98,36 +98,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "auditable"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a5688d93433d0c5d82a0214b490358112f359b69efe8093b45e80b48262e891"
-
-[[package]]
-name = "auditable-build"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b75a4eac8b65ab1e9d03394cd522eace98a452554651f3dda58a609873a1bd2"
-dependencies = [
- "auditable-serde",
- "cargo_metadata",
- "miniz_oxide",
- "serde_json",
-]
-
-[[package]]
-name = "auditable-serde"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b6cab96878190de929001e8d9c15bcafbd21d1c259b010e2b1ee8ed1f5786ae"
-dependencies = [
- "cargo_metadata",
- "semver",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -177,17 +147,6 @@ name = "bytes"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e4cec68f03f32e44924783795810fa50a7035d8c8ebe78580ad7e6c703fba38"
-
-[[package]]
-name = "cargo_metadata"
-version = "0.11.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e708746e51dfaeff27c6c3979a4005a7faddabe40144204a0b1ce5ad34a1d0a5"
-dependencies = [
- "semver",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "cc"
@@ -919,8 +878,6 @@ name = "mbot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "auditable",
- "auditable-build",
  "chrono",
  "comfy-table",
  "env_logger",
@@ -1526,22 +1483,6 @@ dependencies = [
  "core-foundation-sys",
  "libc",
 ]
-
-[[package]]
-name = "semver"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "394cec28fa623e00903caf7ba4fa6fb9a0e260280bb8cdbbba029611108a0190"
-dependencies = [
- "semver-parser",
- "serde",
-]
-
-[[package]]
-name = "semver-parser"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"

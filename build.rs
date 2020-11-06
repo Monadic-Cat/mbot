@@ -166,6 +166,5 @@ fn main() -> anyhow::Result<()> {
     write!(maddie, "{}\n", playbook_list_command(&data.playbooks, &data.sources))?;
     commands.push("playbooks");
     write!(maddie, "{}", command_group("MaddieTools", commands))?;
-    ::auditable_build::collect_dependency_list();
     Ok(())
 }

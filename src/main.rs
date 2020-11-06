@@ -16,11 +16,6 @@ mod turns;
 #[cfg(feature = "maddie_tools")]
 mod masks;
 
-/// Use Shnatsel's fancy tool for remembering what we put in deployed binaries.
-/// Much easier than maintaining a database for the purpose.
-#[cfg(feature = "auditable-data")]
-static COMPRESSED_DEPENDENCY_LIST: &[u8] = ::auditable::inject_dependency_list!();
-
 #[cfg(feature = "turns_db")]
 use serenity::model::{channel::GuildChannel, id::MessageId, guild::{PartialGuild, Guild}};
 use serenity::{
@@ -473,11 +468,6 @@ pub(crate) async fn shutdown() {
 
 #[tokio::main]
 async fn main() {
-    // Actually use the data to work around a bug in rustc:
-    // https://github.com/rust-lang/rust/issues/47384
-    // On nightly you can use `test::black_box` instead of `println!`
-    #[cfg(feature = "auditable-data")]
-    println!("{}", COMPRESSED_DEPENDENCY_LIST[0]);
     env_logger::init();
     #[cfg(not(feature = "static_token"))]
     let token = std::env::var(TOKEN_NAME)
