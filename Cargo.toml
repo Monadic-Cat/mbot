@@ -41,6 +41,7 @@ default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools", "db"
 bot_commands = []
 db = ["sqlx"]
 # This feature is incomplete.
+# This feature has been intentionally broken.
 turns_db = ["db", "fehler", "comfy-table"]
 # This feature is incomplete.
 control_socket = []
