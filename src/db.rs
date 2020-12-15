@@ -1,17 +1,52 @@
-//! Database related functionality goes here uwu
-use sqlx::SqlitePool;
-use once_cell::sync::Lazy;
+//! Custom storage engine, prioritizing safety over speed.
+//! I was planning on using SQLite, but this is more fun.
+use ::std::fs::{File, OpenOptions};
+use ::std::path::Path;
+use ::std::io;
 
-// Frickin' ambient authority. lol
-/// This will be set exactly once, right there in the `main` functions.
-/// It therefore does not require synchronization.
-/// `SqlitePool` does its own synchronization, and is used via shared references.
-pub(crate) static POOL: Lazy<SqlitePool> = Lazy::new(|| SqlitePool::connect_lazy("sqlite://dev.db").unwrap());
+// I'd love to only support Linux,
+// but I specifically have to support Windows.
+// Gonna be so fun to roll my own storage engine.
 
-pub(crate) async fn initialize() -> Result<(), ::sqlx::Error> {
-    POOL.acquire().await.map(|_| ())
+// Servers
+// Categories
+// Channels
+
+/// Offset into database file.
+struct Offset(usize);
+
+struct Server {
+    id: u64,
 }
 
-pub(crate) async fn shutdown() {
-    POOL.close().await
+struct Category {
+    id: u64,
 }
+
+struct Channel {
+    id: u64,
+}
+
+struct Header {
+    
+}
+
+struct DB {
+    file: File,
+    header: Header,
+}
+impl DB {
+    fn open(path: &Path) -> io::Result<Self> {
+        let mut options = OpenOptions::new();
+        let file = options.open(path)?;
+        Ok(Self {
+            file,
+            free: todo!(), 
+        })
+    }
+}
+
+pub(crate) async fn initialize() -> Result<(), ()> {
+    todo!("custom storage engine initialization")
+}
+pub(crate) async fn shutdown() {}

@@ -21,12 +21,18 @@ foretry = { git = "https://github.com/Monadic-Cat/foretry.git" }
 env_logger = "0.7"
 comfy-table = { version = "1", optional = true }
 pulldown-cmark = { git = "https://github.com/Monadic-Cat/pulldown-discordmark.git", optional = true }
+
 [dependencies.sqlx]
-git = "https://github.com/Monadic-Cat/sqlx.git"
-branch = "sqlite-code-owo"
+version = "0.4.0-beta.1"
 default-features = false
-features = [ "runtime-tokio", "macros", "sqlite" ]
+features = ["runtime-tokio", "macros", "sqlite"]
 optional = true
+# [dependencies.sqlx]
+# git = "https://github.com/Monadic-Cat/sqlx.git"
+# branch = "sqlite-code-owo"
+# default-features = false
+# features = [ "runtime-tokio", "macros", "sqlite" ]
+# optional = true
 
 [build-dependencies]
 anyhow = "1"
@@ -37,7 +43,7 @@ proc-macro2 = "1"
 titlecase = "1.1.0"
 
 [features]
-default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools", "db"]
+default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools"]
 bot_commands = []
 db = ["sqlx"]
 # This feature is incomplete.
