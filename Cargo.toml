@@ -74,3 +74,6 @@ static_token = []
 lto = true # Link Time Optimization
 # opt-level = "z" # Optimize for size. Default is "3".
 codegen-units = 1 # Make less parallel permit more optimizations. Default is 16.
+
+[workspace]
+members = ["slash"]

@@ -1,0 +1,5 @@
+// This is a Discord Slash command schema for, well, a dice rolling command.
+SlashSchema(
+    name: "roll",
+    description: "Roll a dice expression",
+)
