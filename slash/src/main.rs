@@ -73,6 +73,9 @@ mod api {
             Slash::Global { .. } => todo!("registering global slashes"),
         }
     }
+    /// Returns a single valid WSS URI, which we can use for connecting to the Gateway.
+    /// Clients *should* cache this value, and only call this if they are unable to
+    /// properly establish a connection using the cached version of the URI.
     pub(crate) async fn get_gateway(client: &::reqwest::Client) -> Result<String, ::reqwest::Error> {
         client.get(&endpoint::gateway()).send().await?.text().await
     }
