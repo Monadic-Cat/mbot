@@ -7,8 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = "0.2"
-reqwest = { version = "0.10.10", features = ["rustls-tls"] }
+tokio = { version = "0.2", features = ["full"] }
+reqwest = { version = "0.10.10", features = ["rustls-tls", "json"] }
 structopt = "0.3.21"
 serde = { version = "1.0.118", features = ["derive"] }
 ron = "0.6.2"
