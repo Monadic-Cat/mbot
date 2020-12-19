@@ -34,6 +34,11 @@ mod api {
                 application_id
             )
         }
+        pub(crate) fn gateway() -> String {
+            format!("{}/v{}/gateway",
+                    super::BASE,
+                    super::VERSION)
+        }
     }
     /// Calling this with a Slash Command that uses an already used name
     /// for your application will updated the existing command.
@@ -67,6 +72,9 @@ mod api {
             // This is the same as above, but with a different endpoint and no guild_id.
             Slash::Global { .. } => todo!("registering global slashes"),
         }
+    }
+    pub(crate) async fn get_gateway(client: &::reqwest::Client) -> Result<String, ::reqwest::Error> {
+        client.get(&endpoint::gateway()).send().await?.text().await
     }
 }
 mod gateway {
@@ -155,6 +163,11 @@ struct ServerAppConfig {
     id: ApplicationId,
     auth: Auth,
     cache: PathBuf,
+    // While this may not be the final form
+    // this field or sharding configuration takes,
+    // there will always be a "we don't do sharding" value.
+    // That is the first state we're going to support.
+    sharded: bool,
 }
 
 #[derive(Debug, StructOpt)]
@@ -317,10 +330,14 @@ async fn main() {
         Opt::Validate(SchemaKind::Server { app_path }) => {
             let server_input = BufReader::new(File::open(app_path).expect("couldn't open schema file"));
             match ::ron::de::from_reader(server_input) {
-                Ok(ServerAppConfig { .. }) => {
+                Ok(ServerAppConfig { sharded: false, .. }) => {
                     println!("Valid schema!");
                     ::std::process::exit(0);
                 },
+                Ok(ServerAppConfig { sharded: true, .. }) => {
+                    eprintln!("Sharding isn't supported yet.");
+                    ::std::process::exit(2);
+                }
                 Err(e) => {
                     eprintln!("Invalid schema: {:?}", e);
                     ::std::process::exit(1);
