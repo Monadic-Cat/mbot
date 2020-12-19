@@ -69,6 +69,11 @@ mod api {
         }
     }
 }
+mod gateway {
+    /// The Discord Gateway is versioned separately from the HTTP APIs.
+    /// This is the Gateway version against which this is written.
+    pub(crate) const VERSION: u8 = 8;
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
