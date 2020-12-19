@@ -147,6 +147,16 @@ struct AppConfig {
     auth: Auth,
 }
 
+// This is a strict superset of `AppConfig`.
+// Ideally, I should enforce this with a macro or something.
+#[derive(Debug, Deserialize)]
+#[serde(rename = "AppConfig")]
+struct ServerAppConfig {
+    id: ApplicationId,
+    auth: Auth,
+    cache: PathBuf,
+}
+
 #[derive(Debug, StructOpt)]
 enum Kind {
     /// Adds a guild-level slash command.
@@ -163,6 +173,16 @@ enum Slash {
     Global {
         schema: SlashSchema,
     },
+}
+
+#[derive(Debug, StructOpt)]
+enum SchemaKind {
+    /// Validates a Slash Command schema.
+    Slash { path: PathBuf },
+    /// Validates an Application schema.
+    App { app_path: PathBuf },
+    /// Validates a server Application schema.
+    Server { app_path: PathBuf },
 }
 
 /// Doing stuff with slash commands.
@@ -184,6 +204,7 @@ enum Opt {
         /// Path to app configuration.
         app_path: PathBuf,
     },
+    Validate(SchemaKind),
 }
 
 #[::tokio::main]
@@ -233,7 +254,7 @@ async fn main() {
             let app_input = BufReader::new(File::open(app_path).expect("couldn't open app file"));
             // Note: Consider adding a ServerAppConfig that's a superset of the fields of
             // AppConfig, in the case that the server needs more configuration.
-            let config: AppConfig =
+            let config: ServerAppConfig =
                 ::ron::de::from_reader(app_input).expect("couldn't deserialize app configuration");
 
             use ::std::net::ToSocketAddrs;
@@ -266,6 +287,45 @@ async fn main() {
             .await
             .expect("couldn't open WebSocket stream");
             todo!("actually using the WebSocket connection")
-        }
+        },
+        Opt::Validate(SchemaKind::Slash { path }) => {
+            let slash_input = BufReader::new(File::open(path).expect("couldn't open schema file"));
+            match ::ron::de::from_reader(slash_input) {
+                Ok(SlashSchema { .. }) => {
+                    println!("Valid schema!");
+                    ::std::process::exit(0);
+                },
+                Err(e) => {
+                    eprintln!("Invalid schema: {:?}", e);
+                    ::std::process::exit(1);
+                }
+            }
+        },
+        Opt::Validate(SchemaKind::App { app_path }) => {
+            let app_input = BufReader::new(File::open(app_path).expect("couldn't open schema file"));
+            match ::ron::de::from_reader(app_input) {
+                Ok(AppConfig { .. }) => {
+                    println!("Valid schema!");
+                    ::std::process::exit(0);
+                },
+                Err(e) => {
+                    eprintln!("Invalid schema: {:?}", e);
+                    ::std::process::exit(1);
+                },
+            }
+        },
+        Opt::Validate(SchemaKind::Server { app_path }) => {
+            let server_input = BufReader::new(File::open(app_path).expect("couldn't open schema file"));
+            match ::ron::de::from_reader(server_input) {
+                Ok(ServerAppConfig { .. }) => {
+                    println!("Valid schema!");
+                    ::std::process::exit(0);
+                },
+                Err(e) => {
+                    eprintln!("Invalid schema: {:?}", e);
+                    ::std::process::exit(1);
+                }
+            }
+        },
     }
 }
