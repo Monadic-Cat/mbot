@@ -5,6 +5,9 @@ use ::std::fs::File;
 use ::std::io::BufReader;
 use ::std::path::{Path, PathBuf};
 use ::structopt::StructOpt;
+// Reqwest still uses Tokio 0.2,
+// but tokio-rustls uses Tokio 0.3.
+use ::tokio_compat_02::FutureExt;
 
 mod api {
     /// Discord API base URI.
@@ -40,7 +43,7 @@ mod api {
         auth: &super::Auth,
         slash: &super::Slash,
     ) -> Result<String, ::reqwest::Error> {
-        use super::{GuildId, Slash, Auth};
+        use super::{Auth, GuildId, Slash};
         match slash {
             Slash::Guild {
                 schema,
@@ -49,10 +52,13 @@ mod api {
                 client
                     .post(&endpoint::guild_slash(application_id.id, *guild_id))
                     .json(&schema)
-                    .header("Authorization", match auth {
-                        Auth::BotToken(token) => format!("Bot {}", token),
-                        Auth::BearerToken(token) => format!("Bearer {}", token),
-                    })
+                    .header(
+                        "Authorization",
+                        match auth {
+                            Auth::BotToken(token) => format!("Bot {}", token),
+                            Auth::BearerToken(token) => format!("Bearer {}", token),
+                        },
+                    )
                     .send()
                     .await?
                     .text()
@@ -166,19 +172,31 @@ enum Opt {
         #[structopt(flatten)]
         kind: Kind,
     },
+    /// Runs Discord Gateway connected server
+    /// for receiving Interactions.
+    // We'll get to handling later, lol.
+    Server {
+        /// Path to app configuration.
+        app_path: PathBuf,
+    },
 }
 
 #[::tokio::main]
 async fn main() {
     let opt = Opt::from_args();
     match opt {
-        Opt::Register { path, kind, app_path } => {
-            let command_input = BufReader::new(File::open(path).expect("couldn't open schema file"));
+        Opt::Register {
+            path,
+            kind,
+            app_path,
+        } => {
+            let command_input =
+                BufReader::new(File::open(path).expect("couldn't open schema file"));
             let app_input = BufReader::new(File::open(app_path).expect("couldn't open app file"));
             let schema: SlashSchema =
                 ::ron::de::from_reader(command_input).expect("couldn't deserialize command schema");
-            let app: AppConfig = ::ron::de::from_reader(app_input)
-                .expect("couldn't deserialize app configuration");
+            let app: AppConfig =
+                ::ron::de::from_reader(app_input).expect("couldn't deserialize app configuration");
             println!("Schema: {:#?}", schema);
             println!(
                 "JSON Schema: {}",
@@ -187,18 +205,62 @@ async fn main() {
             let client = ::reqwest::Client::new();
             match kind {
                 Kind::Guild(guild_id) => {
-                    let result = api::upsert_slash(&client, app.id, &app.auth, &Slash::Guild {
-                        guild_id, schema
-                    }).await;
+                    let result = api::upsert_slash(
+                        &client,
+                        app.id,
+                        &app.auth,
+                        &Slash::Guild { guild_id, schema },
+                    )
+                    .compat()
+                    .await;
                     println!("Result: {:?}", result);
-                },
+                }
                 Kind::Global => {
-                    let result = api::upsert_slash(&client, app.id, &app.auth, &Slash::Global {
-                        schema
-                    }).await;
+                    let result =
+                        api::upsert_slash(&client, app.id, &app.auth, &Slash::Global { schema })
+                            .compat()
+                            .await;
                     println!("Result: {:?}", result);
-                },
+                }
             }
+        }
+        Opt::Server { app_path } => {
+            let app_input = BufReader::new(File::open(app_path).expect("couldn't open app file"));
+            // Note: Consider adding a ServerAppConfig that's a superset of the fields of
+            // AppConfig, in the case that the server needs more configuration.
+            let config: AppConfig =
+                ::ron::de::from_reader(app_input).expect("couldn't deserialize app configuration");
+
+            use ::std::net::ToSocketAddrs;
+            use ::std::sync::Arc;
+            use ::tokio::net::TcpStream;
+            use ::tokio_rustls::{rustls::ClientConfig, TlsConnector};
+            use ::webpki::DNSNameRef;
+            let mut client_config = ClientConfig::new();
+            client_config
+                .root_store
+                .add_server_trust_anchors(&::webpki_roots::TLS_SERVER_ROOTS);
+            let connector = TlsConnector::from(Arc::new(client_config));
+            let dnsname = DNSNameRef::try_from_ascii_str("gateway.discord.gg").unwrap();
+            let addr = ("gateway.discord.gg", 443)
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .expect("Discord host not found");
+            let stream = TcpStream::connect(addr)
+                .await
+                .expect("couldn't open TCP connection with Discord");
+            let mut stream = connector
+                .connect(dnsname, stream)
+                .await
+                .expect("couldn't open TLS connection");
+            let (ws_stream, _) = ::tokio_tungstenite::client_async(
+                "wss://gateway.discord.gg/?v=6&encoding=json",
+                stream,
+            )
+            .await
+            .expect("couldn't open WebSocket stream");
+            todo!("actually using the WebSocket connection")
         }
     }
 }
