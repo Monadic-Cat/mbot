@@ -151,7 +151,7 @@ mod gateway {
         // This and event_name will always be null when
         // the opcode isn't Opcode::Dispatch.
         #[serde(rename = "s")]
-        pub(crate) sequence_number: Option<u32>,
+        pub(crate) sequence_number: Option<SequenceNumber>,
         #[serde(rename = "t")]
         pub(crate) event_name: Option<String>,
     }
@@ -181,6 +181,9 @@ mod gateway {
         // Receive
         HeartbeatACK = 11,
     }
+    #[derive(Serialize, Deserialize, Copy, Clone)]
+    #[serde(transparent)]
+    pub(crate) struct SequenceNumber(u32);
     #[derive(Deserialize)]
     pub(crate) struct HelloData {
         pub(crate) heartbeat_interval: u32,
@@ -494,7 +497,7 @@ async fn main() {
                                         opcode: gateway::Opcode::Heartbeat,
                                         // TODO: store last sequence number so we can use it here.
                                         // We might use a `watch` channel.
-                                        data: None::<i32>,
+                                        data: None::<gateway::SequenceNumber>,
                                         event_name: None,
                                         sequence_number: None,
                                     }).expect("couldn't serialize heartbeat payload"))).await;
