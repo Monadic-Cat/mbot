@@ -2,14 +2,42 @@
 use ::serde::{Deserialize, Serialize};
 use ::serde_repr::Serialize_repr;
 use ::std::fs::File;
-use ::std::io::BufReader;
+use ::std::io::{self, BufReader, BufWriter};
 use ::std::path::{Path, PathBuf};
 use ::structopt::StructOpt;
 // Reqwest still uses Tokio 0.2,
 // but tokio-rustls uses Tokio 0.3.
+use ::thiserror::Error;
 use ::tokio_compat_02::FutureExt;
 
+use ::reqwest::Url;
+mod url_opt {
+    use ::reqwest::Url;
+    use ::serde::{Deserialize, Deserializer, Serializer};
+    pub(crate) fn serialize<S>(url: &Option<Url>, ser: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match url {
+            Some(url) => ser.serialize_some(url.as_str()),
+            None => ser.serialize_none(),
+        }
+    }
+    pub(crate) fn deserialize<'de, D>(d: D) -> Result<Option<Url>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let string: String = Deserialize::deserialize(d)?;
+        let url = Url::parse(&string);
+        match url {
+            Ok(url) => Ok(Some(url)),
+            Err(_) => Ok(None),
+        }
+    }
+}
+
 mod api {
+    use ::reqwest::Url;
     /// Discord API base URI.
     pub(crate) const BASE: &str = "https://discord.com/api";
     /// Discord API version against which this is written.
@@ -35,9 +63,7 @@ mod api {
             )
         }
         pub(crate) fn gateway() -> String {
-            format!("{}/v{}/gateway",
-                    super::BASE,
-                    super::VERSION)
+            format!("{}/v{}/gateway", super::BASE, super::VERSION)
         }
     }
     /// Calling this with a Slash Command that uses an already used name
@@ -76,14 +102,29 @@ mod api {
     /// Returns a single valid WSS URI, which we can use for connecting to the Gateway.
     /// Clients *should* cache this value, and only call this if they are unable to
     /// properly establish a connection using the cached version of the URI.
-    pub(crate) async fn get_gateway(client: &::reqwest::Client) -> Result<String, ::reqwest::Error> {
-        client.get(&endpoint::gateway()).send().await?.text().await
+    pub(crate) async fn get_gateway(client: &::reqwest::Client) -> Result<Url, ::reqwest::Error> {
+        #[derive(::serde::Deserialize)]
+        struct GetGateway {
+            url: String,
+        }
+        client
+            .get(&endpoint::gateway())
+            .send()
+            .await?
+            .json()
+            .await
+            .map(|x: GetGateway| {
+                // This could be handled, but I don't care.
+                Url::parse(&x.url).expect("discord is sending us bad data")
+            })
     }
 }
 mod gateway {
     /// The Discord Gateway is versioned separately from the HTTP APIs.
     /// This is the Gateway version against which this is written.
     pub(crate) const VERSION: u8 = 8;
+    /// Port to connect to for our WebSockets WSS connection.
+    pub(crate) const PORT: u16 = 443;
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -171,6 +212,48 @@ struct ServerAppConfig {
     // there will always be a "we don't do sharding" value.
     // That is the first state we're going to support.
     sharded: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ServerAppCache {
+    #[serde(default, with = "url_opt")]
+    gateway_url: Option<Url>,
+}
+#[derive(Debug, Error)]
+enum CacheLoadError {
+    #[error("{0}")]
+    InvalidData(#[from] ::ron::de::Error),
+    #[error("{0}")]
+    Io(#[from] io::Error),
+}
+impl ServerAppCache {
+    fn load(path: &Path) -> Result<Self, CacheLoadError> {
+        ::ron::de::from_reader(BufReader::new(File::open(path)?)).map_err(|e| e.into())
+    }
+    fn save(&self, path: &Path) -> Result<(), io::Error> {
+        Ok(
+            ::ron::ser::to_writer(BufWriter::new(File::create(path)?), self)
+                .expect("I don't understand how ron can fail at serialization"),
+        )
+    }
+    async fn get_gateway_url(
+        &mut self,
+        client: &::reqwest::Client,
+    ) -> Result<&Url, ::reqwest::Error> {
+        match self.gateway_url {
+            Some(ref x) => Ok(x),
+            None => match api::get_gateway(client).await {
+                Ok(x) => {
+                    self.gateway_url = Some(x);
+                    match self.gateway_url {
+                        Some(ref x) => Ok(x),
+                        None => unreachable!("this is literally impossible"),
+                    }
+                }
+                Err(e) => Err(e),
+            },
+        }
+    }
 }
 
 #[derive(Debug, StructOpt)]
@@ -267,11 +350,30 @@ async fn main() {
             }
         }
         Opt::Server { app_path } => {
-            let app_input = BufReader::new(File::open(app_path).expect("couldn't open app file"));
+            let app_input = BufReader::new(File::open(&app_path).expect("couldn't open app file"));
             // Note: Consider adding a ServerAppConfig that's a superset of the fields of
             // AppConfig, in the case that the server needs more configuration.
             let config: ServerAppConfig =
                 ::ron::de::from_reader(app_input).expect("couldn't deserialize app configuration");
+            let mut cache =
+                ServerAppCache::load(&config.cache).expect("couldn't load server cache");
+            let req_client = ::reqwest::Client::new();
+            // Load stuff we need from cache before we do anything else.
+            let gateway_url = cache
+                .get_gateway_url(&req_client)
+                .await
+                .expect("couldn't get gateway URI");
+            // cache.save(&app_path); // Might as well save our cache.
+            let domain = gateway_url
+                .domain()
+                .expect("gateway URI needs a domain component");
+            let mut wss_request = gateway_url.clone();
+            wss_request
+                .query_pairs_mut()
+                .clear()
+                .append_pair("v", &format!("{}", gateway::VERSION))
+                .append_pair("encoding", "json");
+            // Done preparing from cache.
 
             use ::std::net::ToSocketAddrs;
             use ::std::sync::Arc;
@@ -283,8 +385,8 @@ async fn main() {
                 .root_store
                 .add_server_trust_anchors(&::webpki_roots::TLS_SERVER_ROOTS);
             let connector = TlsConnector::from(Arc::new(client_config));
-            let dnsname = DNSNameRef::try_from_ascii_str("gateway.discord.gg").unwrap();
-            let addr = ("gateway.discord.gg", 443)
+            let dnsname = DNSNameRef::try_from_ascii_str(domain).unwrap();
+            let addr = (domain, gateway::PORT)
                 .to_socket_addrs()
                 .unwrap()
                 .next()
@@ -297,46 +399,48 @@ async fn main() {
                 .await
                 .expect("couldn't open TLS connection");
             let (ws_stream, _) = ::tokio_tungstenite::client_async(
-                "wss://gateway.discord.gg/?v=6&encoding=json",
+                wss_request,
                 stream,
             )
             .await
             .expect("couldn't open WebSocket stream");
             todo!("actually using the WebSocket connection")
-        },
+        }
         Opt::Validate(SchemaKind::Slash { path }) => {
             let slash_input = BufReader::new(File::open(path).expect("couldn't open schema file"));
             match ::ron::de::from_reader(slash_input) {
                 Ok(SlashSchema { .. }) => {
                     println!("Valid schema!");
                     ::std::process::exit(0);
-                },
+                }
                 Err(e) => {
                     eprintln!("Invalid schema: {:?}", e);
                     ::std::process::exit(1);
                 }
             }
-        },
+        }
         Opt::Validate(SchemaKind::App { app_path }) => {
-            let app_input = BufReader::new(File::open(app_path).expect("couldn't open schema file"));
+            let app_input =
+                BufReader::new(File::open(app_path).expect("couldn't open schema file"));
             match ::ron::de::from_reader(app_input) {
                 Ok(AppConfig { .. }) => {
                     println!("Valid schema!");
                     ::std::process::exit(0);
-                },
+                }
                 Err(e) => {
                     eprintln!("Invalid schema: {:?}", e);
                     ::std::process::exit(1);
-                },
+                }
             }
-        },
+        }
         Opt::Validate(SchemaKind::Server { app_path }) => {
-            let server_input = BufReader::new(File::open(app_path).expect("couldn't open schema file"));
+            let server_input =
+                BufReader::new(File::open(app_path).expect("couldn't open schema file"));
             match ::ron::de::from_reader(server_input) {
                 Ok(ServerAppConfig { sharded: false, .. }) => {
                     println!("Valid schema!");
                     ::std::process::exit(0);
-                },
+                }
                 Ok(ServerAppConfig { sharded: true, .. }) => {
                     eprintln!("Sharding isn't supported yet.");
                     ::std::process::exit(2);
@@ -346,6 +450,6 @@ async fn main() {
                     ::std::process::exit(1);
                 }
             }
-        },
+        }
     }
 }

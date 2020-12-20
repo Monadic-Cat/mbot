@@ -1718,6 +1718,7 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "structopt",
+ "thiserror",
  "tokio 0.3.6",
  "tokio-compat-02",
  "tokio-rustls 0.21.1",
