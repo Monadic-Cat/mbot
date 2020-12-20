@@ -27,11 +27,16 @@ mod url_opt {
     where
         D: Deserializer<'de>,
     {
-        let string: String = Deserialize::deserialize(d)?;
-        let url = Url::parse(&string);
-        match url {
-            Ok(url) => Ok(Some(url)),
-            Err(_) => Ok(None),
+        let string: Option<String> = Deserialize::deserialize(d)?;
+        match string {
+            Some(string) => {
+                let url = Url::parse(&string);
+                match url {
+                    Ok(url) => Ok(Some(url)),
+                    Err(_) => Ok(None),
+                }
+            },
+            None => Ok(None),
         }
     }
 }
