@@ -35,7 +35,7 @@ mod url_opt {
                     Ok(url) => Ok(Some(url)),
                     Err(_) => Ok(None),
                 }
-            },
+            }
             None => Ok(None),
         }
     }
@@ -237,11 +237,9 @@ impl ServerAppCache {
         match file {
             Ok(file) => ::ron::de::from_reader(BufReader::new(file)).map_err(|e| e.into()),
             Err(e) => match e.kind() {
-                io::ErrorKind::NotFound => Ok(Self {
-                    gateway_url: None,
-                }),
+                io::ErrorKind::NotFound => Ok(Self { gateway_url: None }),
                 _ => Err(e.into()),
-            }
+            },
         }
     }
     fn save(&self, path: &Path) -> Result<(), io::Error> {
@@ -375,7 +373,8 @@ async fn main() {
             let req_client = ::reqwest::Client::new();
             // Load stuff we need from cache before we do anything else.
             let gateway_url = cache
-                .get_gateway_url(&req_client).compat()
+                .get_gateway_url(&req_client)
+                .compat()
                 .await
                 .expect("couldn't get gateway URI");
             cache.save(&config.cache).expect("couldn't save our cache"); // Might as well save our cache.
@@ -413,12 +412,9 @@ async fn main() {
                 .connect(dnsname, stream)
                 .await
                 .expect("couldn't open TLS connection");
-            let (ws_stream, _) = ::tokio_tungstenite::client_async(
-                wss_request,
-                stream,
-            )
-            .await
-            .expect("couldn't open WebSocket stream");
+            let (ws_stream, _) = ::tokio_tungstenite::client_async(wss_request, stream)
+                .await
+                .expect("couldn't open WebSocket stream");
             todo!("actually using the WebSocket connection")
         }
         Opt::Validate(SchemaKind::Slash { path }) => {
