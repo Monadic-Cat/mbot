@@ -4,10 +4,14 @@ use ::serde_repr::Serialize_repr;
 use ::std::fs::File;
 use ::std::io::{self, BufReader, BufWriter};
 use ::std::path::{Path, PathBuf};
+use ::std::time::Duration;
 use ::structopt::StructOpt;
 // Reqwest still uses Tokio 0.2,
 // but tokio-rustls uses Tokio 0.3.
 use ::thiserror::Error;
+use ::tokio::stream::StreamExt;
+use ::tokio::task;
+use ::tokio::time;
 use ::tokio_compat_02::FutureExt;
 
 use ::reqwest::Url;
@@ -125,8 +129,8 @@ mod api {
     }
 }
 mod gateway {
-    use ::serde::{Serialize, Deserialize};
-    use ::serde_repr::{Serialize_repr, Deserialize_repr};
+    use ::serde::{Deserialize, Serialize};
+    use ::serde_repr::{Deserialize_repr, Serialize_repr};
     /// The Discord Gateway is versioned separately from the HTTP APIs.
     /// This is the Gateway version against which this is written.
     pub(crate) const VERSION: u8 = 8;
@@ -137,19 +141,22 @@ mod gateway {
     #[derive(Serialize, Deserialize)]
     pub(crate) struct Payload<T> {
         #[serde(rename = "op")]
-        opcode: Opcode,
+        pub(crate) opcode: Opcode,
+        // This will sometimes not be anything.
+        // Whether this field is actually nullable depends
+        // on the opcode we're dealing with.
         #[serde(rename = "d")]
-        data: Option<T>,
+        pub(crate) data: T,
         // This and event_name will always be null when
         // the opcode isn't Opcode::Dispatch.
         #[serde(rename = "s")]
-        sequence_number: Option<u32>,
+        pub(crate) sequence_number: Option<u32>,
         #[serde(rename = "t")]
-        event_name: Option<String>
+        pub(crate) event_name: Option<String>,
     }
     #[derive(Serialize_repr, Deserialize_repr)]
     #[repr(u8)]
-    enum Opcode {
+    pub(crate) enum Opcode {
         // Receive
         Dispatch = 0,
         // Send/Receive
@@ -172,6 +179,10 @@ mod gateway {
         Hello = 10,
         // Receive
         HeartbeatACK = 11,
+    }
+    #[derive(Deserialize)]
+    pub(crate) struct HelloData {
+        pub(crate) heartbeat_interval: u32,
     }
 }
 
@@ -456,9 +467,50 @@ async fn main() {
                 .connect(dnsname, stream)
                 .await
                 .expect("couldn't open TLS connection");
-            let (ws_stream, _) = ::tokio_tungstenite::client_async(wss_request, stream)
+            let (mut ws_stream, _) = ::tokio_tungstenite::client_async(wss_request, stream)
                 .await
                 .expect("couldn't open WebSocket stream");
+
+            // Read Hello first.
+            if let Some(first_msg) = ws_stream.next().await {
+                use ::tungstenite::error::Error as WsError;
+                use ::tungstenite::Message;
+                println!("First Message: {:?}", first_msg);
+                match first_msg {
+                    Ok(Message::Text(text)) => match ::serde_json::from_str(&text) {
+                        Ok(gateway::Payload {
+                            opcode: gateway::Opcode::Hello,
+                            data: gateway::HelloData { heartbeat_interval },
+                            ..
+                        }) => {
+                            task::spawn(async move {
+                                // Consider doing the heartbeat a little early?
+                                let mut interval =
+                                    time::interval(Duration::from_millis(heartbeat_interval as _));
+                                loop {
+                                    interval.tick().await;
+                                    
+                                }
+                            });
+                        }
+                        Ok(_) | Err(_) => todo!("handling invalid first message"),
+                    },
+                    Err(WsError::ConnectionClosed) => {
+                        todo!("handle connection being closed before we can read a single message")
+                    }
+                    Err(WsError::Io(e)) => match e.kind() {
+                        io::ErrorKind::WouldBlock => todo!("what to do with this"),
+                        _ => todo!("stream is dead. reconnect or something"),
+                    },
+                    Err(WsError::AlreadyClosed) => {
+                        unreachable!("reading from already closed stream")
+                    }
+                    _ => todo!("handling other websocket errors"),
+                }
+            }
+            // while let Some(msg) = ws_stream.next().await {
+            //     println!("Another message: {:?}", msg);
+            // }
             todo!("actually using the WebSocket connection")
         }
         Opt::Validate(SchemaKind::Slash { path }) => {

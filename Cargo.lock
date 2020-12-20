@@ -1723,6 +1723,7 @@ dependencies = [
  "tokio-compat-02",
  "tokio-rustls 0.21.1",
  "tokio-tungstenite",
+ "tungstenite",
  "webpki",
  "webpki-roots 0.21.0",
 ]
@@ -2222,6 +2223,7 @@ dependencies = [
  "httparse",
  "input_buffer",
  "log",
+ "native-tls",
  "rand",
  "sha-1",
  "url",
