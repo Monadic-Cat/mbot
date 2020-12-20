@@ -10,6 +10,7 @@ use ::structopt::StructOpt;
 // but tokio-rustls uses Tokio 0.3.
 use ::thiserror::Error;
 use ::tokio::stream::StreamExt;
+use ::futures::sink::SinkExt;
 use ::tokio::task;
 use ::tokio::time;
 use ::tokio_compat_02::FutureExt;
@@ -489,7 +490,14 @@ async fn main() {
                                     time::interval(Duration::from_millis(heartbeat_interval as _));
                                 loop {
                                     interval.tick().await;
-                                    
+                                    ws_stream.send(Message::text(::serde_json::to_string(&gateway::Payload {
+                                        opcode: gateway::Opcode::Heartbeat,
+                                        // TODO: store last sequence number so we can use it here.
+                                        // We might use a `watch` channel.
+                                        data: None::<i32>,
+                                        event_name: None,
+                                        sequence_number: None,
+                                    }).expect("couldn't serialize heartbeat payload"))).await;
                                 }
                             });
                         }
