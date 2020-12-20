@@ -139,7 +139,7 @@ mod gateway {
     pub(crate) const PORT: u16 = 443;
     // Payloads are limited to a maximum of 4096 bytes sent, going over this will
     // cause a connection termination with error code 4002.
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize, Debug)]
     pub(crate) struct Payload<T> {
         #[serde(rename = "op")]
         pub(crate) opcode: Opcode,
@@ -155,7 +155,7 @@ mod gateway {
         #[serde(rename = "t")]
         pub(crate) event_name: Option<String>,
     }
-    #[derive(Serialize_repr, Deserialize_repr)]
+    #[derive(Serialize_repr, Deserialize_repr, Debug)]
     #[repr(u8)]
     pub(crate) enum Opcode {
         // Receive
@@ -181,13 +181,15 @@ mod gateway {
         // Receive
         HeartbeatACK = 11,
     }
-    #[derive(Serialize, Deserialize, Copy, Clone)]
+    #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
     #[serde(transparent)]
     pub(crate) struct SequenceNumber(u32);
     #[derive(Deserialize)]
     pub(crate) struct HelloData {
         pub(crate) heartbeat_interval: u32,
     }
+    #[derive(Deserialize)]
+    pub(crate) struct DispatchData {}
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -501,6 +503,11 @@ async fn main() {
                                     time::interval(Duration::from_millis(heartbeat_interval as _));
                                 loop {
                                     interval.tick().await;
+                                    // TODO:
+                                    // Check to see if we've received a heartbeat ACK.
+                                    // If so, send heartbeat.
+                                    // Otherwise, terminate the connection with a non-1000 close code,
+                                    // reconnect, and attempt to resume.
                                     let seq_number: Option<gateway::SequenceNumber> =
                                         *sequence_rx.borrow();
                                     ws_sender
@@ -516,7 +523,39 @@ async fn main() {
                                         .await;
                                 }
                             });
-                            while let Some(msg) = ws_receiver.next().await {}
+                            while let Some(msg) = ws_receiver.next().await {
+                                println!("Another message: {:?}", msg);
+                                match msg {
+                                    Ok(Message::Text(text)) => {
+                                        match ::serde_json::from_str(&text) {
+                                            Ok(gateway::Payload {
+                                                opcode: gateway::Opcode::Dispatch,
+                                                data,
+                                                event_name: Some(event_name),
+                                                sequence_number: Some(sequence_number),
+                                            }) => {
+                                                let data: gateway::DispatchData =
+                                                    ::serde_json::from_value(data).unwrap();
+                                                sequence_tx.send(Some(sequence_number)).unwrap();
+                                                println!("--------------------");
+                                                println!("|     Dispatch     |");
+                                                println!("--------------------");
+                                                println!("Event Name: {}", event_name);
+                                                println!("Sequence Number: {:?}", sequence_number);
+                                                println!("--------------------");
+                                            }
+                                            Ok(payload) => {
+                                                println!("Payload of unknown type: {:?}", payload);
+                                            }
+                                            Err(_) => todo!("handling malformed Gateway payloads"),
+                                        }
+                                    }
+                                    Ok(_) => {
+                                        todo!("handling different forms of WebSocket messages")
+                                    }
+                                    Err(_) => todo!("handling connection errors"),
+                                }
+                            }
                         }
                         Ok(_) | Err(_) => todo!("handling invalid first message"),
                     },
