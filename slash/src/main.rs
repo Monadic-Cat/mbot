@@ -125,11 +125,50 @@ mod api {
     }
 }
 mod gateway {
+    use ::serde::{Serialize, Deserialize};
+    use ::serde_repr::{Serialize_repr, Deserialize_repr};
     /// The Discord Gateway is versioned separately from the HTTP APIs.
     /// This is the Gateway version against which this is written.
     pub(crate) const VERSION: u8 = 8;
     /// Port to connect to for our WebSockets WSS connection.
     pub(crate) const PORT: u16 = 443;
+    #[derive(Serialize, Deserialize)]
+    pub(crate) struct Payload<T> {
+        #[serde(rename = "op")]
+        opcode: Opcode,
+        #[serde(rename = "d")]
+        data: Option<T>,
+        #[serde(rename = "s")]
+        sequence_number: Option<u32>,
+        #[serde(rename = "t")]
+        event_name: Option<String>
+    }
+    #[derive(Serialize_repr, Deserialize_repr)]
+    #[repr(u8)]
+    enum Opcode {
+        // Receive
+        Dispatch = 0,
+        // Send/Receive
+        Heartbeat = 1,
+        // Send
+        Identify = 2,
+        // Send
+        PresenceUpdate = 3,
+        // Send
+        VoiceStateUpdate = 4,
+        // Send
+        Resume = 6,
+        // Receive
+        Reconnect = 7,
+        // Send
+        RequestGuildMembers = 8,
+        // Receive
+        InvalidSession = 9,
+        // Receive
+        Hello = 10,
+        // Receive
+        HeartbeatACK = 11,
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
