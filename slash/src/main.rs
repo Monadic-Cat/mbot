@@ -239,14 +239,14 @@ impl ServerAppCache {
     async fn get_gateway_url(
         &mut self,
         client: &::reqwest::Client,
-    ) -> Result<&Url, ::reqwest::Error> {
+    ) -> Result<Url, ::reqwest::Error> {
         match self.gateway_url {
-            Some(ref x) => Ok(x),
+            Some(ref x) => Ok(x.clone()),
             None => match api::get_gateway(client).await {
                 Ok(x) => {
                     self.gateway_url = Some(x);
                     match self.gateway_url {
-                        Some(ref x) => Ok(x),
+                        Some(ref x) => Ok(x.clone()),
                         None => unreachable!("this is literally impossible"),
                     }
                 }
@@ -363,7 +363,7 @@ async fn main() {
                 .get_gateway_url(&req_client)
                 .await
                 .expect("couldn't get gateway URI");
-            // cache.save(&app_path); // Might as well save our cache.
+            cache.save(&app_path); // Might as well save our cache.
             let domain = gateway_url
                 .domain()
                 .expect("gateway URI needs a domain component");
