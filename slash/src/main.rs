@@ -132,6 +132,8 @@ mod gateway {
     pub(crate) const VERSION: u8 = 8;
     /// Port to connect to for our WebSockets WSS connection.
     pub(crate) const PORT: u16 = 443;
+    // Payloads are limited to a maximum of 4096 bytes sent, going over this will
+    // cause a connection termination with error code 4002.
     #[derive(Serialize, Deserialize)]
     pub(crate) struct Payload<T> {
         #[serde(rename = "op")]
@@ -360,6 +362,7 @@ enum Opt {
     Validate(SchemaKind),
 }
 
+// TODO: split apart this gigant main function.
 #[::tokio::main]
 async fn main() {
     let opt = Opt::from_args();
