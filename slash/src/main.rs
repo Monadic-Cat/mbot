@@ -129,6 +129,7 @@ mod api {
             })
     }
 }
+
 mod gateway {
     use ::serde::{Deserialize, Serialize};
     use ::serde_repr::{Deserialize_repr, Serialize_repr};
@@ -190,6 +191,92 @@ mod gateway {
     }
     #[derive(Deserialize)]
     pub(crate) struct DispatchData {}
+    pub(crate) enum Intent {
+        Guilds = 0,
+        GuildMembers = 1,
+        GuildBans = 2,
+        GuildEmojis = 3,
+        GuildIntegrations = 4,
+        GuildWebhooks = 5,
+        GuildInvites = 6,
+        GuildVoiceStates = 7,
+        GuildPresences = 8,
+        GuildMessages = 9,
+        GuildMessageReactions = 10,
+        GuildMessageTyping = 11,
+        DirectMessages = 12,
+        DirectMessageReactions = 13,
+        DirectMessageTyping = 14,
+    }
+    #[derive(Clone, Copy, Serialize, Deserialize)]
+    #[serde(transparent)]
+    pub(crate) struct Intents(u16);
+    impl Intents {
+        pub(crate) fn empty() -> Self { Self(0) }
+        pub(crate) fn add_intent(self, intent: Intent) -> Self {
+            Self(self.0 | (1 << (intent as u8)))
+        }
+    }
+    #[derive(Serialize)]
+    struct ConnectionProperties {
+        #[serde(rename = "$os")]
+        os: String,
+        #[serde(rename = "$browser")]
+        browser: String,
+        #[serde(rename = "$device")]
+        device: String,
+    }
+    #[derive(Serialize_repr)]
+    #[repr(u8)]
+    enum ActivityType {
+        Game = 0,
+        Streaming = 1,
+        Listening = 2,
+        Custom = 4,
+        Competing = 5,
+    }
+    #[derive(Serialize)]
+    struct ActivityTimestamps {
+        start: Option<u32>,
+        end: Option<u32>,
+    }
+    #[derive(Serialize, Deserialize)]
+    #[serde(transparent)]
+    struct Snowflake(u64);
+    #[derive(Serialize)]
+    struct Activity {
+        name: String,
+        #[serde(rename = "type")]
+        ty: ActivityType,
+        // Stream URL. Is validated when type is Streaming.
+        url: Option<String>,
+        created_at: u64,
+        timestamps: Option<ActivityTimestamps>,
+        application_id: Snowflake,
+        // TODO: Incomplete.
+    }
+    #[derive(Serialize)]
+    struct UpdateStatus {
+        since: Option<u32>,
+        activities: Option<Vec<Activity>>,
+        status: String, // This deserves a better type.
+        afk: bool,
+        // TODO: Incomplete.
+    }
+    #[derive(Serialize)]
+    pub(crate) struct IdentifyData {
+        token: String,
+        properties: ConnectionProperties,
+        intents: Intents,
+        compress: Option<bool>,
+        // Between 50 and 250, total number of members
+        // where the gateway will stop sending offline members
+        // in the guild member list.
+        large_threshold: u8,
+        shard: Option<[u32; 2]>,
+        presence: Option<UpdateStatus>,
+        // TODO: Incomplete
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
