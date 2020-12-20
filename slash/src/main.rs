@@ -469,7 +469,7 @@ async fn main() {
             let stream = TcpStream::connect(addr)
                 .await
                 .expect("couldn't open TCP connection with Discord");
-            let mut stream = connector
+            let stream = connector
                 .connect(dnsname, stream)
                 .await
                 .expect("couldn't open TLS connection");
@@ -520,7 +520,7 @@ async fn main() {
                                             })
                                             .expect("couldn't serialize heartbeat payload"),
                                         ))
-                                        .await;
+                                        .await.expect("heartbeat send failure");
                                 }
                             });
                             while let Some(msg) = ws_receiver.next().await {
