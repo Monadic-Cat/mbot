@@ -474,7 +474,7 @@ async fn main() {
             let (mut ws_stream, _) = ::tokio_tungstenite::client_async(wss_request, stream)
                 .await
                 .expect("couldn't open WebSocket stream");
-
+            let (sequence_tx, sequence_rx) = ::tokio::sync::watch::channel(None::<gateway::SequenceNumber>);
             // Read Hello first.
             if let Some(first_msg) = ws_stream.next().await {
                 use ::tungstenite::error::Error as WsError;
@@ -493,11 +493,10 @@ async fn main() {
                                     time::interval(Duration::from_millis(heartbeat_interval as _));
                                 loop {
                                     interval.tick().await;
+                                    let seq_number: Option<gateway::SequenceNumber> = *sequence_rx.borrow();
                                     ws_stream.send(Message::text(::serde_json::to_string(&gateway::Payload {
                                         opcode: gateway::Opcode::Heartbeat,
-                                        // TODO: store last sequence number so we can use it here.
-                                        // We might use a `watch` channel.
-                                        data: None::<gateway::SequenceNumber>,
+                                        data: seq_number,
                                         event_name: None,
                                         sequence_number: None,
                                     }).expect("couldn't serialize heartbeat payload"))).await;
