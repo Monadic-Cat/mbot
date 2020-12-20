@@ -138,6 +138,8 @@ mod gateway {
         opcode: Opcode,
         #[serde(rename = "d")]
         data: Option<T>,
+        // This and event_name will always be null when
+        // the opcode isn't Opcode::Dispatch.
         #[serde(rename = "s")]
         sequence_number: Option<u32>,
         #[serde(rename = "t")]
