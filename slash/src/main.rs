@@ -317,6 +317,7 @@ enum Opt {
         /// Path to app configuration.
         app_path: PathBuf,
     },
+    /// Validate a schema.
     Validate(SchemaKind),
 }
 
