@@ -698,7 +698,8 @@ async fn main() {
                                             })
                                             .expect("couldn't serialize heartbeat payload"),
                                         ))
-                                        .await.expect("heartbeat send failure");
+                                        .await
+                                        .expect("heartbeat send failure");
                                 }
                             });
                             while let Some(msg) = ws_receiver.next().await {
@@ -728,8 +729,11 @@ async fn main() {
                                             Err(_) => todo!("handling malformed Gateway payloads"),
                                         }
                                     }
-                                    Ok(_) => {
-                                        todo!("handling different forms of WebSocket messages")
+                                    Ok(msg) => {
+                                        println!(
+                                            "TODO: handle this kind of WebSocket message: {:?}",
+                                            msg
+                                        )
                                     }
                                     Err(_) => todo!("handling connection errors"),
                                 }
@@ -753,7 +757,6 @@ async fn main() {
             // while let Some(msg) = ws_stream.next().await {
             //     println!("Another message: {:?}", msg);
             // }
-            todo!("actually using the WebSocket connection")
         }
         Opt::Validate(SchemaKind::Slash { path }) => {
             let slash_input = BufReader::new(File::open(path).expect("couldn't open schema file"));
