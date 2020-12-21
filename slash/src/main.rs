@@ -130,6 +130,9 @@ mod api {
     }
 }
 
+// Note that Discord sort of distinguishes between omission of fields and null values
+// for those fields, although they appear to have the same semantics on their end.
+// So, we skip serialization of all nulled optional fields where omission is allowed.
 mod gateway {
     use ::serde::{Deserialize, Serialize};
     use ::serde_repr::{Deserialize_repr, Serialize_repr};
