@@ -783,7 +783,7 @@ async fn main() {
                                     shard: None,
                                     presence: None,
                                     guild_subscriptions: None,
-                                    intents: gateway::Intents::empty().add_intent(gateway::Intent::GuildMessages),
+                                    intents: gateway::Intents::empty(),
                                 },
                                 event_name: None,
                                 sequence_number: None,
