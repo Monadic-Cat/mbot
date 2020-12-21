@@ -653,6 +653,28 @@ async fn main() {
                             // Probably gonna end up with a bunch of tasks.
                             let (mut ws_sender, mut ws_receiver) =
                                 ::futures::stream::StreamExt::split(ws_stream);
+                            ws_sender.send(Message::Text(::serde_json::to_string(&gateway::Payload {
+                                opcode: gateway::Opcode::Identify,
+                                data: gateway::IdentifyData {
+                                    token: match config.auth {
+                                        Auth::BotToken(x) => x.clone(),
+                                        Auth::BearerToken(_) => todo!("figure out if token kind is relevant in Identify payloads"),
+                                    },
+                                    properties: gateway::ConnectionProperties {
+                                        os: "Linux".to_string(),
+                                        browser: "mbot-slash-gateway".to_string(),
+                                        device: "mbot-slash-gateway".to_string(),
+                                    },
+                                    compress: Some(false),
+                                    large_threshold: None,
+                                    shard: None,
+                                    presence: None,
+                                    guild_subscriptions: None,
+                                    intents: gateway::Intents::empty().add_intent(gateway::Intent::GuildMessages),
+                                },
+                                event_name: None,
+                                sequence_number: None,
+                            }).expect("couldn't serialize Identify payload"))).await;
                             task::spawn(async move {
                                 // Consider doing the heartbeat a little early?
                                 let mut interval =
