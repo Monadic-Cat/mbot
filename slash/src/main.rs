@@ -130,8 +130,13 @@ mod api {
     }
     use ::serde_aux::field_attributes::deserialize_number_from_string;
     /// A 64 bit integer type that deserializes Discord's stringed up integers just fine.
-    #[derive(serde::Serialize, serde::Deserialize, Debug)]
+    #[derive(serde::Serialize, serde::Deserialize)]
     pub(crate) struct U64(#[serde(deserialize_with = "deserialize_number_from_string")] pub u64);
+    impl ::core::fmt::Debug for U64 {
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            write!(f, "{:?}", self.0)
+        }
+    }
 }
 
 // Note that Discord sort of distinguishes between omission of fields and null values
