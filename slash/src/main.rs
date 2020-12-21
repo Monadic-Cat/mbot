@@ -215,7 +215,9 @@ mod gateway {
     #[serde(transparent)]
     pub(crate) struct Intents(u16);
     impl Intents {
-        pub(crate) fn empty() -> Self { Self(0) }
+        pub(crate) fn empty() -> Self {
+            Self(0)
+        }
         pub(crate) fn add_intent(self, intent: Intent) -> Self {
             Self(self.0 | (1 << (intent as u8)))
         }
