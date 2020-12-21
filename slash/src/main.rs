@@ -674,7 +674,8 @@ async fn main() {
                                 },
                                 event_name: None,
                                 sequence_number: None,
-                            }).expect("couldn't serialize Identify payload"))).await;
+                            }).expect("couldn't serialize Identify payload"))).await
+                                .expect("identify send failure");
                             task::spawn(async move {
                                 // Consider doing the heartbeat a little early?
                                 let mut interval =
