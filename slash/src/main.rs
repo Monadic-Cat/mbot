@@ -346,6 +346,108 @@ mod gateway {
         pub(crate) guild_subscriptions: Option<bool>,
         pub(crate) intents: Intents,
     }
+    #[derive(Deserialize_repr)]
+    #[repr(u8)]
+    enum InteractionType {
+        Ping = 1,
+        ApplicationCommand = 2,
+    }
+    #[derive(Deserialize)]
+    struct ApplicationCommandInteractionData {
+        id: Snowflake,
+        name: String,
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        options: Option<Vec<ApplicationCommandInteractionDataOption>>,
+    }
+    #[derive(Deserialize)]
+    struct ApplicationCommandInteractionDataOption {
+        name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<super::CommandOptionType>,
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        options: Option<Vec<ApplicationCommandInteractionDataOption>>,
+    }
+    #[derive(Deserialize)]
+    struct User {
+        id: Snowflake,
+        username: String,
+        // This is four digits long.
+        // Perhaps I should just parse this to an integer.
+        discriminator: String,
+        // `null` is allowed, omission is not.
+        avatar: Option<String>,
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bot: Option<bool>,
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        system: Option<bool>,
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        mfa_enabled: Option<bool>,
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        locale: Option<String>,
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        verified: Option<bool>,
+        // Both `null` and omission are allowed.
+        email: Option<String>,
+        // TODO: type these flags
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        flags: Option<u64>,
+        // TODO: type this
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        premium_type: Option<u64>,
+        // TODO: type this
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        public_flags: Option<u64>,
+    }
+    #[derive(Deserialize)]
+    struct GuildMember {
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        user: Option<User>,
+        // `null` is allowed, omission is not.
+        nick: Option<String>,
+        roles: Vec<Snowflake>,
+        // TODO: this is an ISO8601 timestamp, and should be typed as such
+        joined_at: String,
+        // TODO: this is also an ISO8601 timestamp,
+        // and should be typed as such as well
+        // Both `null` and omission are allowed.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        premium_since: Option<String>,
+        deaf: bool,
+        mute: bool,
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pending: Option<bool>
+    }
+    #[derive(Deserialize)]
+    struct Interaction {
+        id: Snowflake,
+        #[serde(rename = "type")]
+        ty: InteractionType,
+        // This is always present on ApplicationCommand Interaction types.
+        // `null` is not allowed, omission is.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        data: Option<ApplicationCommandInteractionData>,
+        guild_id: Snowflake,
+        channel_id: Snowflake,
+        member: GuildMember,
+        token: String,
+        // Always `1`.
+        version: u8,
+    }
+    // TODO: examine each use of Snowflake and
+    // see if it should be more strongly typed
+    // TODO: Look into borrowing more strings, possibly using Cow<'a, str>.
 }
 
 #[derive(Debug, Serialize, Deserialize)]
