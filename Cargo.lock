@@ -1598,6 +1598,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-aux"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "461084aac33f658fff8b892a83a7edcd8679f8f52d1ee5caa20898d5136fabf6"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.118"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1716,6 +1727,7 @@ dependencies = [
  "reqwest",
  "ron",
  "serde",
+ "serde-aux",
  "serde_json",
  "serde_repr",
  "structopt",

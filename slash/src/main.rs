@@ -128,6 +128,10 @@ mod api {
                 Url::parse(&x.url).expect("discord is sending us bad data")
             })
     }
+    use ::serde_aux::field_attributes::deserialize_number_from_string;
+    /// A 64 bit integer type that deserializes Discord's stringed up integers just fine.
+    #[derive(serde::Serialize, serde::Deserialize, Debug)]
+    pub(crate) struct U64(#[serde(deserialize_with = "deserialize_number_from_string")] pub u64);
 }
 
 // Note that Discord sort of distinguishes between omission of fields and null values
@@ -136,6 +140,7 @@ mod api {
 mod gateway {
     use ::serde::{Deserialize, Serialize};
     use ::serde_repr::{Deserialize_repr, Serialize_repr};
+    use super::api::U64;
     /// The Discord Gateway is versioned separately from the HTTP APIs.
     /// This is the Gateway version against which this is written.
     pub(crate) const VERSION: u8 = 8;
@@ -249,9 +254,9 @@ mod gateway {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub(crate) end: Option<u32>,
     }
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize, Debug)]
     #[serde(transparent)]
-    pub(crate) struct Snowflake(pub(crate) u64);
+    pub(crate) struct Snowflake(pub(crate) U64);
     #[derive(Serialize)]
     pub(crate) struct ActivityEmoji {
         pub(crate) name: String,
@@ -293,7 +298,7 @@ mod gateway {
         // Both `null` and omission are allowed.
         #[serde(skip_serializing_if = "Option::is_none")]
         url: Option<String>,
-        created_at: u64,
+        created_at: U64,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
         timestamps: Option<ActivityTimestamps>,
@@ -346,104 +351,104 @@ mod gateway {
         pub(crate) guild_subscriptions: Option<bool>,
         pub(crate) intents: Intents,
     }
-    #[derive(Deserialize_repr)]
+    #[derive(Deserialize_repr, Debug)]
     #[repr(u8)]
-    enum InteractionType {
+    pub(crate) enum InteractionType {
         Ping = 1,
         ApplicationCommand = 2,
     }
-    #[derive(Deserialize)]
-    struct ApplicationCommandInteractionData {
-        id: Snowflake,
-        name: String,
+    #[derive(Deserialize, Debug)]
+    pub(crate) struct ApplicationCommandInteractionData {
+        pub(crate) id: Snowflake,
+        pub(crate) name: String,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        options: Option<Vec<ApplicationCommandInteractionDataOption>>,
+        pub(crate) options: Option<Vec<ApplicationCommandInteractionDataOption>>,
     }
-    #[derive(Deserialize)]
-    struct ApplicationCommandInteractionDataOption {
-        name: String,
+    #[derive(Deserialize, Debug)]
+    pub(crate) struct ApplicationCommandInteractionDataOption {
+        pub(crate) name: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        value: Option<super::CommandOptionType>,
+        pub(crate) value: Option<super::CommandOptionType>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        options: Option<Vec<ApplicationCommandInteractionDataOption>>,
+        pub(crate) options: Option<Vec<ApplicationCommandInteractionDataOption>>,
     }
-    #[derive(Deserialize)]
-    struct User {
-        id: Snowflake,
-        username: String,
+    #[derive(Deserialize, Debug)]
+    pub(crate) struct User {
+        pub(crate) id: Snowflake,
+        pub(crate) username: String,
         // This is four digits long.
         // Perhaps I should just parse this to an integer.
-        discriminator: String,
+        pub(crate) discriminator: String,
         // `null` is allowed, omission is not.
-        avatar: Option<String>,
+        pub(crate) avatar: Option<String>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        bot: Option<bool>,
+        pub(crate) bot: Option<bool>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        system: Option<bool>,
+        pub(crate) system: Option<bool>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        mfa_enabled: Option<bool>,
+        pub(crate) mfa_enabled: Option<bool>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        locale: Option<String>,
+        pub(crate) locale: Option<String>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        verified: Option<bool>,
+        pub(crate) verified: Option<bool>,
         // Both `null` and omission are allowed.
-        email: Option<String>,
+        pub(crate) email: Option<String>,
         // TODO: type these flags
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        flags: Option<u64>,
+        pub(crate) flags: Option<U64>,
         // TODO: type this
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        premium_type: Option<u64>,
+        pub(crate) premium_type: Option<U64>,
         // TODO: type this
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        public_flags: Option<u64>,
+        pub(crate) public_flags: Option<U64>,
     }
-    #[derive(Deserialize)]
-    struct GuildMember {
+    #[derive(Deserialize, Debug)]
+    pub(crate) struct GuildMember {
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        user: Option<User>,
+        pub(crate) user: Option<User>,
         // `null` is allowed, omission is not.
-        nick: Option<String>,
-        roles: Vec<Snowflake>,
+        pub(crate) nick: Option<String>,
+        pub(crate) roles: Vec<Snowflake>,
         // TODO: this is an ISO8601 timestamp, and should be typed as such
-        joined_at: String,
+        pub(crate) joined_at: String,
         // TODO: this is also an ISO8601 timestamp,
         // and should be typed as such as well
         // Both `null` and omission are allowed.
         #[serde(skip_serializing_if = "Option::is_none")]
-        premium_since: Option<String>,
-        deaf: bool,
-        mute: bool,
+        pub(crate) premium_since: Option<String>,
+        pub(crate) deaf: bool,
+        pub(crate) mute: bool,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        pending: Option<bool>
+        pub(crate) pending: Option<bool>
     }
-    #[derive(Deserialize)]
-    struct Interaction {
-        id: Snowflake,
+    #[derive(Deserialize, Debug)]
+    pub(crate) struct Interaction {
+        pub(crate) id: Snowflake,
         #[serde(rename = "type")]
-        ty: InteractionType,
+        pub(crate) ty: InteractionType,
         // This is always present on ApplicationCommand Interaction types.
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        data: Option<ApplicationCommandInteractionData>,
-        guild_id: Snowflake,
-        channel_id: Snowflake,
-        member: GuildMember,
-        token: String,
+        pub(crate) data: Option<ApplicationCommandInteractionData>,
+        pub(crate) guild_id: Snowflake,
+        pub(crate) channel_id: Snowflake,
+        pub(crate) member: GuildMember,
+        pub(crate) token: String,
         // Always `1`.
-        version: u8,
+        pub(crate) version: u8,
     }
     // TODO: examine each use of Snowflake and
     // see if it should be more strongly typed
@@ -816,8 +821,9 @@ async fn main() {
                                                 event_name: Some(event_name),
                                                 sequence_number: Some(sequence_number),
                                             }) => {
-                                                let data: gateway::DispatchData =
-                                                    ::serde_json::from_value(data).unwrap();
+                                                let data: ::serde_json::Value = data;
+                                                // let data: gateway::DispatchData =
+                                                //     ::serde_json::from_value(data).unwrap();
                                                 sequence_tx.send(Some(sequence_number)).unwrap();
                                                 println!("--------------------");
                                                 println!("|     Dispatch     |");
@@ -825,6 +831,13 @@ async fn main() {
                                                 println!("Event Name: {}", event_name);
                                                 println!("Sequence Number: {:?}", sequence_number);
                                                 println!("--------------------");
+                                                match &*event_name {
+                                                    "INTERACTION_CREATE" => {
+                                                        let data: gateway::Interaction = ::serde_json::from_value(data).unwrap();
+                                                        println!("Data: {:#?}", data);
+                                                    }
+                                                    _ => (),
+                                                }
                                             }
                                             Ok(payload) => {
                                                 println!("Payload of unknown type: {:?}", payload);
