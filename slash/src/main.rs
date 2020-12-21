@@ -221,17 +221,17 @@ mod gateway {
         }
     }
     #[derive(Serialize)]
-    struct ConnectionProperties {
+    pub(crate) struct ConnectionProperties {
         #[serde(rename = "$os")]
-        os: String,
+        pub(crate) os: String,
         #[serde(rename = "$browser")]
-        browser: String,
+        pub(crate) browser: String,
         #[serde(rename = "$device")]
-        device: String,
+        pub(crate) device: String,
     }
     #[derive(Serialize_repr)]
     #[repr(u8)]
-    enum ActivityType {
+    pub(crate) enum ActivityType {
         Game = 0,
         Streaming = 1,
         Listening = 2,
@@ -239,27 +239,27 @@ mod gateway {
         Competing = 5,
     }
     #[derive(Serialize)]
-    struct ActivityTimestamps {
+    pub(crate) struct ActivityTimestamps {
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        start: Option<u32>,
+        pub(crate) start: Option<u32>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        end: Option<u32>,
+        pub(crate) end: Option<u32>,
     }
     #[derive(Serialize, Deserialize)]
     #[serde(transparent)]
-    struct Snowflake(u64);
+    pub(crate) struct Snowflake(pub(crate) u64);
     #[derive(Serialize)]
-    struct ActivityEmoji {
-        name: String,
+    pub(crate) struct ActivityEmoji {
+        pub(crate) name: String,
         // `null` is anot allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        id: Option<Snowflake>,
-        animated: bool,
+        pub(crate) id: Option<Snowflake>,
+        pub(crate) animated: bool,
     }
     #[derive(Serialize)]
-    enum StatusType {
+    pub(crate) enum StatusType {
         #[serde(rename = "online")]
         Online,
         #[serde(rename = "dnd")]
@@ -273,14 +273,14 @@ mod gateway {
     }
     // Bots are only allowed to send these fields of the `Activity` struct.
     #[derive(Serialize)]
-    struct BotActivity {
-        name: String,
+    pub(crate) struct BotActivity {
+        pub(crate) name: String,
         #[serde(rename = "type")]
-        ty: ActivityType,
+        pub(crate) ty: ActivityType,
         // Stream URL. Is validated when type is Streaming.
         // Both `null` and omission are allowed.
         #[serde(skip_serializing_if = "Option::is_none")]
-        url: Option<String>,
+        pub(crate) url: Option<String>,
     }
     #[derive(Serialize)]
     struct Activity {
@@ -310,39 +310,39 @@ mod gateway {
         // TODO: Incomplete.
     }
     #[derive(Serialize)]
-    struct UpdateStatus {
-        since: Option<u32>,
+    pub(crate) struct UpdateStatus {
+        pub(crate) since: Option<u32>,
         // `null` is allowed, omission is not.
         // TODO: Since we only care about sending these for the moment,
         // we're using the BotActivity type, but I'd prefer to
         // abstract over the two at some point.
-        activities: Option<Vec<BotActivity>>,
-        status: StatusType,
-        afk: bool,
+        pub(crate) activities: Option<Vec<BotActivity>>,
+        pub(crate) status: StatusType,
+        pub(crate) afk: bool,
     }
     #[derive(Serialize)]
     pub(crate) struct IdentifyData {
-        token: String,
-        properties: ConnectionProperties,
+        pub(crate) token: String,
+        pub(crate) properties: ConnectionProperties,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        compress: Option<bool>,
+        pub(crate) compress: Option<bool>,
         // Between 50 and 250, total number of members
         // where the gateway will stop sending offline members
         // in the guild member list.
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        large_threshold: Option<u8>,
+        pub(crate) large_threshold: Option<u8>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        shard: Option<[u32; 2]>,
+        pub(crate) shard: Option<[u32; 2]>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        presence: Option<UpdateStatus>,
+        pub(crate) presence: Option<UpdateStatus>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        guild_subscriptions: Option<bool>,
-        intents: Intents,
+        pub(crate) guild_subscriptions: Option<bool>,
+        pub(crate) intents: Intents,
     }
 }
 
