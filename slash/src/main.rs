@@ -375,7 +375,7 @@ mod gateway {
     pub(crate) struct ApplicationCommandInteractionDataOption {
         pub(crate) name: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub(crate) value: Option<super::CommandOptionType>,
+        pub(crate) value: Option<::serde_json::Value>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub(crate) options: Option<Vec<ApplicationCommandInteractionDataOption>>,
