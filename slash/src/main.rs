@@ -128,6 +128,27 @@ mod api {
                 Url::parse(&x.url).expect("discord is sending us bad data")
             })
     }
+    pub(crate) async fn reply_gateway_interaction(
+        client: &::reqwest::Client,
+        interaction: super::gateway::Snowflake,
+        token: String,
+        data: String,
+    ) -> Result<(), ::reqwest::Error> {
+        client
+            .post(&format!(
+                "{}/v{}/interactions/{}/{}/callback",
+                BASE, VERSION, interaction.0 .0, token
+            ))
+            .json(&::serde_json::json!({
+                "type": 4,
+                "data": {
+                    "content": data
+                }
+            }))
+            .send()
+            .await
+            .map(|_| ())
+    }
     use ::serde_aux::field_attributes::deserialize_number_from_string;
     /// A 64 bit integer type that deserializes Discord's stringed up integers just fine.
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -144,9 +165,9 @@ mod api {
 // for those fields, although they appear to have the same semantics on their end.
 // So, we skip serialization of all nulled optional fields where omission is allowed.
 mod gateway {
+    use super::api::U64;
     use ::serde::{Deserialize, Serialize};
     use ::serde_repr::{Deserialize_repr, Serialize_repr};
-    use super::api::U64;
     /// The Discord Gateway is versioned separately from the HTTP APIs.
     /// This is the Gateway version against which this is written.
     pub(crate) const VERSION: u8 = 8;
@@ -438,7 +459,7 @@ mod gateway {
         pub(crate) mute: bool,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub(crate) pending: Option<bool>
+        pub(crate) pending: Option<bool>,
     }
     #[derive(Deserialize, Debug)]
     pub(crate) struct Interaction {
@@ -839,7 +860,27 @@ async fn main() {
                                                 println!("--------------------");
                                                 match &*event_name {
                                                     "INTERACTION_CREATE" => {
-                                                        let data: gateway::Interaction = ::serde_json::from_value(data).unwrap();
+                                                        let interaction: gateway::Interaction =
+                                                            ::serde_json::from_value(data).unwrap();
+                                                        let data = interaction.data.unwrap();
+                                                        match data.options.as_deref() {
+                                                            Some(
+                                                                [gateway::ApplicationCommandInteractionDataOption {
+                                                                name, value: Some(::serde_json::Value::String(exp)), ..
+                                                            }],
+                                                            ) => {
+                                                                let name: &str = &*name;
+                                                                match name {
+                                                                    "expression" => {
+                                                                        let exp = ::mice::parse::Expression::parse(exp).unwrap().1.unwrap();
+                                                                        api::reply_gateway_interaction(&req_client, interaction.id, interaction.token, exp.roll().unwrap().format(Default::default())).compat().await.unwrap();
+                                                                    }
+                                                                    _ => todo!("wrong option"),
+                                                                }
+                                                            }
+                                                            Some([..]) => todo!("wrong options"),
+                                                            None => todo!("no options"),
+                                                        }
                                                         println!("Data: {:#?}", data);
                                                     }
                                                     _ => (),

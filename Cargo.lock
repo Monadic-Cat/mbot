@@ -1724,6 +1724,7 @@ name = "slash"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "mice",
  "reqwest",
  "ron",
  "serde",
