@@ -680,6 +680,7 @@ mod heartbeat {
         interval: u64,
         ws_sender: mpsc::Sender<::tungstenite::Message>,
     }
+    #[derive(Debug)]
     enum HeartMessage {
         Ack,
     }
@@ -737,12 +738,17 @@ mod heartbeat {
         fn new(interval: u64, ws_sender: mpsc::Sender<::tungstenite::Message>) -> Self {
             // This capacity is connected to the TODO above.
             let (sender, receiver) = mpsc::channel(1);
+            // TODO: ascertain that this initial ACK is necessary
+            sender.try_send(HeartMessage::Ack).expect("couldn't send initial ACK");
             let (seq_sender, seq_receiver) = watch::channel(None);
             let beater = Heart::new(receiver, seq_receiver, interval, ws_sender);
             ::tokio::spawn(beater.run());
             Self { sender, seq_sender }
         }
-        fn set_seq(&mut self, seq: SequenceNumber) {
+        async fn send(&self, msg: HeartMessage) -> Result<(), mpsc::error::SendError<HeartMessage>> {
+            self.sender.send(msg).await
+        }
+        fn set_seq(&self, seq: SequenceNumber) {
             let _ = self.seq_sender.send(Some(seq));
         }
     }
