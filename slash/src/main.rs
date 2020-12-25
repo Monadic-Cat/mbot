@@ -669,6 +669,85 @@ enum Opt {
     Validate(SchemaKind),
 }
 
+mod heartbeat {
+    use super::gateway::{self, SequenceNumber};
+    use ::tokio::sync::{mpsc, oneshot, watch};
+    use ::tokio::sync::mpsc::error::TryRecvError;
+    use ::tokio::time;
+    struct Heart {
+        receiver: mpsc::Receiver<HeartMessage>,
+        seq_rx: watch::Receiver<Option<SequenceNumber>>,
+        interval: u64,
+        ws_sender: mpsc::Sender<::tungstenite::Message>,
+    }
+    enum HeartMessage {
+        Ack,
+    }
+    impl Heart {
+        fn new(
+            receiver: mpsc::Receiver<HeartMessage>,
+            seq_rx: watch::Receiver<Option<SequenceNumber>>,
+            interval: u64,
+            ws_sender: mpsc::Sender<::tungstenite::Message>,
+        ) -> Self {
+            Self { receiver, seq_rx, interval, ws_sender }
+        }
+        async fn run(mut self) {
+            let mut interval = time::interval(time::Duration::from_millis(self.interval));
+            loop {
+                interval.tick().await;
+                let seq = *self.seq_rx.borrow();
+                match self.receiver.try_recv() {
+                    Ok(HeartMessage::Ack) => {
+                        // TODO: consider what would happen if this send took
+                        // longer than the heartbeat interval.
+                        let send_result = self.ws_sender.send(::tungstenite::Message::text(
+                            ::serde_json::to_string(&gateway::Payload {
+                                opcode: gateway::Opcode::Heartbeat,
+                                data: seq,
+                                event_name: None,
+                                sequence_number: None,
+                            }).expect("couldn't serialize heartbeat payload")
+                        )).await;
+                        match send_result {
+                            Ok(()) => (),
+                            // If sending returns an Err, that means the receiver is closed.
+                            // If the receiver is closed, that means we're winding down.
+                            // So, just exit the heartbeat loop.
+                            Err(_) => break,
+                        }
+                    },
+                    // This is the case where we haven't received any HeartbeatACKs since
+                    // our last heartbeat, unless it's the first run?
+                    // Consider sending a special initial heartbeat before entering the loop.
+                    Err(TryRecvError::Empty) => todo!("attempt reconnection"),
+                    // If the sender is closed, that means we're winding down.
+                    // As above, panicking is silly- just stop sending heartbeat messages.
+                    Err(TryRecvError::Closed) => break,
+                }
+            }
+        }
+    }
+
+    struct HeartHandle {
+        sender: mpsc::Sender<HeartMessage>,
+        seq_sender: watch::Sender<Option<SequenceNumber>>,
+    }
+    impl HeartHandle {
+        fn new(interval: u64, ws_sender: mpsc::Sender<::tungstenite::Message>) -> Self {
+            // This capacity is connected to the TODO above.
+            let (sender, receiver) = mpsc::channel(1);
+            let (seq_sender, seq_receiver) = watch::channel(None);
+            let beater = Heart::new(receiver, seq_receiver, interval, ws_sender);
+            ::tokio::spawn(beater.run());
+            Self { sender, seq_sender }
+        }
+        fn set_seq(&mut self, seq: SequenceNumber) {
+            let _ = self.seq_sender.send(Some(seq));
+        }
+    }
+}
+
 // TODO: split apart this gigant main function.
 #[::tokio::main]
 async fn main() {
