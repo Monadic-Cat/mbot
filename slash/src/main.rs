@@ -671,8 +671,8 @@ enum Opt {
 
 mod heartbeat {
     use super::gateway::{self, SequenceNumber};
-    use ::tokio::sync::{mpsc, oneshot, watch};
     use ::tokio::sync::mpsc::error::TryRecvError;
+    use ::tokio::sync::{mpsc, oneshot, watch};
     use ::tokio::time;
     struct Heart {
         receiver: mpsc::Receiver<HeartMessage>,
@@ -681,7 +681,7 @@ mod heartbeat {
         ws_sender: mpsc::Sender<::tungstenite::Message>,
     }
     #[derive(Debug)]
-    enum HeartMessage {
+    pub(crate) enum HeartMessage {
         Ack,
     }
     impl Heart {
@@ -691,7 +691,12 @@ mod heartbeat {
             interval: u64,
             ws_sender: mpsc::Sender<::tungstenite::Message>,
         ) -> Self {
-            Self { receiver, seq_rx, interval, ws_sender }
+            Self {
+                receiver,
+                seq_rx,
+                interval,
+                ws_sender,
+            }
         }
         async fn run(mut self) {
             let mut interval = time::interval(time::Duration::from_millis(self.interval));
@@ -702,14 +707,18 @@ mod heartbeat {
                     Ok(HeartMessage::Ack) => {
                         // TODO: consider what would happen if this send took
                         // longer than the heartbeat interval.
-                        let send_result = self.ws_sender.send(::tungstenite::Message::text(
-                            ::serde_json::to_string(&gateway::Payload {
-                                opcode: gateway::Opcode::Heartbeat,
-                                data: seq,
-                                event_name: None,
-                                sequence_number: None,
-                            }).expect("couldn't serialize heartbeat payload")
-                        )).await;
+                        let send_result = self
+                            .ws_sender
+                            .send(::tungstenite::Message::text(
+                                ::serde_json::to_string(&gateway::Payload {
+                                    opcode: gateway::Opcode::Heartbeat,
+                                    data: seq,
+                                    event_name: None,
+                                    sequence_number: None,
+                                })
+                                .expect("couldn't serialize heartbeat payload"),
+                            ))
+                            .await;
                         match send_result {
                             Ok(()) => (),
                             // If sending returns an Err, that means the receiver is closed.
@@ -717,10 +726,12 @@ mod heartbeat {
                             // So, just exit the heartbeat loop.
                             Err(_) => break,
                         }
-                    },
+                    }
                     // This is the case where we haven't received any HeartbeatACKs since
                     // our last heartbeat, unless it's the first run?
                     // Consider sending a special initial heartbeat before entering the loop.
+                    // TODO: terminate the connection with a non-1000 close code, reconnect,
+                    // and attempt to resume.
                     Err(TryRecvError::Empty) => todo!("attempt reconnection"),
                     // If the sender is closed, that means we're winding down.
                     // As above, panicking is silly- just stop sending heartbeat messages.
@@ -730,25 +741,30 @@ mod heartbeat {
         }
     }
 
-    struct HeartHandle {
+    pub(crate) struct HeartHandle {
         sender: mpsc::Sender<HeartMessage>,
         seq_sender: watch::Sender<Option<SequenceNumber>>,
     }
     impl HeartHandle {
-        fn new(interval: u64, ws_sender: mpsc::Sender<::tungstenite::Message>) -> Self {
+        pub(crate) fn new(interval: u64, ws_sender: mpsc::Sender<::tungstenite::Message>) -> Self {
             // This capacity is connected to the TODO above.
             let (sender, receiver) = mpsc::channel(1);
             // TODO: ascertain that this initial ACK is necessary
-            sender.try_send(HeartMessage::Ack).expect("couldn't send initial ACK");
+            sender
+                .try_send(HeartMessage::Ack)
+                .expect("couldn't send initial ACK");
             let (seq_sender, seq_receiver) = watch::channel(None);
             let beater = Heart::new(receiver, seq_receiver, interval, ws_sender);
             ::tokio::spawn(beater.run());
             Self { sender, seq_sender }
         }
-        async fn send(&self, msg: HeartMessage) -> Result<(), mpsc::error::SendError<HeartMessage>> {
+        pub(crate) async fn send(
+            &self,
+            msg: HeartMessage,
+        ) -> Result<(), mpsc::error::SendError<HeartMessage>> {
             self.sender.send(msg).await
         }
-        fn set_seq(&self, seq: SequenceNumber) {
+        pub(crate) fn set_seq(&self, seq: SequenceNumber) {
             let _ = self.seq_sender.send(Some(seq));
         }
     }
@@ -895,95 +911,98 @@ async fn main() {
                                 sequence_number: None,
                             }).expect("couldn't serialize Identify payload"))).await
                                 .expect("identify send failure");
-                            task::spawn(async move {
-                                // Consider doing the heartbeat a little early?
-                                let mut interval =
-                                    time::interval(Duration::from_millis(heartbeat_interval as _));
-                                loop {
-                                    interval.tick().await;
-                                    // TODO:
-                                    // Check to see if we've received a heartbeat ACK.
-                                    // If so, send heartbeat.
-                                    // Otherwise, terminate the connection with a non-1000 close code,
-                                    // reconnect, and attempt to resume.
-                                    let seq_number: Option<gateway::SequenceNumber> =
-                                        *sequence_rx.borrow();
-                                    ws_sender
-                                        .send(Message::text(
-                                            ::serde_json::to_string(&gateway::Payload {
-                                                opcode: gateway::Opcode::Heartbeat,
-                                                data: seq_number,
-                                                event_name: None,
-                                                sequence_number: None,
-                                            })
-                                            .expect("couldn't serialize heartbeat payload"),
-                                        ))
-                                        .await
-                                        .expect("heartbeat send failure");
-                                }
-                            });
-                            while let Some(msg) = ws_receiver.next().await {
-                                println!("Another message: {:?}", msg);
-                                match msg {
-                                    Ok(Message::Text(text)) => {
-                                        match ::serde_json::from_str(&text) {
-                                            Ok(gateway::Payload {
-                                                opcode: gateway::Opcode::Dispatch,
-                                                data,
-                                                event_name: Some(event_name),
-                                                sequence_number: Some(sequence_number),
-                                            }) => {
-                                                let data: ::serde_json::Value = data;
-                                                // let data: gateway::DispatchData =
-                                                //     ::serde_json::from_value(data).unwrap();
-                                                sequence_tx.send(Some(sequence_number)).unwrap();
-                                                println!("--------------------");
-                                                println!("|     Dispatch     |");
-                                                println!("--------------------");
-                                                println!("Event Name: {}", event_name);
-                                                println!("Sequence Number: {:?}", sequence_number);
-                                                println!("--------------------");
-                                                match &*event_name {
-                                                    "INTERACTION_CREATE" => {
-                                                        let interaction: gateway::Interaction =
-                                                            ::serde_json::from_value(data).unwrap();
-                                                        let data = interaction.data.unwrap();
-                                                        match data.options.as_deref() {
-                                                            Some(
-                                                                [gateway::ApplicationCommandInteractionDataOption {
-                                                                name, value: Some(::serde_json::Value::String(exp)), ..
-                                                            }],
-                                                            ) => {
-                                                                let name: &str = &*name;
-                                                                match name {
-                                                                    "expression" => {
-                                                                        let exp = ::mice::parse::Expression::parse(exp).unwrap().1.unwrap();
-                                                                        api::reply_gateway_interaction(&req_client, interaction.id, interaction.token, exp.roll().unwrap().format(Default::default())).compat().await.unwrap();
+                            // This is the channel over which the Heart should send us
+                            // its heartbeat messages.
+                            let (h_ws_tx, mut h_ws_rx) = ::tokio::sync::mpsc::channel(1);
+                            let heart_handle =
+                                heartbeat::HeartHandle::new(heartbeat_interval as _, h_ws_tx);
+                            // Now, the event loop.
+                            loop {
+                                ::tokio::select! {
+                                    msg = h_ws_rx.recv() => {
+                                        match msg {
+                                            Some(msg) => ws_sender.send(msg).await.expect("couldn't send heartbeat"),
+                                            None => todo!("handle heart exiting early"),
+                                        }
+                                    },
+                                    msg = ws_receiver.next() => {
+                                        match msg {
+                                            Some(msg) => {
+                                                println!("Another message: {:?}", msg);
+                                                match msg {
+                                                    Ok(Message::Text(text)) => {
+                                                        match ::serde_json::from_str(&text) {
+                                                            Ok(gateway::Payload {
+                                                                opcode: gateway::Opcode::Dispatch,
+                                                                data,
+                                                                event_name: Some(event_name),
+                                                                sequence_number: Some(sequence_number),
+                                                            }) => {
+                                                                let data: ::serde_json::Value = data;
+                                                                // let data: gateway::DispatchData =
+                                                                //     ::serde_json::from_value(data).unwrap();
+                                                                sequence_tx.send(Some(sequence_number)).unwrap();
+                                                                println!("--------------------");
+                                                                println!("|     Dispatch     |");
+                                                                println!("--------------------");
+                                                                println!("Event Name: {}", event_name);
+                                                                println!("Sequence Number: {:?}", sequence_number);
+                                                                println!("--------------------");
+                                                                match &*event_name {
+                                                                    "INTERACTION_CREATE" => {
+                                                                        let interaction: gateway::Interaction =
+                                                                            ::serde_json::from_value(data).unwrap();
+                                                                        let data = interaction.data.unwrap();
+                                                                        match data.options.as_deref() {
+                                                                            Some(
+                                                                                [gateway::ApplicationCommandInteractionDataOption {
+                                                                                    name, value: Some(::serde_json::Value::String(exp)), ..
+                                                                                }],
+                                                                            ) => {
+                                                                                let name: &str = &*name;
+                                                                                match name {
+                                                                                    "expression" => {
+                                                                                        let exp = ::mice::parse::Expression::parse(exp).unwrap().1.unwrap();
+                                                                                        api::reply_gateway_interaction(&req_client, interaction.id, interaction.token, exp.roll().unwrap().format(Default::default())).compat().await.unwrap();
+                                                                                    }
+                                                                                    _ => todo!("wrong option"),
+                                                                                }
+                                                                            }
+                                                                            Some([..]) => todo!("wrong options"),
+                                                                            None => todo!("no options"),
+                                                                        }
+                                                                        println!("Data: {:#?}", data);
                                                                     }
-                                                                    _ => todo!("wrong option"),
+                                                                    _ => (),
                                                                 }
                                                             }
-                                                            Some([..]) => todo!("wrong options"),
-                                                            None => todo!("no options"),
+                                                            Ok(gateway::Payload {
+                                                                opcode: gateway::Opcode::HeartbeatACK,
+                                                                data: _, // TODO: what's this
+                                                                sequence_number: None,
+                                                                event_name: None,
+                                                            }) => match heart_handle.send(heartbeat::HeartMessage::Ack).await {
+                                                                Ok(()) => (),
+                                                                Err(_) => todo!("handle heart exiting early"),
+                                                            },
+                                                            Ok(payload) => {
+                                                                println!("Payload of unknown type: {:?}", payload);
+                                                            }
+                                                            Err(_) => todo!("handling malformed Gateway payloads"),
                                                         }
-                                                        println!("Data: {:#?}", data);
                                                     }
-                                                    _ => (),
+                                                    Ok(msg) => {
+                                                        println!(
+                                                            "TODO: handle this kind of WebSocket message: {:?}",
+                                                            msg
+                                                        )
+                                                    }
+                                                    Err(_) => todo!("handling connection errors"),
                                                 }
-                                            }
-                                            Ok(payload) => {
-                                                println!("Payload of unknown type: {:?}", payload);
-                                            }
-                                            Err(_) => todo!("handling malformed Gateway payloads"),
+                                            },
+                                            None => todo!("handle closed gateway stream"),
                                         }
-                                    }
-                                    Ok(msg) => {
-                                        println!(
-                                            "TODO: handle this kind of WebSocket message: {:?}",
-                                            msg
-                                        )
-                                    }
-                                    Err(_) => todo!("handling connection errors"),
+                                    },
                                 }
                             }
                         }
