@@ -235,6 +235,9 @@ mod gateway {
         id: Snowflake,
         flags: u64,
     }
+    #[derive(Serialize, Deserialize)]
+    #[serde(transparent)]
+    struct SessionId(String);
     /// [Ready](https://discord.com/developers/docs/topics/gateway#ready)
     #[derive(Deserialize)]
     pub(crate) struct Ready {
@@ -243,8 +246,7 @@ mod gateway {
         user: User,
         private_channels: [(); 0],
         guilds: Vec<UnavailableGuild>,
-        // TODO: This ought to have a better type.
-        session_id: String,
+        session_id: SessionId,
         shard: ShardData,
         application: PartialApplication,
     }
