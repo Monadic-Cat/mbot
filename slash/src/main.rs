@@ -881,14 +881,7 @@ async fn main() {
                             data: gateway::HelloData { heartbeat_interval },
                             ..
                         }) => {
-                            // We're might put the sender half in a Mutex or something.
-                            // We're going to have a single task reading from the receiver, though.
-                            // That would be our event loop.
-                            // Gonna be a fun time, handling reconnects.
-                            // Probably gonna end up with a bunch of tasks.
-                            let (mut ws_sender, mut ws_receiver) =
-                                ::futures::stream::StreamExt::split(ws_stream);
-                            ws_sender.send(Message::Text(::serde_json::to_string(&gateway::Payload {
+                            ws_stream.send(Message::Text(::serde_json::to_string(&gateway::Payload {
                                 opcode: gateway::Opcode::Identify,
                                 data: gateway::IdentifyData {
                                     token: match config.auth {
@@ -921,11 +914,11 @@ async fn main() {
                                 ::tokio::select! {
                                     msg = h_ws_rx.recv() => {
                                         match msg {
-                                            Some(msg) => ws_sender.send(msg).await.expect("couldn't send heartbeat"),
+                                            Some(msg) => ws_stream.send(msg).await.expect("couldn't send heartbeat"),
                                             None => todo!("handle heart exiting early"),
                                         }
                                     },
-                                    msg = ws_receiver.next() => {
+                                    msg = ws_stream.next() => {
                                         match msg {
                                             Some(msg) => {
                                                 println!("Another message: {:?}", msg);
