@@ -224,6 +224,30 @@ mod gateway {
     pub(crate) struct HelloData {
         pub(crate) heartbeat_interval: u32,
     }
+    /// [Unavailable Guild](https://discord.com/developers/docs/resources/guild#unavailable-guild-object)
+    #[derive(Deserialize)]
+    struct UnavailableGuild {
+        id: U64,
+    }
+    /// [Partial Application](https://discord.com/developers/docs/topics/gateway#ready-ready-event-fields)
+    #[derive(Deserialize)]
+    struct PartialApplication {
+        id: Snowflake,
+        flags: u64,
+    }
+    /// [Ready](https://discord.com/developers/docs/topics/gateway#ready)
+    #[derive(Deserialize)]
+    pub(crate) struct Ready {
+        #[serde(rename = "v")]
+        version: u8,
+        user: User,
+        private_channels: [(); 0],
+        guilds: Vec<UnavailableGuild>,
+        // TODO: This ought to have a better type.
+        session_id: String,
+        shard: ShardData,
+        application: PartialApplication,
+    }
     #[derive(Deserialize)]
     pub(crate) struct DispatchData {}
     pub(crate) enum Intent {
@@ -354,6 +378,12 @@ mod gateway {
         pub(crate) status: StatusType,
         pub(crate) afk: bool,
     }
+    /// [Sharding](https://discord.com/developers/docs/topics/gateway#sharding)
+    #[derive(Serialize, Deserialize)]
+    #[serde(transparent)]
+    pub(crate) struct ShardData {
+        arr: [u32; 2],
+    }
     #[derive(Serialize)]
     pub(crate) struct IdentifyData {
         pub(crate) token: String,
@@ -369,7 +399,7 @@ mod gateway {
         pub(crate) large_threshold: Option<u8>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub(crate) shard: Option<[u32; 2]>,
+        pub(crate) shard: Option<ShardData>,
         // `null` is not allowed, omission is.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub(crate) presence: Option<UpdateStatus>,
