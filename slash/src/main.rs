@@ -802,6 +802,99 @@ mod heartbeat {
     }
 }
 
+mod connection {
+    use super::gateway::SequenceNumber;
+    use super::heartbeat::HeartHandle;
+    /// TLS secured WebSocketStream we use with the Discord Gateway.
+    type WSStream = ::tokio_tungstenite::WebSocketStream<::tokio_rustls::client::TlsStream<::tokio::net::TcpStream>>;
+    use ::tokio_tungstenite::WebSocketStream;
+    // Handles IO with a single Gateway connection.
+    // Does not perform reconnections- that's someone else's job.
+    // *Does* return errors indicative of whether reconnects are advisable.
+    struct Connection {
+        stream: WSStream,
+        heartbeat_interval: u32,
+    }
+    enum Never {}
+    // TODO: flesh this out
+    enum ConnectionClosed {
+        Resumable(Option<SequenceNumber>),
+        Nonresumable,
+    }
+    impl Connection {
+        /// Initializes a Gateway connection from a just created WebSocket stream,
+        /// issuing a Resume event instead of an Identify event.
+        async fn with_resume(stream: WSStream) -> Result<Self, ()> {
+            todo!("sending resume events")
+        }
+        /// Initializes a Gateway connection from a just created WebSocket stream.
+        async fn initialize(stream: WSStream) -> Result<Self, ()> {
+            todo!("sending identify payload")
+        }
+        /// Runs event loop and concurrently sends appropriate heartbeat messages.
+        async fn run_event_loop(mut self) -> Result<Never, ConnectionClosed> {
+            use ::tokio::stream::StreamExt;
+            use ::futures::sink::SinkExt;
+            let (h_ws_tx, mut h_ws_rx) = ::tokio::sync::mpsc::channel(1);
+            let heart_handle = HeartHandle::new(self.heartbeat_interval as _, h_ws_tx);
+            loop {
+                ::tokio::select! {
+                    msg = h_ws_rx.recv() => match msg {
+                        Some(msg) => self.stream.send(msg).await.expect("couldn't send heartbeat"),
+                        None => todo!("handle heart exiting early"),
+                    },
+                    msg = self.stream.next() => match msg {
+                        Some(msg) => {
+                            println!("Another message: {:?}", msg);
+                        },
+                        None => todo!("handle closed gateway stream"),
+                    }
+                }
+            }
+        }
+    }
+    struct ConnectionHandle {
+        // TODO: figure out what needs to be held to talk back 'n shit
+    }
+    impl ConnectionHandle {
+        async fn new(stream: WSStream) -> Result<ConnectionHandle, ()> {
+            let connection = Connection::initialize(stream).await?;
+            ::tokio::spawn(connection.run_event_loop());
+            Ok(Self {})
+        }
+        async fn resume(&mut self, stream: WSStream) -> Result<(), ()> {
+            todo!("connection resumption")
+        }
+        async fn next(&mut self) -> Option<()> {
+            todo!("event stream")
+        }
+        fn is_resumable(&self) -> bool {
+            todo!("recording whether a Gateway connection is resumable")
+        }
+    }
+    fn get_stream() -> WSStream {
+        todo!("lol")
+    }
+    async fn example() {
+        let ws_stream = get_stream();
+        let mut connection = ConnectionHandle::new(ws_stream).await.unwrap();
+        loop {
+            // use it
+            while let Some(event) = connection.next().await {
+                match event {
+                    () => (),
+                }
+            }
+            // handle it dying:
+            if connection.is_resumable() {
+                connection.resume(get_stream()).await.unwrap();
+            } else {
+                break
+            }
+        }
+    }
+}
+
 // TODO: split apart this gigant main function.
 #[::tokio::main]
 async fn main() {
