@@ -803,11 +803,12 @@ mod heartbeat {
 }
 
 mod connection {
-    use super::gateway::SequenceNumber;
+    use super::gateway::{self, SequenceNumber};
     use super::heartbeat::HeartHandle;
     /// TLS secured WebSocketStream we use with the Discord Gateway.
     type WSStream = ::tokio_tungstenite::WebSocketStream<::tokio_rustls::client::TlsStream<::tokio::net::TcpStream>>;
     use ::tokio_tungstenite::WebSocketStream;
+    use ::tokio::sync::oneshot;
     // Handles IO with a single Gateway connection.
     // Does not perform reconnections- that's someone else's job.
     // *Does* return errors indicative of whether reconnects are advisable.
@@ -824,7 +825,7 @@ mod connection {
     impl Connection {
         /// Initializes a Gateway connection from a just created WebSocket stream,
         /// issuing a Resume event instead of an Identify event.
-        async fn with_resume(stream: WSStream) -> Result<Self, ()> {
+        async fn with_resume(seq: SequenceNumber, stream: WSStream) -> Result<Self, ()> {
             todo!("sending resume events")
         }
         /// Initializes a Gateway connection from a just created WebSocket stream.
@@ -832,7 +833,7 @@ mod connection {
             todo!("sending identify payload")
         }
         /// Runs event loop and concurrently sends appropriate heartbeat messages.
-        async fn run_event_loop(mut self) -> Result<Never, ConnectionClosed> {
+        async fn run_event_loop(mut self, exit: oneshot::Sender<ConnectionClosed>) -> Result<Never, ()> {
             use ::tokio::stream::StreamExt;
             use ::futures::sink::SinkExt;
             let (h_ws_tx, mut h_ws_rx) = ::tokio::sync::mpsc::channel(1);
@@ -853,22 +854,44 @@ mod connection {
             }
         }
     }
+    // I will hopefully merge this with the deserialization
+    // code in the gateway module at some point.
+    // For now, it's manual, though.
+    //
+    // I don't feel like exposing sequence numbers unless we have to.
+    #[non_exhaustive]
+    enum GatewayEvent {
+        // We'll be omitting heartbeats from this, for now.
+        DispatchInteractionCreate(gateway::Interaction),
+    }
+    /// A session resume token.
+    /// Contains whatever is necessary to resume a Gateway session.
+    struct SessionResume {
+        seq: SequenceNumber,
+    }
+    // TODO: consider renaming this to `SessionHandle`
     struct ConnectionHandle {
         // TODO: figure out what needs to be held to talk back 'n shit
+        exit: Option<oneshot::Receiver<ConnectionClosed>>
     }
     impl ConnectionHandle {
         async fn new(stream: WSStream) -> Result<ConnectionHandle, ()> {
             let connection = Connection::initialize(stream).await?;
-            ::tokio::spawn(connection.run_event_loop());
-            Ok(Self {})
+            let (exit_tx, exit_rx) = oneshot::channel();
+            ::tokio::spawn(connection.run_event_loop(exit_tx));
+            Ok(Self { exit: Some(exit_rx) })
         }
-        async fn resume(&mut self, stream: WSStream) -> Result<(), ()> {
+        /// Attempt to resume Gateway session with new WebSocket stream.
+        async fn resume(&mut self, resume_token: SessionResume, stream: WSStream) -> Result<(), ()> {
+            let connection = Connection::with_resume(resume_token.seq, stream).await?;
+            let (exit_tx, exit_rx) = oneshot::channel();
+            ::tokio::spawn(connection.run_event_loop(exit_tx));
             todo!("connection resumption")
         }
-        async fn next(&mut self) -> Option<()> {
+        async fn next(&mut self) -> Option<GatewayEvent> {
             todo!("event stream")
         }
-        fn is_resumable(&self) -> bool {
+        fn is_resumable(&self) -> Option<SessionResume> {
             todo!("recording whether a Gateway connection is resumable")
         }
     }
@@ -882,14 +905,16 @@ mod connection {
             // use it
             while let Some(event) = connection.next().await {
                 match event {
-                    () => (),
+                    GatewayEvent::DispatchInteractionCreate { .. } => (),
                 }
             }
             // handle it dying:
-            if connection.is_resumable() {
-                connection.resume(get_stream()).await.unwrap();
-            } else {
-                break
+            match connection.is_resumable() {
+                Some(token) => connection.resume(token, get_stream()).await.unwrap(),
+                None => match ConnectionHandle::new(get_stream()).await {
+                    Ok(x) => connection = x,
+                    Err(_) => break
+                }
             }
         }
     }
