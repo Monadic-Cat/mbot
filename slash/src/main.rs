@@ -857,6 +857,8 @@ mod connection {
                             // TODO: Consider factoring out event decoding somehow.
                             let msg: gateway::Payload<::serde_json::Value> = ::serde_json::from_str(&msg)
                                 .expect("discord sent invalid message");
+                            // TODO: consider matching on the whole structure of the message,
+                            // for improved validity in the face of updates to the Discord API.
                             match msg.opcode {
                                 gateway::Opcode::Dispatch => {
                                     let event_name = &*msg.event_name
