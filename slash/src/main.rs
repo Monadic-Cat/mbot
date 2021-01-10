@@ -846,9 +846,15 @@ mod connection {
                         Some(msg) => self.stream.send(msg).await.expect("couldn't send heartbeat"),
                         None => todo!("handle heart exiting early"),
                     },
+                    // If the receiving half is closed, we've
+                    // either been intentionally stopped by the ConnectionHandle,
+                    // or the ConnectionHandle has been dropped.
+                    // In either case, this task should wind down immediately.
+                    _ = events.closed() => break,
                     msg = self.stream.next() => match msg {
                         Some(Ok(Message::Text(msg))) => {
                             println!("Another message: {:?}", msg);
+                            // TODO: Consider factoring out event decoding somehow.
                             let msg: gateway::Payload<::serde_json::Value> = ::serde_json::from_str(&msg)
                                 .expect("discord sent invalid message");
                             match msg.opcode {
