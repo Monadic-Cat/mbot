@@ -967,7 +967,7 @@ mod connection {
     //
     // I don't feel like exposing sequence numbers unless we have to.
     #[non_exhaustive]
-    enum GatewayEvent {
+    pub(crate) enum GatewayEvent {
         // We'll be omitting heartbeats from this, for now.
         DispatchInteractionCreate(gateway::Interaction),
     }
@@ -977,14 +977,14 @@ mod connection {
         seq: SequenceNumber,
     }
     // TODO: consider renaming this to `SessionHandle`
-    struct ConnectionHandle<'a> {
+    pub(crate) struct ConnectionHandle<'a> {
         // TODO: figure out what needs to be held to talk back 'n shit
         exit: Option<oneshot::Receiver<ConnectionClosed>>,
         events: mpsc::UnboundedReceiver<GatewayEvent>,
         auth: &'a Auth,
     }
     impl<'a> ConnectionHandle<'a> {
-        async fn new(auth: &'a Auth, stream: WSStream) -> Result<ConnectionHandle<'a>, ()> {
+        pub(crate) async fn new(auth: &'a Auth, stream: WSStream) -> Result<ConnectionHandle<'a>, ()> {
             let connection = Connection::initialize(auth, stream).await?;
             let (exit_tx, exit_rx) = oneshot::channel();
             let (event_tx, event_rx) = mpsc::unbounded_channel();
@@ -999,7 +999,7 @@ mod connection {
             ::tokio::spawn(connection.run_event_loop(exit_tx, event_tx));
             todo!("connection resumption")
         }
-        async fn next(&mut self) -> Option<GatewayEvent> {
+        pub(crate) async fn next(&mut self) -> Option<GatewayEvent> {
             use ::tokio::stream::StreamExt;
             self.events.next().await
         }
