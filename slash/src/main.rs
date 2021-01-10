@@ -863,9 +863,12 @@ mod connection {
                                         .expect("event dispatches always have event names");
                                     match event_name {
                                         "INTERACTION_CREATE" => {
-                                            let interaction: gateway::Interaction = ::serde_json::from_value(msg.data)
+                                            let interaction: gateway::Interaction =
+                                                ::serde_json::from_value(msg.data)
                                                 .expect("discord sent invalid INTERACTION_CREATE payload");
-                                            match events.send(GatewayEvent::DispatchInteractionCreate(interaction)) {
+                                            match events.send(
+                                                GatewayEvent::DispatchInteractionCreate(interaction)
+                                            ) {
                                                 Ok(()) => (),
                                                 // Sending on an unbounded mpsc sender will only fail
                                                 // if the receiving half is closed.
