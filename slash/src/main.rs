@@ -1151,7 +1151,12 @@ async fn main() {
                                 match name {
                                     "expression" => {
                                         let exp = ::mice::parse::Expression::parse(exp).unwrap().1.unwrap();
-                                        api::reply_gateway_interaction(&req_client, interaction.id, interaction.token, exp.roll().unwrap().format(Default::default())).compat().await.unwrap();
+                                        api::reply_gateway_interaction(&req_client,
+                                                                       interaction.id,
+                                                                       interaction.token,
+                                                                       exp.roll().unwrap().format(
+                                                                           Default::default())
+                                        ).compat().await.unwrap();
                                     }
                                     _ => todo!("wrong option"),
                                 }
