@@ -1134,151 +1134,32 @@ async fn main() {
             let (mut ws_stream, _) = ::tokio_tungstenite::client_async(wss_request, stream)
                 .await
                 .expect("couldn't open WebSocket stream");
-            let (sequence_tx, sequence_rx) =
-                ::tokio::sync::watch::channel(None::<gateway::SequenceNumber>);
-            // Read Hello first.
-            if let Some(first_msg) = ws_stream.next().await {
-                use ::tungstenite::error::Error as WsError;
-                use ::tungstenite::Message;
-                println!("First Message: {:?}", first_msg);
-                match first_msg {
-                    Ok(Message::Text(text)) => match ::serde_json::from_str(&text) {
-                        Ok(gateway::Payload {
-                            opcode: gateway::Opcode::Hello,
-                            data: gateway::HelloData { heartbeat_interval },
-                            ..
-                        }) => {
-                            ws_stream.send(Message::Text(::serde_json::to_string(&gateway::Payload {
-                                opcode: gateway::Opcode::Identify,
-                                data: gateway::IdentifyData {
-                                    token: match config.auth {
-                                        Auth::BotToken(x) => x.clone(),
-                                        Auth::BearerToken(_) => todo!("figure out if token kind is relevant in Identify payloads"),
-                                    },
-                                    properties: gateway::ConnectionProperties {
-                                        os: "Linux".to_string(),
-                                        browser: "mbot-slash-gateway".to_string(),
-                                        device: "mbot-slash-gateway".to_string(),
-                                    },
-                                    compress: Some(false),
-                                    large_threshold: None,
-                                    shard: None,
-                                    presence: None,
-                                    guild_subscriptions: None,
-                                    intents: gateway::Intents::empty(),
-                                },
-                                event_name: None,
-                                sequence_number: None,
-                            }).expect("couldn't serialize Identify payload"))).await
-                                .expect("identify send failure");
-                            // This is the channel over which the Heart should send us
-                            // its heartbeat messages.
-                            let (h_ws_tx, mut h_ws_rx) = ::tokio::sync::mpsc::channel(1);
-                            let heart_handle =
-                                heartbeat::HeartHandle::new(heartbeat_interval as _, h_ws_tx);
-                            // Now, the event loop.
-                            loop {
-                                ::tokio::select! {
-                                    msg = h_ws_rx.recv() => {
-                                        match msg {
-                                            Some(msg) => ws_stream.send(msg).await.expect("couldn't send heartbeat"),
-                                            None => todo!("handle heart exiting early"),
-                                        }
-                                    },
-                                    msg = ws_stream.next() => {
-                                        match msg {
-                                            Some(msg) => {
-                                                println!("Another message: {:?}", msg);
-                                                match msg {
-                                                    Ok(Message::Text(text)) => {
-                                                        match ::serde_json::from_str(&text) {
-                                                            Ok(gateway::Payload {
-                                                                opcode: gateway::Opcode::Dispatch,
-                                                                data,
-                                                                event_name: Some(event_name),
-                                                                sequence_number: Some(sequence_number),
-                                                            }) => {
-                                                                let data: ::serde_json::Value = data;
-                                                                // let data: gateway::DispatchData =
-                                                                //     ::serde_json::from_value(data).unwrap();
-                                                                sequence_tx.send(Some(sequence_number)).unwrap();
-                                                                println!("--------------------");
-                                                                println!("|     Dispatch     |");
-                                                                println!("--------------------");
-                                                                println!("Event Name: {}", event_name);
-                                                                println!("Sequence Number: {:?}", sequence_number);
-                                                                println!("--------------------");
-                                                                match &*event_name {
-                                                                    "INTERACTION_CREATE" => {
-                                                                        let interaction: gateway::Interaction =
-                                                                            ::serde_json::from_value(data).unwrap();
-                                                                        let data = interaction.data.unwrap();
-                                                                        match data.options.as_deref() {
-                                                                            Some(
-                                                                                [gateway::ApplicationCommandInteractionDataOption {
-                                                                                    name, value: Some(::serde_json::Value::String(exp)), ..
-                                                                                }],
-                                                                            ) => {
-                                                                                let name: &str = &*name;
-                                                                                match name {
-                                                                                    "expression" => {
-                                                                                        let exp = ::mice::parse::Expression::parse(exp).unwrap().1.unwrap();
-                                                                                        api::reply_gateway_interaction(&req_client, interaction.id, interaction.token, exp.roll().unwrap().format(Default::default())).compat().await.unwrap();
-                                                                                    }
-                                                                                    _ => todo!("wrong option"),
-                                                                                }
-                                                                            }
-                                                                            Some([..]) => todo!("wrong options"),
-                                                                            None => todo!("no options"),
-                                                                        }
-                                                                        println!("Data: {:#?}", data);
-                                                                    }
-                                                                    _ => (),
-                                                                }
-                                                            }
-                                                            Ok(gateway::Payload {
-                                                                opcode: gateway::Opcode::HeartbeatACK,
-                                                                data: _, // TODO: what's this
-                                                                sequence_number: None,
-                                                                event_name: None,
-                                                            }) => match heart_handle.send(heartbeat::HeartMessage::Ack).await {
-                                                                Ok(()) => (),
-                                                                Err(_) => todo!("handle heart exiting early"),
-                                                            },
-                                                            Ok(payload) => {
-                                                                println!("Payload of unknown type: {:?}", payload);
-                                                            }
-                                                            Err(_) => todo!("handling malformed Gateway payloads"),
-                                                        }
-                                                    }
-                                                    Ok(msg) => {
-                                                        println!(
-                                                            "TODO: handle this kind of WebSocket message: {:?}",
-                                                            msg
-                                                        )
-                                                    }
-                                                    Err(_) => todo!("handling connection errors"),
-                                                }
-                                            },
-                                            None => todo!("handle closed gateway stream"),
-                                        }
-                                    },
+            use connection::{ConnectionHandle, GatewayEvent};
+            let mut connection = ConnectionHandle::new(&config.auth, ws_stream).await.unwrap();
+            while let Some(event) = connection.next().await {
+                match event {
+                    GatewayEvent::DispatchInteractionCreate(interaction) => {
+                        let data = interaction.data
+                            .expect("Currently, this field is guaranteed to be populated");
+                        match data.options.as_deref() {
+                            Some(
+                                [gateway::ApplicationCommandInteractionDataOption {
+                                    name, value: Some(::serde_json::Value::String(exp)), ..
+                                }],
+                            ) => {
+                                let name: &str = &*name;
+                                match name {
+                                    "expression" => {
+                                        let exp = ::mice::parse::Expression::parse(exp).unwrap().1.unwrap();
+                                        api::reply_gateway_interaction(&req_client, interaction.id, interaction.token, exp.roll().unwrap().format(Default::default())).compat().await.unwrap();
+                                    }
+                                    _ => todo!("wrong option"),
                                 }
                             }
+                            Some([..]) => todo!("wrong options"),
+                            None => todo!("no options"),
                         }
-                        Ok(_) | Err(_) => todo!("handling invalid first message"),
                     },
-                    Err(WsError::ConnectionClosed) => {
-                        todo!("handle connection being closed before we can read a single message")
-                    }
-                    Err(WsError::Io(e)) => match e.kind() {
-                        io::ErrorKind::WouldBlock => todo!("what to do with this"),
-                        _ => todo!("stream is dead. reconnect or something"),
-                    },
-                    Err(WsError::AlreadyClosed) => {
-                        unreachable!("reading from already closed stream")
-                    }
-                    _ => todo!("handling other websocket errors"),
                 }
             }
             // while let Some(msg) = ws_stream.next().await {
