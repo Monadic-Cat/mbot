@@ -804,11 +804,12 @@ mod heartbeat {
 
 mod connection {
     use super::gateway::{self, SequenceNumber};
-    use super::heartbeat::HeartHandle;
+    use super::heartbeat::{HeartHandle, HeartMessage};
     /// TLS secured WebSocketStream we use with the Discord Gateway.
     type WSStream = ::tokio_tungstenite::WebSocketStream<::tokio_rustls::client::TlsStream<::tokio::net::TcpStream>>;
     use ::tokio_tungstenite::WebSocketStream;
-    use ::tokio::sync::oneshot;
+    use ::tungstenite::Message;
+    use ::tokio::sync::{oneshot, mpsc};
     // Handles IO with a single Gateway connection.
     // Does not perform reconnections- that's someone else's job.
     // *Does* return errors indicative of whether reconnects are advisable.
@@ -833,7 +834,8 @@ mod connection {
             todo!("sending identify payload")
         }
         /// Runs event loop and concurrently sends appropriate heartbeat messages.
-        async fn run_event_loop(mut self, exit: oneshot::Sender<ConnectionClosed>) -> Result<Never, ()> {
+        async fn run_event_loop(mut self, exit: oneshot::Sender<ConnectionClosed>,
+                                events: mpsc::UnboundedSender<GatewayEvent>) {
             use ::tokio::stream::StreamExt;
             use ::futures::sink::SinkExt;
             let (h_ws_tx, mut h_ws_rx) = ::tokio::sync::mpsc::channel(1);
@@ -845,9 +847,47 @@ mod connection {
                         None => todo!("handle heart exiting early"),
                     },
                     msg = self.stream.next() => match msg {
-                        Some(msg) => {
+                        Some(Ok(Message::Text(msg))) => {
                             println!("Another message: {:?}", msg);
+                            let msg: gateway::Payload<::serde_json::Value> = ::serde_json::from_str(&msg)
+                                .expect("discord sent invalid message");
+                            match msg.opcode {
+                                gateway::Opcode::Dispatch => {
+                                    let event_name = &*msg.event_name
+                                        .expect("event dispatches always have event names");
+                                    match event_name {
+                                        "INTERACTION_CREATE" => {
+                                            let interaction: gateway::Interaction = ::serde_json::from_value(msg.data)
+                                                .expect("discord sent invalid INTERACTION_CREATE payload");
+                                            match events.send(GatewayEvent::DispatchInteractionCreate(interaction)) {
+                                                Ok(()) => (),
+                                                // Sending on an unbounded mpsc sender will only fail
+                                                // if the receiving half is closed.
+                                                // If the receiving half is closed, that means
+                                                // either we've been intentionally stopped by
+                                                // the ConnectionHandle, or the ConnectionHandle
+                                                // has been dropped.
+                                                // In either case, this task should wind down.
+                                                Err(_) => {
+                                                    eprintln!("dropped gateway message due to internal event channel being closed while parsing message");
+                                                    break
+                                                },
+                                            }
+                                        },
+                                        name => eprintln!("unknown event name: {}", name),
+                                    }
+                                }
+                                gateway::Opcode::HeartbeatACK => {
+                                    match heart_handle.send(HeartMessage::Ack).await {
+                                        Ok(()) => (),
+                                        Err(_) => todo!("handle heart exiting early"),
+                                    }
+                                }
+                                code => eprintln!("unhandled payload type: {:?}", code),
+                            }
                         },
+                        Some(Ok(_)) => todo!("handle other kinds of WebSocket message"),
+                        Some(Err(_)) => todo!("handle WebSocket error"),
                         None => todo!("handle closed gateway stream"),
                     }
                 }
@@ -872,20 +912,23 @@ mod connection {
     // TODO: consider renaming this to `SessionHandle`
     struct ConnectionHandle {
         // TODO: figure out what needs to be held to talk back 'n shit
-        exit: Option<oneshot::Receiver<ConnectionClosed>>
+        exit: Option<oneshot::Receiver<ConnectionClosed>>,
+        events: mpsc::UnboundedReceiver<GatewayEvent>,
     }
     impl ConnectionHandle {
         async fn new(stream: WSStream) -> Result<ConnectionHandle, ()> {
             let connection = Connection::initialize(stream).await?;
             let (exit_tx, exit_rx) = oneshot::channel();
-            ::tokio::spawn(connection.run_event_loop(exit_tx));
-            Ok(Self { exit: Some(exit_rx) })
+            let (event_tx, event_rx) = mpsc::unbounded_channel();
+            ::tokio::spawn(connection.run_event_loop(exit_tx, event_tx));
+            Ok(Self { exit: Some(exit_rx), events: event_rx })
         }
         /// Attempt to resume Gateway session with new WebSocket stream.
         async fn resume(&mut self, resume_token: SessionResume, stream: WSStream) -> Result<(), ()> {
             let connection = Connection::with_resume(resume_token.seq, stream).await?;
             let (exit_tx, exit_rx) = oneshot::channel();
-            ::tokio::spawn(connection.run_event_loop(exit_tx));
+            let (event_tx, event_rx) = mpsc::unbounded_channel();
+            ::tokio::spawn(connection.run_event_loop(exit_tx, event_tx));
             todo!("connection resumption")
         }
         async fn next(&mut self) -> Option<GatewayEvent> {
@@ -909,6 +952,7 @@ mod connection {
                 }
             }
             // handle it dying:
+            // note that we'll likely have a retry loop or something here
             match connection.is_resumable() {
                 Some(token) => connection.resume(token, get_stream()).await.unwrap(),
                 None => match ConnectionHandle::new(get_stream()).await {
