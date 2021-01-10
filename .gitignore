@@ -4,3 +4,4 @@
 .env
 /deploy.sh
 /dev.db
+.dev_env
