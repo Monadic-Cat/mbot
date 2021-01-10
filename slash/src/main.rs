@@ -861,6 +861,12 @@ mod connection {
                                 gateway::Opcode::Dispatch => {
                                     let event_name = &*msg.event_name
                                         .expect("event dispatches always have event names");
+                                    println!("--------------------");
+                                    println!("|     Dispatch     |");
+                                    println!("--------------------");
+                                    println!("Event Name: {}", event_name);
+                                    println!("Sequence Number: {:?}", msg.sequence_number);
+                                    println!("--------------------");
                                     match event_name {
                                         "INTERACTION_CREATE" => {
                                             let interaction: gateway::Interaction =
