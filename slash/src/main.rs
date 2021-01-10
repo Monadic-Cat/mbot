@@ -850,7 +850,9 @@ mod connection {
                                     Auth::BearerToken(_) => todo!("figure out if token kind is relevant in Identify payloads"),
                                 },
                                 properties: gateway::ConnectionProperties {
+                                    // TODO: perform OS detection
                                     os: "Linux".to_string(),
+                                    // TODO: consider renaming our gateway library at some point
                                     browser: "mbot-slash-gateway".to_string(),
                                     device: "mbot-slash-gateway".to_string(),
                                 },
