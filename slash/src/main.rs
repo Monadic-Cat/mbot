@@ -941,7 +941,8 @@ mod connection {
             todo!("connection resumption")
         }
         async fn next(&mut self) -> Option<GatewayEvent> {
-            todo!("event stream")
+            use ::tokio::stream::StreamExt;
+            self.events.next().await
         }
         fn is_resumable(&self) -> Option<SessionResume> {
             todo!("recording whether a Gateway connection is resumable")
