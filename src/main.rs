@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+// #![forbid(unsafe_code)]
 use mice::FormatOptions as MiceFormat;
 use ::mice::util::ExpressionExt;
 mod initiative;
@@ -17,6 +17,8 @@ mod turns;
 mod db;
 #[cfg(feature = "maddie_tools")]
 mod masks;
+#[cfg(feature = "turn_scheduler")]
+mod scheduler;
 
 #[cfg(feature = "turns_db")]
 use serenity::model::{channel::GuildChannel, id::MessageId, guild::{PartialGuild, Guild}};

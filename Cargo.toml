@@ -21,6 +21,7 @@ foretry = { git = "https://github.com/Monadic-Cat/foretry.git" }
 env_logger = "0.7"
 comfy-table = { version = "1", optional = true }
 pulldown-cmark = { git = "https://github.com/Monadic-Cat/pulldown-discordmark.git", optional = true }
+wasmtime = { version = "0.21.0", optional = true }
 
 [dependencies.sqlx]
 version = "0.4.0-beta.1"
@@ -43,7 +44,7 @@ proc-macro2 = "1"
 titlecase = "1.1.0"
 
 [features]
-default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools"]
+default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools", "turn_scheduler"]
 bot_commands = []
 db = ["sqlx"]
 # This feature is incomplete.
@@ -58,6 +59,9 @@ internal_rolls  = ["pulldown-cmark"]
 # In particular, Masks Move commands.
 # Maddie Repo: https://github.com/harkano/maddie
 maddie_tools = ["bot_commands"]
+
+# Using WASM plugins to do turn scheduling and such.
+turn_scheduler = ["wasmtime"]
 
 # I believe some parts of the cli_control feature may violate
 # the Discord Terms of Service, so tread with care.
