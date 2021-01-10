@@ -805,6 +805,7 @@ mod heartbeat {
 mod connection {
     use super::gateway::{self, SequenceNumber};
     use super::heartbeat::{HeartHandle, HeartMessage};
+    use super::Auth;
     /// TLS secured WebSocketStream we use with the Discord Gateway.
     type WSStream = ::tokio_tungstenite::WebSocketStream<::tokio_rustls::client::TlsStream<::tokio::net::TcpStream>>;
     use ::tokio_tungstenite::WebSocketStream;
@@ -830,8 +831,55 @@ mod connection {
             todo!("sending resume events")
         }
         /// Initializes a Gateway connection from a just created WebSocket stream.
-        async fn initialize(stream: WSStream) -> Result<Self, ()> {
-            todo!("sending identify payload")
+        async fn initialize(auth: &Auth, mut stream: WSStream) -> Result<Self, ()> {
+            use ::futures::SinkExt;
+            use ::tokio::stream::StreamExt;
+            // TODO: more precise handling of invalid first messages
+            match stream.next().await {
+                Some(Ok(Message::Text(first_msg))) => match ::serde_json::from_str(&first_msg) {
+                    Ok(gateway::Payload {
+                        opcode: gateway::Opcode::Hello,
+                        data: gateway::HelloData { heartbeat_interval },
+                        ..
+                    }) => {
+                        stream.send(Message::Text(::serde_json::to_string(&gateway::Payload {
+                            opcode: gateway::Opcode::Identify,
+                            data: gateway::IdentifyData {
+                                token: match auth {
+                                    Auth::BotToken(x) => x.clone(),
+                                    Auth::BearerToken(_) => todo!("figure out if token kind is relevant in Identify payloads"),
+                                },
+                                properties: gateway::ConnectionProperties {
+                                    os: "Linux".to_string(),
+                                    browser: "mbot-slash-gateway".to_string(),
+                                    device: "mbot-slash-gateway".to_string(),
+                                },
+                                compress: Some(false),
+                                large_threshold: None,
+                                shard: None,
+                                presence: None,
+                                guild_subscriptions: None,
+                                intents: gateway::Intents::empty(),
+                            },
+                            event_name: None,
+                            sequence_number: None,
+                            // TODO: consider distinguishing between Identify send failure and
+                            // failure to read the first message.
+                        }).expect("couldn't serialize Identify payload"))).await.map_err(|_| ())?;
+                        Ok(Self { stream, heartbeat_interval })
+                    },
+                    // Initialization failure:
+                    // Invalid first message
+                    Ok(_) => Err(()),
+                    Err(_) => Err(()),
+                }
+                // Initialization failure:
+                // Invalid first message
+                Some(Ok(_)) | Some(Err(_)) => Err(()),
+                // Initialization failure:
+                // Connection closed before we could read a single message.
+                None => Err(()),
+            }
         }
         /// Runs event loop and concurrently sends appropriate heartbeat messages.
         async fn run_event_loop(mut self, exit: oneshot::Sender<ConnectionClosed>,
@@ -927,18 +975,19 @@ mod connection {
         seq: SequenceNumber,
     }
     // TODO: consider renaming this to `SessionHandle`
-    struct ConnectionHandle {
+    struct ConnectionHandle<'a> {
         // TODO: figure out what needs to be held to talk back 'n shit
         exit: Option<oneshot::Receiver<ConnectionClosed>>,
         events: mpsc::UnboundedReceiver<GatewayEvent>,
+        auth: &'a Auth,
     }
-    impl ConnectionHandle {
-        async fn new(stream: WSStream) -> Result<ConnectionHandle, ()> {
-            let connection = Connection::initialize(stream).await?;
+    impl<'a> ConnectionHandle<'a> {
+        async fn new(auth: &'a Auth, stream: WSStream) -> Result<ConnectionHandle<'a>, ()> {
+            let connection = Connection::initialize(auth, stream).await?;
             let (exit_tx, exit_rx) = oneshot::channel();
             let (event_tx, event_rx) = mpsc::unbounded_channel();
             ::tokio::spawn(connection.run_event_loop(exit_tx, event_tx));
-            Ok(Self { exit: Some(exit_rx), events: event_rx })
+            Ok(Self { exit: Some(exit_rx), events: event_rx, auth })
         }
         /// Attempt to resume Gateway session with new WebSocket stream.
         async fn resume(&mut self, resume_token: SessionResume, stream: WSStream) -> Result<(), ()> {
@@ -959,9 +1008,13 @@ mod connection {
     fn get_stream() -> WSStream {
         todo!("lol")
     }
+    fn get_auth() -> Auth {
+        todo!(":upside_down:")
+    }
     async fn example() {
         let ws_stream = get_stream();
-        let mut connection = ConnectionHandle::new(ws_stream).await.unwrap();
+        let auth = get_auth();
+        let mut connection = ConnectionHandle::new(&auth, ws_stream).await.unwrap();
         loop {
             // use it
             while let Some(event) = connection.next().await {
@@ -973,7 +1026,7 @@ mod connection {
             // note that we'll likely have a retry loop or something here
             match connection.is_resumable() {
                 Some(token) => connection.resume(token, get_stream()).await.unwrap(),
-                None => match ConnectionHandle::new(get_stream()).await {
+                None => match ConnectionHandle::new(&auth, get_stream()).await {
                     Ok(x) => connection = x,
                     Err(_) => break
                 }
