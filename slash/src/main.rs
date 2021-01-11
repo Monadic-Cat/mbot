@@ -191,6 +191,7 @@ mod gateway {
         #[serde(rename = "t")]
         pub(crate) event_name: Option<String>,
     }
+    /// [Opcode](https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-opcodes)
     #[derive(Serialize_repr, Deserialize_repr, Debug)]
     #[repr(u8)]
     pub(crate) enum Opcode {
