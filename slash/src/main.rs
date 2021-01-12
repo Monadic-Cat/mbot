@@ -954,8 +954,8 @@ mod connection {
                                 code => eprintln!("unhandled payload type: {:?}", code),
                             }
                         },
-                        Some(Ok(_)) => todo!("handle other kinds of WebSocket message"),
-                        Some(Err(_)) => todo!("handle WebSocket error"),
+                        Some(Ok(msg)) => todo!("handle other kinds of WebSocket message: {:?}", msg),
+                        Some(Err(e)) => todo!("handle WebSocket error: {:?}", e),
                         None => todo!("handle closed gateway stream"),
                     }
                 }
