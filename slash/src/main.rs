@@ -1067,7 +1067,7 @@ mod connection {
     }
     /// A session resume token.
     /// Contains whatever is necessary to resume a Gateway session.
-    struct SessionResume {
+    pub(crate) struct SessionResume {
         seq: SequenceNumber,
     }
     // TODO: consider renaming this to `SessionHandle`
@@ -1099,7 +1099,7 @@ mod connection {
             })
         }
         /// Attempt to resume Gateway session with new WebSocket stream.
-        async fn resume(&mut self, resume_token: SessionResume, stream: WSStream) -> Result<(), ()> {
+        pub(crate) async fn resume(&mut self, resume_token: SessionResume, stream: WSStream) -> Result<(), ()> {
             let connection = Connection::with_resume(self.auth, resume_token.seq, self.session_id.clone(), stream).await?;
             let (exit_tx, exit_rx) = oneshot::channel();
             ::tokio::spawn(connection.run_event_loop(exit_tx, self.event_sender.clone()));
@@ -1114,7 +1114,7 @@ mod connection {
             // This strategy is lighter on IO and requires less bookkeeping.
             self.events.next().await
         }
-        fn take_resume(&mut self) -> Option<SessionResume> {
+        pub(crate) fn take_resume(&mut self) -> Option<SessionResume> {
             match self.exit.take() {
                 Some(mut exit) => match exit.try_recv() {
                     Ok(ConnectionClosed::Resumable(Some(seq))) => Some(SessionResume { seq }),
@@ -1244,47 +1244,61 @@ async fn main() {
                 .unwrap()
                 .next()
                 .expect("Discord host not found");
-            let stream = TcpStream::connect(addr)
-                .await
-                .expect("couldn't open TCP connection with Discord");
-            let stream = connector
-                .connect(dnsname, stream)
-                .await
-                .expect("couldn't open TLS connection");
-            let (mut ws_stream, _) = ::tokio_tungstenite::client_async(wss_request, stream)
-                .await
-                .expect("couldn't open WebSocket stream");
+            let get_stream = || async {
+                let stream = TcpStream::connect(addr)
+                    .await
+                    .expect("couldn't open TCP connection with Discord");
+                let stream = connector
+                    .connect(dnsname, stream)
+                    .await
+                    .expect("couldn't open TLS connection");
+                let (ws_stream, _) = ::tokio_tungstenite::client_async(&wss_request, stream)
+                    .await
+                    .expect("couldn't open WebSocket stream");
+                ws_stream
+            };
+            let ws_stream = get_stream().await;
             use connection::{ConnectionHandle, GatewayEvent};
             let mut connection = ConnectionHandle::new(&config.auth, ws_stream).await.unwrap();
-            while let Some(event) = connection.next().await {
-                match event {
-                    GatewayEvent::DispatchInteractionCreate(interaction) => {
-                        let data = interaction.data
-                            .expect("Currently, this field is guaranteed to be populated");
-                        match data.options.as_deref() {
-                            Some(
-                                [gateway::ApplicationCommandInteractionDataOption {
-                                    name, value: Some(::serde_json::Value::String(exp)), ..
-                                }],
-                            ) => {
-                                let name: &str = &*name;
-                                match name {
-                                    "expression" => {
-                                        let exp = ::mice::parse::Expression::parse(exp).unwrap().1.unwrap();
-                                        api::reply_gateway_interaction(&req_client,
-                                                                       interaction.id,
-                                                                       interaction.token,
-                                                                       exp.roll().unwrap().format(
-                                                                           Default::default())
-                                        ).compat().await.unwrap();
+            loop {
+                while let Some(event) = connection.next().await {
+                    match event {
+                        GatewayEvent::DispatchInteractionCreate(interaction) => {
+                            let data = interaction.data
+                                .expect("Currently, this field is guaranteed to be populated");
+                            match data.options.as_deref() {
+                                Some(
+                                    [gateway::ApplicationCommandInteractionDataOption {
+                                        name, value: Some(::serde_json::Value::String(exp)), ..
+                                    }],
+                                ) => {
+                                    let name: &str = &*name;
+                                    match name {
+                                        "expression" => {
+                                            let exp =
+                                                ::mice::parse::Expression::parse(exp).unwrap().1.unwrap();
+                                            api::reply_gateway_interaction(&req_client,
+                                                                           interaction.id,
+                                                                           interaction.token,
+                                                                           exp.roll().unwrap().format(
+                                                                               Default::default())
+                                            ).compat().await.unwrap();
+                                        }
+                                        _ => todo!("wrong option"),
                                     }
-                                    _ => todo!("wrong option"),
                                 }
+                                Some([..]) => todo!("wrong options"),
+                                None => todo!("no options"),
                             }
-                            Some([..]) => todo!("wrong options"),
-                            None => todo!("no options"),
-                        }
-                    },
+                        },
+                    }
+                }
+                match connection.take_resume() {
+                    Some(token) => connection.resume(token, get_stream().await).await.unwrap(),
+                    None => match ConnectionHandle::new(&config.auth, get_stream().await).await {
+                        Ok(x) => connection = x,
+                        Err(_) => break,
+                    }
                 }
             }
             // while let Some(msg) = ws_stream.next().await {
