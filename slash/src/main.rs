@@ -242,14 +242,15 @@ mod gateway {
     /// [Ready](https://discord.com/developers/docs/topics/gateway#ready)
     #[derive(Deserialize)]
     pub(crate) struct Ready {
-        #[serde(rename = "v")]
-        version: u8,
-        user: User,
-        private_channels: [(); 0],
-        guilds: Vec<UnavailableGuild>,
-        session_id: SessionId,
-        shard: ShardData,
-        application: PartialApplication,
+        // TODO: ensure each of these fields is correct
+        // #[serde(rename = "v")]
+        // pub(crate) version: u8,
+        // pub(crate) user: User,
+        // pub(crate) private_channels: [(); 0],
+        // guilds: Vec<UnavailableGuild>,
+        pub(crate) session_id: SessionId,
+        // pub(crate) shard: ShardData,
+        // application: PartialApplication,
     }
     #[derive(Deserialize)]
     pub(crate) struct DispatchData {}
@@ -830,6 +831,10 @@ mod connection {
     struct Connection {
         stream: WSStream,
         heartbeat_interval: u32,
+        // Since this field is initialized by the `Ready` event,
+        // which is required for a session to be considered initialized,
+        // this is guaranteed to be present.
+        sequence_number: SequenceNumber,
     }
     enum Never {}
     // TODO: flesh this out
@@ -864,7 +869,7 @@ mod connection {
                             event_name: None,
                             sequence_number: None,
                         }).expect("couldn't serialize Resume payload"))).await.map_err(|_| ())?;
-                        Ok(Self { stream, heartbeat_interval })
+                        Ok(Self { sequence_number: seq, stream, heartbeat_interval })
                     },
                     Ok(_) | Err(_) => Err(()),
                 },
@@ -877,7 +882,7 @@ mod connection {
             }
         }
         /// Initializes a Gateway connection from a just created WebSocket stream.
-        async fn initialize(auth: &Auth, mut stream: WSStream) -> Result<Self, ()> {
+        async fn initialize(auth: &Auth, mut stream: WSStream) -> Result<(Self, SessionId), ()> {
             use ::futures::SinkExt;
             use ::tokio::stream::StreamExt;
             // TODO: more precise handling of invalid first messages
@@ -914,7 +919,11 @@ mod connection {
                             // TODO: consider distinguishing between Identify send failure and
                             // failure to read the first message.
                         }).expect("couldn't serialize Identify payload"))).await.map_err(|_| ())?;
-                        Ok(Self { stream, heartbeat_interval })
+                        // TODO: consider handling the case where the time Discord takes to send us
+                        // the Ready event is longer than the heartbeat interval
+                        let (ready, sequence_number) = Self::take_ready(&mut stream).await?;
+                        Ok((Self { sequence_number, stream, heartbeat_interval },
+                            ready.session_id))
                     },
                     // Initialization failure:
                     // Invalid first message
@@ -926,6 +935,26 @@ mod connection {
                 Some(Ok(_)) | Some(Err(_)) => Err(()),
                 // Initialization failure:
                 // Connection closed before we could read a single message.
+                None => Err(()),
+            }
+        }
+        /// Internal function, used by `Connection::initialize`.
+        async fn take_ready(stream: &mut WSStream) -> Result<(gateway::Ready, SequenceNumber), ()> {
+            use ::tokio::stream::StreamExt;
+            let res = stream.next().await;
+            println!("Next Message: {:?}", res);
+            match res {
+                Some(Ok(Message::Text(text))) => match ::serde_json::from_str(&text) {
+                    Ok(gateway::Payload {
+                        opcode: gateway::Opcode::Dispatch,
+                        event_name: Some(event_name),
+                        sequence_number: Some(sequence_number),
+                        data: ready @ gateway::Ready { .. },
+                        ..
+                    }) => Ok((ready, sequence_number)),
+                    Ok(_) | Err(_) => Err(()),
+                },
+                Some(Ok(_)) | Some(Err(_)) => Err(()),
                 None => Err(()),
             }
         }
@@ -1050,14 +1079,15 @@ mod connection {
         // I'd abbreviate to `resume`, but I'd rather not have
         // a field and method with the same name.
         resume_token: Option<SessionResume>,
+        session_id: SessionId,
     }
     impl<'a> ConnectionHandle<'a> {
         pub(crate) async fn new(auth: &'a Auth, stream: WSStream) -> Result<ConnectionHandle<'a>, ()> {
-            let connection = Connection::initialize(auth, stream).await?;
+            let (connection, session_id) = Connection::initialize(auth, stream).await?;
             let (exit_tx, exit_rx) = oneshot::channel();
             let (event_tx, event_rx) = mpsc::unbounded_channel();
             ::tokio::spawn(connection.run_event_loop(exit_tx, event_tx));
-            Ok(Self { exit: Some(exit_rx), events: event_rx, resume_token: None, auth })
+            Ok(Self { exit: Some(exit_rx), events: event_rx, resume_token: None, auth, session_id })
         }
         /// Attempt to resume Gateway session with new WebSocket stream.
         async fn resume(&mut self, resume_token: SessionResume, stream: WSStream) -> Result<(), ()> {
