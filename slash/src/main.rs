@@ -1146,6 +1146,7 @@ mod connection {
             }
             // handle it dying:
             // note that we'll likely have a retry loop or something here
+            eprintln!("Disconnected. Attempted to reconnect...");
             match connection.take_resume() {
                 Some(token) => connection.resume(token, get_stream()).await.unwrap(),
                 None => match ConnectionHandle::new(&auth, get_stream()).await {
