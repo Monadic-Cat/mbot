@@ -1002,6 +1002,9 @@ mod connection {
         exit: Option<oneshot::Receiver<ConnectionClosed>>,
         events: mpsc::UnboundedReceiver<GatewayEvent>,
         auth: &'a Auth,
+        // I'd abbreviate to `resume`, but I'd rather not have
+        // a field and method with the same name.
+        resume_token: Option<SessionResume>,
     }
     impl<'a> ConnectionHandle<'a> {
         pub(crate) async fn new(auth: &'a Auth, stream: WSStream) -> Result<ConnectionHandle<'a>, ()> {
@@ -1009,7 +1012,7 @@ mod connection {
             let (exit_tx, exit_rx) = oneshot::channel();
             let (event_tx, event_rx) = mpsc::unbounded_channel();
             ::tokio::spawn(connection.run_event_loop(exit_tx, event_tx));
-            Ok(Self { exit: Some(exit_rx), events: event_rx, auth })
+            Ok(Self { exit: Some(exit_rx), events: event_rx, resume_token: None, auth })
         }
         /// Attempt to resume Gateway session with new WebSocket stream.
         async fn resume(&mut self, resume_token: SessionResume, stream: WSStream) -> Result<(), ()> {
@@ -1021,10 +1024,14 @@ mod connection {
         }
         pub(crate) async fn next(&mut self) -> Option<GatewayEvent> {
             use ::tokio::stream::StreamExt;
+            // If we continue using the same mpsc channel, we can simply use the latest
+            // sequence number Discord's given us, instead of trying
+            // to resume from the latest processed event.
+            // This strategy is lighter on IO and requires less bookkeeping.
             self.events.next().await
         }
-        fn is_resumable(&self) -> Option<SessionResume> {
-            todo!("recording whether a Gateway connection is resumable")
+        fn take_resume(&mut self) -> Option<SessionResume> {
+            self.resume_token.take()
         }
     }
     fn get_stream() -> WSStream {
@@ -1046,7 +1053,7 @@ mod connection {
             }
             // handle it dying:
             // note that we'll likely have a retry loop or something here
-            match connection.is_resumable() {
+            match connection.take_resume() {
                 Some(token) => connection.resume(token, get_stream()).await.unwrap(),
                 None => match ConnectionHandle::new(&auth, get_stream()).await {
                     Ok(x) => connection = x,
