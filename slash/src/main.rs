@@ -236,7 +236,8 @@ mod gateway {
         id: Snowflake,
         flags: u64,
     }
-    #[derive(Serialize, Deserialize)]
+    // TODO: make this use a Cow<'a, str> or something
+    #[derive(Serialize, Deserialize, Clone)]
     #[serde(transparent)]
     pub(crate) struct SessionId(String);
     /// [Ready](https://discord.com/developers/docs/topics/gateway#ready)
@@ -845,7 +846,7 @@ mod connection {
     impl Connection {
         /// Initializes a Gateway connection from a just created WebSocket stream,
         /// issuing a Resume event instead of an Identify event.
-        async fn with_resume(auth: &Auth, seq: SequenceNumber, mut stream: WSStream) -> Result<Self, ()> {
+        async fn with_resume(auth: &Auth, seq: SequenceNumber, session_id: SessionId, mut stream: WSStream) -> Result<Self, ()> {
             use ::futures::SinkExt;
             use ::tokio::stream::StreamExt;
             match stream.next().await {
@@ -864,7 +865,7 @@ mod connection {
                                     Auth::BearerToken(_) => todo!("figure out if token kind is relevant"),
                                 },
                                 sequence_number: seq,
-                                session_id: todo!("exfiltrate the session ID from the Ready event"),
+                                session_id,
                             },
                             event_name: None,
                             sequence_number: None,
@@ -939,19 +940,18 @@ mod connection {
             }
         }
         /// Internal function, used by `Connection::initialize`.
+        /// Consumes the next message from the given stream under the assumption
+        /// that it will be the `Ready` event.
         async fn take_ready(stream: &mut WSStream) -> Result<(gateway::Ready, SequenceNumber), ()> {
             use ::tokio::stream::StreamExt;
-            let res = stream.next().await;
-            println!("Next Message: {:?}", res);
-            match res {
+            match stream.next().await {
                 Some(Ok(Message::Text(text))) => match ::serde_json::from_str(&text) {
                     Ok(gateway::Payload {
                         opcode: gateway::Opcode::Dispatch,
                         event_name: Some(event_name),
                         sequence_number: Some(sequence_number),
                         data: ready @ gateway::Ready { .. },
-                        ..
-                    }) => Ok((ready, sequence_number)),
+                    }) if event_name == "READY" => Ok((ready, sequence_number)),
                     Ok(_) | Err(_) => Err(()),
                 },
                 Some(Ok(_)) | Some(Err(_)) => Err(()),
@@ -967,7 +967,7 @@ mod connection {
             let heart_handle = HeartHandle::new(self.heartbeat_interval as _, h_ws_tx);
             // The latest sequence number received from a dispatch.
             // TODO: examine how this gets initialized when resuming a session
-            let mut sequence_number = None;
+            let mut sequence_number = Some(self.sequence_number);
             // Wrapper closure to ensure we always set both at the same time.
             let mut set_seq = |seq| {
                 sequence_number = Some(seq);
@@ -1091,7 +1091,7 @@ mod connection {
         }
         /// Attempt to resume Gateway session with new WebSocket stream.
         async fn resume(&mut self, resume_token: SessionResume, stream: WSStream) -> Result<(), ()> {
-            let connection = Connection::with_resume(self.auth, resume_token.seq, stream).await?;
+            let connection = Connection::with_resume(self.auth, resume_token.seq, self.session_id.clone(), stream).await?;
             let (exit_tx, exit_rx) = oneshot::channel();
             let (event_tx, event_rx) = mpsc::unbounded_channel();
             ::tokio::spawn(connection.run_event_loop(exit_tx, event_tx));
