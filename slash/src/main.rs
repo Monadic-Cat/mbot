@@ -1075,6 +1075,9 @@ mod connection {
         // TODO: figure out what needs to be held to talk back 'n shit
         exit: Option<oneshot::Receiver<ConnectionClosed>>,
         events: mpsc::UnboundedReceiver<GatewayEvent>,
+        // Backup clone of the sender half of the event channel,
+        // so we can continue using the same channel for each connection.
+        event_sender: mpsc::UnboundedSender<GatewayEvent>,
         auth: &'a Auth,
         // I'd abbreviate to `resume`, but I'd rather not have
         // a field and method with the same name.
@@ -1086,16 +1089,22 @@ mod connection {
             let (connection, session_id) = Connection::initialize(auth, stream).await?;
             let (exit_tx, exit_rx) = oneshot::channel();
             let (event_tx, event_rx) = mpsc::unbounded_channel();
+            let extra_event_tx = event_tx.clone();
             ::tokio::spawn(connection.run_event_loop(exit_tx, event_tx));
-            Ok(Self { exit: Some(exit_rx), events: event_rx, resume_token: None, auth, session_id })
+            Ok(Self { exit: Some(exit_rx),
+                      events: event_rx,
+                      event_sender: extra_event_tx,
+                      resume_token: None,
+                      auth, session_id
+            })
         }
         /// Attempt to resume Gateway session with new WebSocket stream.
         async fn resume(&mut self, resume_token: SessionResume, stream: WSStream) -> Result<(), ()> {
             let connection = Connection::with_resume(self.auth, resume_token.seq, self.session_id.clone(), stream).await?;
             let (exit_tx, exit_rx) = oneshot::channel();
-            let (event_tx, event_rx) = mpsc::unbounded_channel();
-            ::tokio::spawn(connection.run_event_loop(exit_tx, event_tx));
-            todo!("connection resumption")
+            ::tokio::spawn(connection.run_event_loop(exit_tx, self.event_sender.clone()));
+            self.exit = Some(exit_rx);
+            Ok(())
         }
         pub(crate) async fn next(&mut self) -> Option<GatewayEvent> {
             use ::tokio::stream::StreamExt;
