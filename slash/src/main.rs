@@ -891,6 +891,14 @@ mod connection {
             use ::futures::sink::SinkExt;
             let (h_ws_tx, mut h_ws_rx) = ::tokio::sync::mpsc::channel(1);
             let heart_handle = HeartHandle::new(self.heartbeat_interval as _, h_ws_tx);
+            // The latest sequence number received from a dispatch.
+            // TODO: examine how this gets initialized when resuming a session
+            let mut sequence_number = None;
+            // Wrapper closure to ensure we always set both at the same time.
+            let mut set_seq = |seq| {
+                sequence_number = Some(seq);
+                heart_handle.set_seq(seq);
+            };
             loop {
                 ::tokio::select! {
                     msg = h_ws_rx.recv() => match msg {
@@ -914,12 +922,15 @@ mod connection {
                                 gateway::Opcode::Dispatch => {
                                     let event_name = &*msg.event_name
                                         .expect("event dispatches always have event names");
+                                    let event_seq = msg.sequence_number
+                                        .expect("events always have sequence numbers");
                                     println!("--------------------");
                                     println!("|     Dispatch     |");
                                     println!("--------------------");
                                     println!("Event Name: {}", event_name);
                                     println!("Sequence Number: {:?}", msg.sequence_number);
                                     println!("--------------------");
+                                    set_seq(event_seq);
                                     match event_name {
                                         "INTERACTION_CREATE" => {
                                             let interaction: gateway::Interaction =
@@ -951,6 +962,14 @@ mod connection {
                                         Err(_) => todo!("handle heart exiting early"),
                                     }
                                 }
+                                gateway::Opcode::Reconnect => {
+                                    // Whether we succeed to send this or not,
+                                    // this task must wind down now.
+                                    match exit.send(ConnectionClosed::Resumable(sequence_number)) {
+                                        Ok(()) => break,
+                                        Err(_) => break,
+                                    }
+                                },
                                 code => eprintln!("unhandled payload type: {:?}", code),
                             }
                         },
