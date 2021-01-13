@@ -816,7 +816,7 @@ mod heartbeat {
 }
 
 mod connection {
-    use super::gateway::{self, SequenceNumber};
+    use super::gateway::{self, SequenceNumber, SessionId};
     use super::heartbeat::{HeartHandle, HeartMessage};
     use super::Auth;
     /// TLS secured WebSocketStream we use with the Discord Gateway.
@@ -1076,7 +1076,16 @@ mod connection {
             self.events.next().await
         }
         fn take_resume(&mut self) -> Option<SessionResume> {
-            self.resume_token.take()
+            match self.exit.take() {
+                Some(mut exit) => match exit.try_recv() {
+                    Ok(ConnectionClosed::Resumable(Some(seq))) => Some(SessionResume { seq }),
+                    // I doubt this one is going to occur, but it's technically possible.
+                    Ok(ConnectionClosed::Resumable(None)) => None,
+                    Ok(ConnectionClosed::Nonresumable) => None,
+                    Err(_) => None,
+                },
+                None => None,
+            }
         }
     }
     fn get_stream() -> WSStream {
