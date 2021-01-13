@@ -238,7 +238,7 @@ mod gateway {
     }
     #[derive(Serialize, Deserialize)]
     #[serde(transparent)]
-    struct SessionId(String);
+    pub(crate) struct SessionId(String);
     /// [Ready](https://discord.com/developers/docs/topics/gateway#ready)
     #[derive(Deserialize)]
     pub(crate) struct Ready {
@@ -840,8 +840,41 @@ mod connection {
     impl Connection {
         /// Initializes a Gateway connection from a just created WebSocket stream,
         /// issuing a Resume event instead of an Identify event.
-        async fn with_resume(seq: SequenceNumber, stream: WSStream) -> Result<Self, ()> {
-            todo!("sending resume events")
+        async fn with_resume(auth: &Auth, seq: SequenceNumber, mut stream: WSStream) -> Result<Self, ()> {
+            use ::futures::SinkExt;
+            use ::tokio::stream::StreamExt;
+            match stream.next().await {
+                // TODO: reduce duplication between this and `initialize`
+                Some(Ok(Message::Text(first_msg))) => match ::serde_json::from_str(&first_msg) {
+                    Ok(gateway::Payload {
+                        opcode: gateway::Opcode::Hello,
+                        data: gateway::HelloData { heartbeat_interval },
+                        ..
+                    }) => {
+                        stream.send(Message::Text(::serde_json::to_string(&gateway::Payload {
+                            opcode: gateway::Opcode::Resume,
+                            data: gateway::ResumeData {
+                                token: match auth {
+                                    Auth::BotToken(x) => x.clone(),
+                                    Auth::BearerToken(_) => todo!("figure out if token kind is relevant"),
+                                },
+                                sequence_number: seq,
+                                session_id: todo!("exfiltrate the session ID from the Ready event"),
+                            },
+                            event_name: None,
+                            sequence_number: None,
+                        }).expect("couldn't serialize Resume payload"))).await.map_err(|_| ())?;
+                        Ok(Self { stream, heartbeat_interval })
+                    },
+                    Ok(_) | Err(_) => Err(()),
+                },
+                // Initialization failure:
+                // Invalid first message
+                Some(Ok(_)) | Some(Err(_)) => Err(()),
+                // Initialization failure:
+                // Connection closed before we could read a single message.
+                None => Err(()),
+            }
         }
         /// Initializes a Gateway connection from a just created WebSocket stream.
         async fn initialize(auth: &Auth, mut stream: WSStream) -> Result<Self, ()> {
@@ -1028,7 +1061,7 @@ mod connection {
         }
         /// Attempt to resume Gateway session with new WebSocket stream.
         async fn resume(&mut self, resume_token: SessionResume, stream: WSStream) -> Result<(), ()> {
-            let connection = Connection::with_resume(resume_token.seq, stream).await?;
+            let connection = Connection::with_resume(self.auth, resume_token.seq, stream).await?;
             let (exit_tx, exit_rx) = oneshot::channel();
             let (event_tx, event_rx) = mpsc::unbounded_channel();
             ::tokio::spawn(connection.run_event_loop(exit_tx, event_tx));
