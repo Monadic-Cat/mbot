@@ -387,8 +387,20 @@ mod gateway {
     pub(crate) struct ShardData {
         arr: [u32; 2],
     }
+    /// [Resume](https://discord.com/developers/docs/topics/gateway#resume)
+    #[derive(Serialize)]
+    pub(crate) struct ResumeData {
+        // This is an auth token.
+        // Perhaps it should be typed that way.
+        pub(crate) token: String,
+        pub(crate) session_id: SessionId,
+        #[serde(rename = "seq")]
+        pub(crate) sequence_number: SequenceNumber,
+    }
     #[derive(Serialize)]
     pub(crate) struct IdentifyData {
+        // This is an auth token.
+        // Perhaps it should be typed that way.
         pub(crate) token: String,
         pub(crate) properties: ConnectionProperties,
         // `null` is not allowed, omission is.
