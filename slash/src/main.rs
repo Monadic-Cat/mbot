@@ -824,7 +824,7 @@ mod connection {
     /// TLS secured WebSocketStream we use with the Discord Gateway.
     type WSStream = ::tokio_tungstenite::WebSocketStream<::tokio_rustls::client::TlsStream<::tokio::net::TcpStream>>;
     use ::tokio_tungstenite::WebSocketStream;
-    use ::tungstenite::Message;
+    use ::tungstenite::{Message, protocol::{CloseFrame, frame::coding::CloseCode}};
     use ::tokio::sync::{oneshot, mpsc};
     // Handles IO with a single Gateway connection.
     // Does not perform reconnections- that's someone else's job.
@@ -1047,6 +1047,18 @@ mod connection {
                                 code => eprintln!("unhandled payload type: {:?}", code),
                             }
                         },
+                        Some(Ok(Message::Close(Some(CloseFrame {
+                            code: CloseCode::Away,
+                            reason,
+                        })))) => {
+                            eprintln!("Close reason: {}", reason);
+                            // Whether we succeed to send this or not,
+                            // this task must wind down now.
+                            match exit.send(ConnectionClosed::Nonresumable) {
+                                Ok(()) => break,
+                                Err(_) => break,
+                            }
+                        }
                         Some(Ok(msg)) => todo!("handle other kinds of WebSocket message: {:?}", msg),
                         Some(Err(e)) => todo!("handle WebSocket error: {:?}", e),
                         None => todo!("handle closed gateway stream"),
