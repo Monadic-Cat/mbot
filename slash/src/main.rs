@@ -1123,6 +1123,8 @@ mod connection {
         // TODO: consider making this return a Result that's more descriptive
         // of why no elements are being yielded
         // TODO: consider yielding events even when gateway connection is closed
+        // The reason we don't currently is just that we want to give the user
+        // a chance to terminate their event processing loop and do reconnection.
         pub(crate) async fn next(&mut self) -> Option<GatewayEvent> {
             use ::tokio::stream::StreamExt;
             // If we continue using the same mpsc channel, we can simply use the latest
