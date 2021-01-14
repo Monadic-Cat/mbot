@@ -1093,6 +1093,8 @@ mod connection {
         auth: &'a Auth,
         // I'd abbreviate to `resume`, but I'd rather not have
         // a field and method with the same name.
+        // We use this to keep the SessionResume on hand
+        // because we can't recv from a oneshot channel more than once.
         resume_token: Option<SessionResume>,
         session_id: SessionId,
     }
@@ -1118,24 +1120,56 @@ mod connection {
             self.exit = Some(exit_rx);
             Ok(())
         }
+        // TODO: consider making this return a Result that's more descriptive
+        // of why no elements are being yielded
+        // TODO: consider yielding events even when gateway connection is closed
         pub(crate) async fn next(&mut self) -> Option<GatewayEvent> {
             use ::tokio::stream::StreamExt;
             // If we continue using the same mpsc channel, we can simply use the latest
             // sequence number Discord's given us, instead of trying
             // to resume from the latest processed event.
             // This strategy is lighter on IO and requires less bookkeeping.
-            self.events.next().await
-        }
-        pub(crate) fn take_resume(&mut self) -> Option<SessionResume> {
-            match self.exit.take() {
-                Some(mut exit) => match exit.try_recv() {
-                    Ok(ConnectionClosed::Resumable(Some(seq))) => Some(SessionResume { seq }),
-                    // I doubt this one is going to occur, but it's technically possible.
-                    Ok(ConnectionClosed::Resumable(None)) => None,
-                    Ok(ConnectionClosed::Nonresumable) => None,
-                    Err(_) => None,
+            match self.exit {
+                Some(ref mut channel) => match channel.try_recv() {
+                    Ok(closed) => {
+                        match closed {
+                            ConnectionClosed::Resumable(Some(seq)) =>
+                                self.resume_token = Some(SessionResume {
+                                    seq
+                                }),
+                            _ => ()
+                        }
+                        self.exit = None;
+                        None
+                    },
+                    // Only yield events when the connection is open,
+                    // even if we have some we haven't processed yet.
+                    Err(oneshot::error::TryRecvError::Empty) => {
+                        self.events.next().await
+                    },
+                    Err(oneshot::error::TryRecvError::Closed) => None,
                 },
                 None => None,
+            }
+        }
+        pub(crate) fn take_resume(&mut self) -> Option<SessionResume> {
+            match self.exit {
+                Some(ref mut exit) => match exit.try_recv() {
+                    Ok(closed) => {
+                        self.exit = None;
+                        match closed {
+                            ConnectionClosed::Resumable(Some(seq)) => Some(SessionResume { seq }),
+                            // I doubt this one is going to occur, but it's technically possible.
+                            ConnectionClosed::Resumable(None) => None,
+                            ConnectionClosed::Nonresumable => None,
+                        }
+                    }
+                    Err(_) => None,
+                },
+                None => match self.resume_token.take() {
+                    Some(token) => Some(token),
+                    None => None,
+                }
             }
         }
     }
