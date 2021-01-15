@@ -151,7 +151,7 @@ mod api {
     }
     use ::serde_aux::field_attributes::deserialize_number_from_string;
     /// A 64 bit integer type that deserializes Discord's stringed up integers just fine.
-    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
     #[serde(transparent)]
     pub(crate) struct U64(#[serde(deserialize_with = "deserialize_number_from_string")] pub u64);
     impl ::core::fmt::Debug for U64 {
@@ -310,7 +310,7 @@ mod gateway {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub(crate) end: Option<u32>,
     }
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
     #[serde(transparent)]
     pub(crate) struct Snowflake(pub(crate) U64);
     #[derive(Serialize)]
@@ -1218,6 +1218,87 @@ mod connection {
     }
 }
 
+// Pasted from the other segment of mbot.
+fn format_smart(exp: mice::ExpressionResult) -> String {
+    const MAX_REPLY_LENGTH: usize = 1900;
+    let first = exp.format(::mice::FormatOptions::new().total_right());
+    let second;
+    if first.len() < MAX_REPLY_LENGTH {
+        first
+    } else if {
+        second = exp.format(::mice::FormatOptions::new().concise().total_right());
+        second.len() < MAX_REPLY_LENGTH
+    } {
+        second
+    } else {
+        exp.total().to_string()
+    }
+}
+
+async fn roll(req_client: &::reqwest::Client,
+              id: gateway::Snowflake,
+              token: String,
+              data: gateway::ApplicationCommandInteractionData) {
+    let roll_internal = |expr: &str, reason: Option<&str>| {
+        let expr = ::mice::parse::Expression::parse(expr).unwrap().1.unwrap();
+        let dice_result = format_smart(expr.roll().unwrap());
+        async move {
+            // TODO: better retry strategy, possibly spawn a task
+            // for each command response
+            loop {
+                let res = api::reply_gateway_interaction(
+                    &req_client,
+                    id,
+                    token.clone(),
+                    dice_result.clone()).compat().await;
+                match res {
+                    Ok(()) => break,
+                    Err(e) => if !e.is_connect() {
+                        break
+                    } else {
+                        ::tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                }
+            }
+        }
+    };
+    match data.options.as_deref() {
+        Some([gateway::ApplicationCommandInteractionDataOption {
+            name, value: Some(::serde_json::Value::String(exp)), ..
+        }]) => {
+            match &**name {
+                "expression" => {
+                    roll_internal(exp, None).await
+                },
+                _ => todo!("wrong option"),
+            }
+        }
+        Some(
+            [
+                gateway::ApplicationCommandInteractionDataOption {
+                    name: first_arg_name,
+                    value: Some(::serde_json::Value::String(exp)),
+                    ..
+                },
+                gateway::ApplicationCommandInteractionDataOption {
+                    name: second_arg_name,
+                    value: Some(::serde_json::Value::String(reason)),
+                    ..
+                }
+            ],
+        ) => {
+            match (&**first_arg_name, &**second_arg_name) {
+                ("expression", "reason") => {
+                    roll_internal(exp, Some(reason)).await
+                }
+                _ => todo!("wrong option"),
+            }
+        }
+        Some([..]) => todo!("wrong options"),
+        None => todo!("no options"),
+    }
+}
+
 // TODO: split apart this gigant main function.
 #[::tokio::main]
 async fn main() {
@@ -1327,29 +1408,10 @@ async fn main() {
                         GatewayEvent::DispatchInteractionCreate(interaction) => {
                             let data = interaction.data
                                 .expect("Currently, this field is guaranteed to be populated");
-                            match data.options.as_deref() {
-                                Some(
-                                    [gateway::ApplicationCommandInteractionDataOption {
-                                        name, value: Some(::serde_json::Value::String(exp)), ..
-                                    }],
-                                ) => {
-                                    let name: &str = &*name;
-                                    match name {
-                                        "expression" => {
-                                            let exp =
-                                                ::mice::parse::Expression::parse(exp).unwrap().1.unwrap();
-                                            api::reply_gateway_interaction(&req_client,
-                                                                           interaction.id,
-                                                                           interaction.token,
-                                                                           exp.roll().unwrap().format(
-                                                                               Default::default())
-                                            ).compat().await.unwrap();
-                                        }
-                                        _ => todo!("wrong option"),
-                                    }
-                                }
-                                Some([..]) => todo!("wrong options"),
-                                None => todo!("no options"),
+                            println!("Interaction Data: {:?}", data);
+                            match &*data.name {
+                                "roll" => roll(&req_client, interaction.id, interaction.token, data).await,
+                                _ => (),
                             }
                         },
                     }

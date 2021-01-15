@@ -3,9 +3,16 @@ SlashSchema(
     name: "roll",
     description: "Roll a dice expression",
     options: Some([CommandOption(
-        type: String,
-        name: "expression",
-        description: "a d&d-esque dice expression",
-        required: Some(true),
-    )]),
+                type: String,
+                name: "expression",
+                description: "a d&d-esque dice expression",
+                required: Some(true),
+            ),
+            CommandOption(
+                type: String,
+                name: "reason",
+                description: "narrative reason for the roll",
+                required: Some(false),
+            ),
+        ]),
 )
