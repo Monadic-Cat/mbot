@@ -1037,6 +1037,7 @@ mod connection {
                                     }
                                 }
                                 gateway::Opcode::Reconnect => {
+                                    eprintln!("Received Reconnect. Ending current WebSocket connection.");
                                     // Whether we succeed to send this or not,
                                     // this task must wind down now.
                                     match exit.send(ConnectionClosed::Resumable(sequence_number)) {
@@ -1147,7 +1148,18 @@ mod connection {
                     // Only yield events when the connection is open,
                     // even if we have some we haven't processed yet.
                     Err(oneshot::error::TryRecvError::Empty) => {
-                        self.events.next().await
+                        ::tokio::select! {
+                            event = self.events.next() => event,
+                            closed = channel => {
+                                match closed {
+                                    Ok(ConnectionClosed::Resumable(Some(seq))) =>
+                                        self.resume_token = Some(SessionResume { seq }),
+                                    _ => ()
+                                }
+                                self.exit = None;
+                                None
+                            },
+                        }
                     },
                     Err(oneshot::error::TryRecvError::Closed) => None,
                 },
