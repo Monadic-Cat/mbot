@@ -1354,6 +1354,7 @@ async fn main() {
                         },
                     }
                 }
+                // TODO: use proper reconnection strategy
                 match connection.take_resume() {
                     Some(token) => connection.resume(token, get_stream().await).await.unwrap(),
                     None => match ConnectionHandle::new(&config.auth, get_stream().await).await {
