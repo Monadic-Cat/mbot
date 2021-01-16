@@ -8,11 +8,7 @@ use ::std::time::Duration;
 use ::structopt::StructOpt;
 // Reqwest still uses Tokio 0.2,
 // but tokio-rustls uses Tokio 0.3.
-use ::futures::sink::SinkExt;
 use ::thiserror::Error;
-use ::tokio::stream::StreamExt;
-use ::tokio::task;
-use ::tokio::time;
 use ::tokio_compat_02::FutureExt;
 
 use ::reqwest::Url;
@@ -719,7 +715,7 @@ enum Opt {
 mod heartbeat {
     use super::gateway::{self, SequenceNumber};
     use ::tokio::sync::mpsc::error::TryRecvError;
-    use ::tokio::sync::{mpsc, oneshot, watch};
+    use ::tokio::sync::{mpsc, watch};
     use ::tokio::time;
     struct Heart {
         receiver: mpsc::Receiver<HeartMessage>,
@@ -823,7 +819,6 @@ mod connection {
     use super::Auth;
     /// TLS secured WebSocketStream we use with the Discord Gateway.
     type WSStream = ::tokio_tungstenite::WebSocketStream<::tokio_rustls::client::TlsStream<::tokio::net::TcpStream>>;
-    use ::tokio_tungstenite::WebSocketStream;
     use ::tungstenite::{Message, protocol::{CloseFrame, frame::coding::CloseCode}};
     use ::tokio::sync::{oneshot, mpsc};
     // Handles IO with a single Gateway connection.
