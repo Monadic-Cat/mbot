@@ -1182,35 +1182,6 @@ mod connection {
             }
         }
     }
-    fn get_stream() -> WSStream {
-        todo!("lol")
-    }
-    fn get_auth() -> Auth {
-        todo!(":upside_down:")
-    }
-    async fn example() {
-        let ws_stream = get_stream();
-        let auth = get_auth();
-        let mut connection = ConnectionHandle::new(&auth, ws_stream).await.unwrap();
-        loop {
-            // use it
-            while let Some(event) = connection.next().await {
-                match event {
-                    GatewayEvent::DispatchInteractionCreate { .. } => (),
-                }
-            }
-            // handle it dying:
-            // note that we'll likely have a retry loop or something here
-            eprintln!("Disconnected. Attempted to reconnect...");
-            match connection.take_resume() {
-                Some(token) => connection.resume(token, get_stream()).await.unwrap(),
-                None => match ConnectionHandle::new(&auth, get_stream()).await {
-                    Ok(x) => connection = x,
-                    Err(_) => break
-                }
-            }
-        }
-    }
 }
 
 // Pasted from the other segment of mbot.
