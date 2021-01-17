@@ -129,6 +129,7 @@ mod api {
         interaction: super::gateway::Snowflake,
         token: String,
         data: String,
+        ephemeral: bool,
     ) -> Result<(), ::reqwest::Error> {
         client
             .post(&format!(
@@ -136,9 +137,14 @@ mod api {
                 BASE, VERSION, interaction.0 .0, token
             ))
             .json(&::serde_json::json!({
-                "type": 4,
+                // TODO: this is obviously some silly implicit behavior
+                // What we're doing here is implicitly suppressing
+                // the command in chat whenever our response is ephemeral.
+                // We should instead make this decision explicitly at the call site.
+                "type": if ephemeral { 3 } else { 4 },
                 "data": {
-                    "content": data
+                    "content": data,
+                    "flags": if ephemeral { Some(1 << 6) } else { None }
                 }
             }))
             .send()
@@ -1205,9 +1211,21 @@ async fn roll(req_client: &::reqwest::Client,
               id: gateway::Snowflake,
               token: String,
               data: gateway::ApplicationCommandInteractionData) {
+    const ROLL_CAP: i64 = 10000;
     let roll_internal = |expr: &str, reason: Option<&str>| {
-        let expr = ::mice::parse::Expression::parse(expr).unwrap().1.unwrap();
-        let dice_result = format_smart(expr.roll().unwrap());
+        let (dice_result, ephemeral) = match ::mice::parse::Expression::parse(expr) {
+            Ok((input, Ok(dice))) => if input.trim().len() == 0 {
+                use ::mice::util::ExpressionExt;
+                if !dice.exceeds_cap(ROLL_CAP) {
+                    (format_smart(dice.roll().unwrap()), false)
+                } else {
+                    (String::from("You tried to DOS me!"), true)
+                }
+            } else {
+                (String::from("You've specified an invalid dice expression."), true)
+            },
+            Ok((_, Err(_))) | Err(_) => (String::from("You've specified an invalid dice expression."), true)
+        };
         async move {
             // TODO: better retry strategy, possibly spawn a task
             // for each command response
@@ -1216,7 +1234,9 @@ async fn roll(req_client: &::reqwest::Client,
                     &req_client,
                     id,
                     token.clone(),
-                    dice_result.clone()).compat().await;
+                    dice_result.clone(),
+                    ephemeral
+                ).compat().await;
                 match res {
                     Ok(()) => break,
                     Err(e) => if !e.is_connect() {
