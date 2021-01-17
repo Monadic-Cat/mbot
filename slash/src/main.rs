@@ -42,6 +42,7 @@ mod url_opt {
     }
 }
 
+// TODO: fill out and fully document the REST API and Gateway endpoints and types
 mod api {
     use ::reqwest::Url;
     /// Discord API base URI.
