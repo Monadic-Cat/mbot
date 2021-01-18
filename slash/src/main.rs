@@ -1215,7 +1215,7 @@ async fn roll(req_client: &::reqwest::Client,
     const ROLL_CAP: i64 = 10000;
     let roll_internal = |expr: &str, reason: Option<&str>| {
         let (dice_result, ephemeral) = match ::mice::parse::Expression::parse(expr) {
-            Ok((input, Ok(dice))) => if input.trim().len() == 0 {
+            Ok((input, Ok(dice))) => if input.trim().is_empty() {
                 use ::mice::util::ExpressionExt;
                 if !dice.exceeds_cap(ROLL_CAP) {
                     (format_smart(dice.roll().unwrap()), false)
