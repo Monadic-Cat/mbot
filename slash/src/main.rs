@@ -73,6 +73,9 @@ mod api {
             format!("{}/v{}/gateway", super::BASE, super::VERSION)
         }
     }
+    // TODO: add slash command list PUT endpoint, which replaces the whole
+    // collection of your registered slash commands with a new collection
+    // of them all at once
     /// Calling this with a Slash Command that uses an already used name
     /// for your application will updated the existing command.
     pub(crate) async fn upsert_slash(
