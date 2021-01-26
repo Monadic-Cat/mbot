@@ -1,13 +1,13 @@
 [package]
 name = "mice"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["Monadic Cat <greenmonadcat@gmail.com>"]
 repository = "https://github.com/Monadic-Cat/mice"
 documentation = "https://docs.rs/mice"
 description = "messing with dice"
 readme = "README.md"
 keywords = ["dice", "roll", "parse"]
-license = "MIT OR Apache-2.0"
+license = "AGPL-3.0-or-later"
 edition = "2018"
 
 [lib]
