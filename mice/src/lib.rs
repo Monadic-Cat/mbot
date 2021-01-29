@@ -87,7 +87,7 @@ where
         })
     } else {
         let mut total: i64 = 0;
-        let mut parts = Vec::new();
+        let mut parts = Vec::with_capacity(a.number as usize);
         // Rng::gen_range has an exlusive upper bound
         // Rng::gen includes the entire range of a type.
         for _ in 0..a.number {
@@ -148,7 +148,7 @@ where
     R: Rng,
 {
     // let mut rng = thread_rng(); // This doesn't work in WASM?
-    let mut pairs = Vec::new();
+    let mut pairs = Vec::with_capacity(input.size_hint().0);
     let mut total: i64 = 0;
     for x in input {
         match x {
