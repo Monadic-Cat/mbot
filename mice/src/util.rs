@@ -27,6 +27,10 @@ type UResult = Result<ExpressionResult, UtilError>;
 
 #[cfg(feature = "thread_rng")]
 fn exceeds_cap(dice: &Expression, cap: i64) -> bool {
+    evaluation_cost(dice, Some(cap)) > cap
+}
+
+fn evaluation_cost(dice: &Expression, cap: Option<i64>) -> i64 {
     let mut roll_count = 0;
     for term in dice.terms() {
         match term {
@@ -41,11 +45,13 @@ fn exceeds_cap(dice: &Expression, cap: i64) -> bool {
             Term::Constant(_) => roll_count += 1,
         }
         // Prevent worst case performance
-        if roll_count > cap {
-            return true;
+        if let Some(cap) = cap {
+            if roll_count > cap {
+                return roll_count
+            }
         }
     }
-    roll_count > cap
+    roll_count
 }
 
 mod private {
@@ -66,6 +72,15 @@ pub trait ExpressionExt: private::Sealed {
     /// Constant terms take one step, dice terms take one step for each die.
     /// An `Nd1` dice term counts as a constant term for the purpose of this sum.
     fn exceeds_cap(&self, cap: i64) -> bool;
+    /// Counts the number of evaluation steps it will take to compute the result
+    /// of an expression.
+    ///
+    /// Constant terms cost `1`, dice terms cost `1` per die, except `Nd1` dice terms,
+    /// which costs `1`.
+    ///
+    /// A cap may be set, which will short circuit the cost calculation
+    /// if the cap has been exceeded.
+    fn evaluation_cost(&self, cap: Option<i64>) -> i64;
 }
 impl ExpressionExt for Expression {
     // Note that this method does not necessarily iterate over the whole expression.
@@ -81,6 +96,9 @@ impl ExpressionExt for Expression {
     // in implementing it.
     fn exceeds_cap(&self, cap: i64) -> bool {
         exceeds_cap(self, cap)
+    }
+    fn evaluation_cost(&self, cap: Option<i64>) -> i64 {
+        evaluation_cost(self, cap)
     }
 }
 

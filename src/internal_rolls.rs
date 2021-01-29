@@ -105,7 +105,14 @@ pub(crate) fn message(input: &str) -> ParsedMessage {
 pub(crate) fn response_for(input: &str) -> Option<String> {
     let info = message(input);
     if info.rolls.len() > 0 {
-        // TODO: limit rolls (this is a trivial DOS vulnerability lmao)
+        use ::mice::util::ExpressionExt;
+        let cost: i64 = info.rolls.iter()
+            .filter_map(|x| x.as_ref().ok())
+            .map(|x| x.evaluation_cost(Some(10000)))
+            .sum();
+        if cost > 10000 {
+            return None;
+        }
         let results: Vec<Result<ExpressionResult, _>> =
             info.rolls.into_iter().map(|x| match x.map(|x| x.roll()) {
                 Ok(Ok(x)) => Ok(x),
