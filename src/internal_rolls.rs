@@ -105,6 +105,7 @@ pub(crate) fn message(input: &str) -> ParsedMessage {
 pub(crate) fn response_for(input: &str) -> Option<String> {
     let info = message(input);
     if info.rolls.len() > 0 {
+        // TODO: limit rolls (this is a trivial DOS vulnerability lmao)
         let results: Vec<Result<ExpressionResult, _>> =
             info.rolls.into_iter().map(|x| match x.map(|x| x.roll()) {
                 Ok(Ok(x)) => Ok(x),
