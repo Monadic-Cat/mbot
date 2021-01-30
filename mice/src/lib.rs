@@ -91,12 +91,7 @@ where
         // Rng::gen_range has an exlusive upper bound
         // Rng::gen includes the entire range of a type.
         for _ in 0..a.number {
-            let random;
-            if let Some(bound) = a.size.checked_add(1) {
-                random = rng.gen_range(1, bound);
-            } else {
-                random = rng.gen();
-            }
+            let random = rng.gen_range(0, a.size) + 1;
             total = total.checked_add(random).ok_or(OverflowPositive)?;
             parts.push(random);
         }
