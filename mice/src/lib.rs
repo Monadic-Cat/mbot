@@ -44,6 +44,8 @@ use builder::RollBuilder;
 mod display;
 pub mod prelude;
 pub mod util;
+pub mod nfmt;
+
 #[derive(::thiserror::Error, Debug, Clone, Copy)]
 #[error("sum is too high for `i64`")]
 pub struct OverflowPositive;
