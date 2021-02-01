@@ -91,6 +91,13 @@ impl<Cns> FormatDescriptor<Cns> {
         self.items.fmt(expr, &mut text);
         text
     }
+    /// Format an evaluated expression with this [`FormatDescriptor`],
+    /// into an existing buffer.
+    fn format_with(&self, expr: &super::ExpressionResult, out: &mut String)
+        where Cns: TopFormat,
+    {
+        self.items.fmt(expr, out);
+    }
 }
 
 #[derive(Clone)]
@@ -442,7 +449,7 @@ pub mod compat {
                 TermSeparator, TermFormatDescriptor, TermFormatItem,
                 PartialSumSignDirective, ExtendList, TermKind};
     use crate::post::{ExpressionResult, FormatOptions, TotalPosition};
-    pub fn format(e: &ExpressionResult, options: FormatOptions) -> String {
+    pub(super) fn format_with(e: &ExpressionResult, options: FormatOptions, out: &mut String) {
         let default_term = depend_kind! {
             dice: [
                 TermFormatItem::Text::<()>(Cow::Borrowed("(")),
@@ -478,11 +485,11 @@ pub mod compat {
                     });
                     let items = left_total.extend(items);
                     let descriptor = FormatDescriptor::new(items);
-                    descriptor.format(e)
+                    descriptor.format_with(e, out)
                 } else {
                     let items = left_total.extend(default);
                     let descriptor = FormatDescriptor::new(items);
-                    descriptor.format(e)
+                    descriptor.format_with(e, out)
                 }
             },
             TotalPosition::Right => {
@@ -492,13 +499,18 @@ pub mod compat {
                 ]);
                 let items = default.extend(right_total);
                 let descriptor = FormatDescriptor::new(items);
-                descriptor.format(e)
+                descriptor.format_with(e, out)
             },
             TotalPosition::Suppressed => {
                 let descriptor = FormatDescriptor::new(default);
-                descriptor.format(e)
+                descriptor.format_with(e, out)
             }
         }
+    }
+    pub fn format(e: &ExpressionResult, options: FormatOptions) -> String {
+        let mut out = String::with_capacity(2000);
+        format_with(e, options, &mut out);
+        out
     }
     #[cfg(test)]
     #[test]
@@ -513,5 +525,14 @@ pub mod compat {
         let new_output = format(&result, mbot_main_format);
 
         assert_eq!(old_output, new_output);
+    }
+}
+
+#[doc(hidden)]
+pub mod benching {
+    // Exposing whatever we need for benchmarks.
+    pub use crate::display::format as old_format;
+    pub fn format_with(e: &crate::ExpressionResult, options: crate::FormatOptions, out: &mut String) {
+        crate::nfmt::compat::format_with(e, options, out);
     }
 }

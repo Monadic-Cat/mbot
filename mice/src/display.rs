@@ -4,7 +4,7 @@ use crate::post::{EvaluatedTerm, ExpressionResult, FormatOptions, TermSeparator,
 
 /// `[T[ = ]](EXP → N [+ N]*) [+ (EXP → N [+ N]*)]*[[ = ]T]`
 /// Main entry point for formatting the results of dice expressions.
-pub(crate) fn format(e: &ExpressionResult, options: FormatOptions) -> String {
+pub fn format(e: &ExpressionResult, options: FormatOptions) -> String {
     let FormatOptions {
         total_position,
         term_separators,
