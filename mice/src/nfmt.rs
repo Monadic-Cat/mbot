@@ -87,7 +87,7 @@ impl<Cns> FormatDescriptor<Cns> {
     pub fn format(&self, expr: &super::ExpressionResult) -> String
         where Cns: TopFormat,
     {
-        let mut text = String::new();
+        let mut text = String::with_capacity(2000);
         self.items.fmt(expr, &mut text);
         text
     }
@@ -211,6 +211,14 @@ impl<Car, Cdr, List> ExtendList<List> for Cons<Car, Cdr>
     }
 }
 
+fn sign_str(sign: crate::parse::Sign) -> &'static str {
+    use crate::parse::Sign;
+    match sign {
+        Sign::Positive => "+",
+        Sign::Negative => "-",
+    }
+}
+
 /// A trait for formatting top level components of evaluated dice expressions.
 pub trait TopFormat {
     fn fmt(&self, expr: &super::ExpressionResult, out: &mut String);
@@ -227,8 +235,8 @@ where F: LengthDependent<'a, Cdr, ()>,
         use FormatItem::*;
         use ::core::fmt::Write;
         match self {
-            Total => write!(out, "{}", expr.total()).unwrap(),
-            Text(ref text) => write!(out, "{}", text).unwrap(),
+            Total => itoa::fmt(out, expr.total()).unwrap(),
+            Text(ref text) => out.push_str(text),
             LengthDependent(ref func) => func.of(expr.pairs().len()).fmt(expr, out),
             Terms(sep, terms) => {
                 let mut pairs = expr.pairs().iter();
@@ -236,9 +244,13 @@ where F: LengthDependent<'a, Cdr, ()>,
                     terms.items.fmt(first, out);
                     for rest in pairs {
                         match sep {
-                            TermSeparator::Comma => write!(out, ", ").unwrap(),
-                            TermSeparator::Text(text) => write!(out, "{}", text).unwrap(),
-                            TermSeparator::Operator => write!(out, " {} ", rest.0.sign).unwrap(),
+                            TermSeparator::Comma => out.push_str(", "),
+                            TermSeparator::Text(text) => out.push_str(text),
+                            TermSeparator::Operator => {
+                                out.push_str(" ");
+                                out.push_str(sign_str(rest.0.sign));
+                                out.push_str(" ");
+                            },
                         }
                         terms.items.fmt(rest, out);
                     }
@@ -273,23 +285,37 @@ where F: KindDependent<'a, ()>
         use TermFormatItem::*;
         use ::core::fmt::Write;
         match self {
-            Total => write!(out, "{}", term.1.value()).unwrap(),
+            Total => itoa::fmt(out, term.1.value()).unwrap(),
             PartialSums(directive) => {
                 let mut parts = term.1.parts().iter();
                 if let Some(first) = parts.next() {
-                    write!(out, "{}", first).unwrap();
+                    itoa::fmt(&mut *out, *first).unwrap();
                     for rest in parts {
                         match directive {
-                            PartialSumSignDirective::Plus => write!(out, " +").unwrap(),
-                            PartialSumSignDirective::Same => write!(out, " {}", term.1.sign()).unwrap(),
+                            PartialSumSignDirective::Plus => out.push_str(" +"),
+                            PartialSumSignDirective::Same => {
+                                out.push_str(" ");
+                                out.push_str(sign_str(term.1.sign()));
+                            },
                         }
-                        write!(out, " {}", rest).unwrap();
+                        out.push_str(" ");
+                        itoa::fmt(&mut *out, *rest).unwrap();
                     }
                 }
             },
-            Expression => write!(out, "{}", term.0.term).unwrap(),
-            Sign => write!(out, "{}", term.0.sign).unwrap(),
-            Text(text) => write!(out, "{}", text).unwrap(),
+            Expression => {
+                use crate::parse::Term;
+                match term.0.term {
+                    Term::Dice(dice) => {
+                        itoa::fmt(&mut *out, dice.count()).unwrap();
+                        out.push_str("d");
+                        itoa::fmt(out, dice.sides()).unwrap();
+                    },
+                    Term::Constant(number) => itoa::fmt(out, number).unwrap(),
+                }
+            },
+            Sign => out.push_str(sign_str(term.0.sign)),
+            Text(text) =>  out.push_str(text),
             KindDependent(func) => {
                 let kind = match term.1 {
                     crate::EvaluatedTerm::Constant(_) => TermKind::Constant,
@@ -410,7 +436,7 @@ macro_rules! depend_length {
 /// A compatibility module for the old formatting facility.
 /// This exists primarily to demonstrate that the new formatting facility
 /// is at least as expressive as the old `FormatOptions` based one.
-mod compat {
+pub mod compat {
     use ::std::borrow::Cow;
     use super::{Cons, FormatDescriptor, Nil, FormatItem,
                 TermSeparator, TermFormatDescriptor, TermFormatItem,

@@ -120,11 +120,14 @@ impl Display for Sign {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub(crate) struct Expr {
-    pub(crate) term: Term,
-    pub(crate) sign: Sign,
+mod hidden{
+    #[derive(Debug, Copy, Clone)]
+    pub struct Expr {
+        pub(crate) term: super::Term,
+        pub(crate) sign: super::Sign,
+    }
 }
+pub(crate) use hidden::Expr;
 impl Expr {
     pub(crate) fn format(&self, options: FormatOptions) -> String {
         // N

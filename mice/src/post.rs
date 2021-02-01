@@ -178,7 +178,7 @@ impl Default for FormatOptions {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct RolledDie {
+pub struct RolledDie {
     pub(crate) total: i64,
     pub(crate) parts: Vec<i64>,
     pub(crate) sign_part: Sign,
@@ -239,7 +239,7 @@ impl Display for RolledDie {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum EvaluatedTerm {
+pub enum EvaluatedTerm {
     Die(RolledDie),
     Constant(i64),
 }
