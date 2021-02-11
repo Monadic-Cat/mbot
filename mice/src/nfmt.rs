@@ -568,6 +568,7 @@ pub mod simple {
     use crate::parse::Expr;
     use super::PartialSumSignDirective;
     use super::TermKind;
+    use super::TermSeparator;
     pub struct ExpressionFormatter<'a> {
         buf: &'a mut String,
         expr: &'a ExpressionResult,
@@ -585,11 +586,33 @@ pub mod simple {
             self
         }
         /// Insert the expression's terms.
-        pub fn terms<F: Fn(TermFormatter)>(&mut self, func: F) -> &mut Self {
+        pub fn terms<F: Fn(TermFormatter)>(&mut self, separator: TermSeparator, func: F) -> &mut Self {
             let ExpressionFormatter { buf, expr } = self;
-            for term in expr.pairs() {
-                let formatter = TermFormatter { buf, term };
-                func(formatter)
+            let mut pairs = expr.pairs().iter();
+            if let Some(first) = pairs.next() {
+                // TODO: examine the necessity of this special case
+                if let TermSeparator::Operator = separator {
+                    use crate::parse::Sign;
+                    match first.0.sign {
+                        Sign::Negative => buf.push_str("-"),
+                        Sign::Positive => (),
+                    }
+                }
+                let formatter = TermFormatter { buf, term: first };
+                func(formatter);
+                for term in pairs {
+                    match separator {
+                        TermSeparator::Comma => buf.push_str(", "),
+                        TermSeparator::Text(ref text) => buf.push_str(text),
+                        TermSeparator::Operator => {
+                            buf.push_str(" ");
+                            buf.push_str(super::sign_str(term.0.sign));
+                            buf.push_str(" ");
+                        },
+                    }
+                    let formatter = TermFormatter { buf, term };
+                    func(formatter)
+                }
             }
             self
         }
@@ -607,6 +630,10 @@ pub mod simple {
             if self.expr.pairs().len() > 1 && self.expr.pairs()[0].1.parts().len() > 1 {
                 func(self);
             }
+            self
+        }
+        pub fn for_many<F: Fn(&mut ExpressionFormatter, bool)>(&mut self, func: F) -> &mut Self {
+            func(self, self.expr.pairs().len() > 1 && self.expr.pairs()[0].1.parts().len() > 1);
             self
         }
     }
@@ -675,6 +702,86 @@ pub mod simple {
     pub fn format_result<F: Fn(ExpressionFormatter)>(expr: &ExpressionResult, buf: &mut String, func: F) {
         let formatter = ExpressionFormatter { buf, expr };
         func(formatter)
+    }
+    pub(crate) fn format_compat(expr: &ExpressionResult, options: crate::FormatOptions) -> String {
+        use crate::post::TotalPosition;
+        let mut buf = String::new();
+        format_result(expr, &mut buf, |mut f| {
+            let insert_terms = |f: &mut ExpressionFormatter| {
+                f.terms(TermSeparator::Operator, |mut f| {
+                    f.for_kind(|f, kind| match kind {
+                        TermKind::Dice => {
+                            // TODO: finish this
+                            if options.term_parentheses {
+                                f.text("(");
+                            }
+                            f.expression().text(" → ");
+                            if options.summarize_terms {
+                                f.total();
+                            } else {
+                                f.partial_sums(PartialSumSignDirective::Plus);
+                            }
+                            if options.term_parentheses {
+                                f.text(")");
+                            }
+                        },
+                        TermKind::Constant => { f.total(); }
+                    });
+                });
+            };
+            macro_rules! term_list_parens {
+                ($formatter:expr , $options:expr , $inner:expr) => {
+                    if $options.term_list_parentheses {
+                        $formatter.text("(");
+                    }
+                    $inner;
+                    if $options.term_list_parentheses {
+                        $formatter.text(")");
+                    }
+                }
+            }
+            match options.total_position {
+                TotalPosition::Left => {
+                    f.total().if_many(|f| {
+                        f.text(" = ");
+                        term_list_parens!(f, options, {
+                            insert_terms(f);
+                        });
+                    });
+                },
+                TotalPosition::Right => {
+                    f.if_many(|f| {
+                        term_list_parens!(f, options, {
+                            insert_terms(f);
+                        });
+                        f.text(" = ");
+                    }).total();
+                },
+                TotalPosition::Suppressed => {
+                    f.for_many(|f, many| {
+                        if many {
+                            term_list_parens!(f, options, {
+                                insert_terms(f);
+                            });
+                        } else {
+                            f.total();
+                        }
+                    });
+                }
+            }
+        });
+        buf
+    }
+    #[cfg(test)]
+    #[test]
+    fn old_compat() {
+        let format_cfg = crate::FormatOptions::new().total_right();
+
+        let result = crate::roll("-2d3 + 2").unwrap();
+
+        let old_output =  crate::display::format(&result, format_cfg);
+        let new_output = format_compat_with(&result, format_cfg);
+        assert_eq!(old_output, new_output);
     }
 }
 
