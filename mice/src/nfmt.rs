@@ -112,7 +112,7 @@ impl ExpressionFormatter<'_> {
 impl TermFormatter<'_> {
     /// Insert the term's total.
     pub fn total(&mut self) -> &mut Self {
-        let _ = itoa::fmt(&mut self.buf, self.term.1.value());
+        let _ = itoa::fmt(&mut self.buf, self.term.1.value().abs());
         self
     }
     /// Insert the term's partial sums.
