@@ -562,7 +562,7 @@ pub mod compat {
 
 // Okay, I got a carried away with that.
 // Let's do this for real now.
-mod simple {
+pub mod simple {
     use crate::ExpressionResult;
     use crate::post::EvaluatedTerm;
     use crate::parse::Expr;
@@ -667,7 +667,7 @@ mod simple {
             self
         }
     }
-    fn format_result<F: Fn(ExpressionFormatter)>(expr: &ExpressionResult, buf: &mut String, func: F) {
+    pub fn format_result<F: Fn(ExpressionFormatter)>(expr: &ExpressionResult, buf: &mut String, func: F) {
         let formatter = ExpressionFormatter { buf, expr };
         func(formatter)
     }
