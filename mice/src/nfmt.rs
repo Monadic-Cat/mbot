@@ -250,6 +250,8 @@ pub fn format_compat(expr: &ExpressionResult, options: crate::FormatOptions) -> 
 #[cfg(test)]
 #[test]
 fn old_compat() {
+    // TODO: use itertools cartesian product to test
+    // each dice expression with each possible FormatOptions configuration
     let format_cfg = crate::FormatOptions::new().total_right();
 
     let results = [
