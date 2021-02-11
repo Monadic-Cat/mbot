@@ -112,23 +112,33 @@ pub enum TermSeparator<'a> {
     Text(Cow<'a, str>),
 }
 
-/// Trait for format items whose value is dependent on the length of an expression.
-pub trait LengthDependent<'a, Cdr, F> {
-    fn of(&self, length: usize) -> FormatItem<'a, Cdr, F>;
+pub struct Queryable {
+    has_many: bool,
 }
-impl<'a, Cdr> LengthDependent<'a, Cdr, ()> for () {
-    fn of(&self, _length: usize) -> FormatItem<'a, Cdr, ()> {
+impl Queryable {
+    fn has_many(&self) -> bool {
+        self.has_many
+    }
+}
+
+/// Trait for format items whose value is dependent on the length of an expression.
+pub trait GlobalPropertyDependent<'a, Cdr, F> {
+    fn of(&self, length: usize, query: Queryable) -> FormatItem<'a, Cdr, F>;
+}
+impl<'a, Cdr> GlobalPropertyDependent<'a, Cdr, ()> for () {
+    fn of(&self, _length: usize, _query: Queryable) -> FormatItem<'a, Cdr, ()> {
         FormatItem::Nothing
     }
 }
-impl<'a, Cdr, F> LengthDependent<'a, Cdr, ()> for F
+impl<'a, Cdr, F> GlobalPropertyDependent<'a, Cdr, ()> for F
 where F: Fn(usize) -> FormatItem<'a, Cdr, ()> {
-    fn of(&self, length: usize) -> FormatItem<'a, Cdr, ()> {
+    fn of(&self, length: usize, _query: Queryable) -> FormatItem<'a, Cdr, ()> {
         self(length)
     }
 }
 
 /// A formatting instruction for [`FormatDescriptor`].
+#[derive(Clone)]
 #[non_exhaustive]
 pub enum FormatItem<'a, Cdr, F = ()> {
     /// Insert the expression's total.
@@ -138,13 +148,14 @@ pub enum FormatItem<'a, Cdr, F = ()> {
     /// Insert arbitrary text.
     Text(Cow<'a, str>),
     /// Insert a formatting item based on the length of the expression.
-    LengthDependent(F),
+    GlobalPropertyDependent(F),
     /// Insert nothing.
     Nothing,
     // TODO: a *Multiple* variant
 }
 
 /// Description of how to format a single evaluated term.
+#[derive(Clone)]
 pub struct TermFormatDescriptor<Cns> {
     items: Cns,
 }
@@ -235,7 +246,7 @@ impl TopFormat for Nil {
 }
 
 impl<'a, Cdr, F> TopFormat for FormatItem<'a, Cdr, F>
-where F: LengthDependent<'a, Cdr, ()>,
+where F: GlobalPropertyDependent<'a, Cdr, ()>,
       Cdr: TermFormat
 {
     fn fmt(&self, expr: &super::ExpressionResult, out: &mut String) {
@@ -244,7 +255,12 @@ where F: LengthDependent<'a, Cdr, ()>,
         match self {
             Total => itoa::fmt(out, expr.total()).unwrap(),
             Text(ref text) => out.push_str(text),
-            LengthDependent(ref func) => func.of(expr.pairs().len()).fmt(expr, out),
+            GlobalPropertyDependent(ref func) => {
+                let query = Queryable {
+                    has_many: expr.pairs().len() > 1 && expr.pairs()[0].1.parts().len() > 1,
+                };
+                func.of(expr.pairs().len(), query).fmt(expr, out)
+            },
             Terms(sep, terms) => {
                 let mut pairs = expr.pairs().iter();
                 if let Some(first) = pairs.next() {
@@ -269,7 +285,7 @@ where F: LengthDependent<'a, Cdr, ()>,
 }
 impl<'top, Cdr, Cadr, F> TopFormat for Cons<FormatItem<'top, Cadr, F>, Cdr>
 where Cdr: TopFormat,
-      F: LengthDependent<'top, Cadr, ()>,
+      F: GlobalPropertyDependent<'top, Cadr, ()>,
       Cadr: TermFormat,
 {
     fn fmt(&self, expr: &super::ExpressionResult, out: &mut String) {
@@ -381,14 +397,14 @@ macro_rules! depend_length {
      $(else [$($e_items:expr),*])?) => {
         $crate::list![
         $(
-            $crate::nfmt::FormatItem::LengthDependent(&(|$len| if $cond {
+            $crate::nfmt::FormatItem::GlobalPropertyDependent(&(|$len| if $cond {
                 $t_items
             } else {
                 $crate::nfmt::FormatItem::Nothing
             }) as &dyn Fn(_) -> FormatItem<'static, Nil>)
         ),*
             $($(
-                $crate::nfmt::FormatItem::LengthDependent(&(|$len| if $cond {
+                $crate::nfmt::FormatItem::GlobalPropertyDependent(&(|$len| if $cond {
                     $crate::nfmt::FormatItem::Nothing
                 } else {
                     $e_items
@@ -400,20 +416,36 @@ macro_rules! depend_length {
      $(else [$($e_items:expr),*])?) => {
         $crate::list![
         $(
-            $crate::nfmt::FormatItem::LengthDependent(|$len| if $cond {
+            $crate::nfmt::FormatItem::GlobalPropertyDependent(|$len| if $cond {
                 $t_items
             } else {
                 $crate::nfmt::FormatItem::Nothing
             })
         ),*
             $($(
-                $crate::nfmt::FormatItem::LengthDependent(|$len| if $cond {
+                $crate::nfmt::FormatItem::GlobalPropertyDependent(|$len| if $cond {
                     $crate::nfmt::FormatItem::Nothing
                 } else {
                     $e_items
                 })
             ),*)?
         ]
+    }
+}
+
+struct IfMany<'a, Cdr, F> {
+    item: FormatItem<'a, Cdr, F>,
+}
+impl<'a, Cdr, F> GlobalPropertyDependent<'a, Cdr, F> for IfMany<'a, Cdr, F>
+where Cdr: Clone,
+      F: Clone,
+{
+    fn of(&self, _length: usize, query: Queryable) -> FormatItem<'a, Cdr, F> {
+        if query.has_many() {
+            self.item.clone()
+        } else {
+            FormatItem::Nothing
+        }
     }
 }
 
@@ -447,7 +479,7 @@ pub mod compat {
     use ::std::borrow::Cow;
     use super::{Cons, FormatDescriptor, Nil, FormatItem,
                 TermSeparator, TermFormatDescriptor, TermFormatItem,
-                PartialSumSignDirective, ExtendList, TermKind};
+                PartialSumSignDirective, ExtendList, TermKind, IfMany};
     use crate::post::{ExpressionResult, FormatOptions, TotalPosition};
     pub(super) fn format_with(e: &ExpressionResult, options: FormatOptions, out: &mut String) {
         let default_term = depend_kind! {
