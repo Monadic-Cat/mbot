@@ -21,27 +21,35 @@ fn compare_formatting(c: &mut Criterion) {
             buf.clear();
         });
     });
+    let same_cfg_func = |mut f: ::mice::nfmt::simple::ExpressionFormatter| {
+        f.if_many(|f| {
+            f.terms(|mut f| {
+                f.for_kind(|f, kind| {
+                    use mice::nfmt::TermKind;
+                    match kind {
+                        TermKind::Dice => {
+                            f.text("(").expression().text(" → ")
+                                .partial_sums(mice::nfmt::PartialSumSignDirective::Plus)
+                                .text(")");
+                        },
+                        TermKind::Constant => {
+                            f.total();
+                        }
+                    }});
+            }).text(" = ");
+        }).total();
+    };
     group.bench_function("Simple New Backend", |b| {
         b.iter(|| {
             let mut buf = String::with_capacity(2000);
-            mice::nfmt::simple::format_result(&dice_result, &mut buf, |mut f| {
-                f.if_many(|f| {
-                    f.terms(|mut f| {
-                        f.for_kind(|f, kind| {
-                        use mice::nfmt::TermKind;
-                        match kind {
-                            TermKind::Dice => {
-                                f.text("(").expression().text(" → ")
-                                    .partial_sums(mice::nfmt::PartialSumSignDirective::Plus)
-                                    .text(")");
-                            },
-                            TermKind::Constant => {
-                                f.total();
-                            }
-                        }});
-                    }).text(" = ");
-                }).total();
-            });
+            mice::nfmt::simple::format_result(&dice_result, &mut buf, same_cfg_func);
+        });
+    });
+    let mut buf = String::with_capacity(2000);
+    group.bench_function("Simple New Backend - With Reusing", |b| {
+        b.iter(|| {
+            mice::nfmt::simple::format_result(&dice_result, &mut buf, same_cfg_func);
+            buf.clear();
         });
     });
     group.finish();
