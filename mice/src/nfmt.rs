@@ -90,19 +90,22 @@ impl ExpressionFormatter<'_> {
         self.buf.push_str(text);
         self
     }
+    fn is_many(&self) -> bool {
+        self.expr.pairs().len() > 1 || self.expr.pairs()[0].1.parts().len() > 1
+    }
     // Barely a convenience function.
     // You'd need to use the evaluation cost stuff in `crate::util`,
     // which operates on the input expression, not the result.
     /// Convenience function for inserting stuff based on
     /// whether there's multiple partial sums in the expression.
     pub fn if_many<F: Fn(&mut ExpressionFormatter)>(&mut self, func: F) -> &mut Self {
-        if self.expr.pairs().len() > 1 && self.expr.pairs()[0].1.parts().len() > 1 {
+        if self.is_many() {
             func(self);
         }
         self
     }
     pub fn for_many<F: Fn(&mut ExpressionFormatter, bool)>(&mut self, func: F) -> &mut Self {
-        func(self, self.expr.pairs().len() > 1 && self.expr.pairs()[0].1.parts().len() > 1);
+        func(self, self.is_many());
         self
     }
 }
@@ -249,11 +252,18 @@ pub fn format_compat(expr: &ExpressionResult, options: crate::FormatOptions) -> 
 fn old_compat() {
     let format_cfg = crate::FormatOptions::new().total_right();
 
-    let result = crate::roll("-2d3 + 2").unwrap();
+    let results = [
+        "1", "d6", "2d6", "1 + 1",
+        "d6 + 1", "d6 + d6", "2d6 + d6",
+        "-1", "-d6", "-2d6", "-1 + 1",
+        "-2d6 + 1", "-2d6 - 1"
+    ].iter().map(|exp| crate::roll(exp).unwrap());
 
-    let old_output =  crate::display::format(&result, format_cfg);
-    let new_output = format_compat(&result, format_cfg);
-    assert_eq!(old_output, new_output);
+    for result in results {
+        let old_output =  crate::display::format(&result, format_cfg);
+        let new_output = format_compat(&result, format_cfg);
+        assert_eq!(old_output, new_output);
+    }
 }
 
 #[doc(hidden)]
