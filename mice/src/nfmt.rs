@@ -703,10 +703,9 @@ pub mod simple {
         let formatter = ExpressionFormatter { buf, expr };
         func(formatter)
     }
-    pub(crate) fn format_compat(expr: &ExpressionResult, options: crate::FormatOptions) -> String {
+    pub fn format_compat_with(expr: &ExpressionResult, buf: &mut String, options: crate::FormatOptions) {
         use crate::post::TotalPosition;
-        let mut buf = String::new();
-        format_result(expr, &mut buf, |mut f| {
+        format_result(expr, buf, |mut f| {
             let insert_terms = |f: &mut ExpressionFormatter| {
                 f.terms(TermSeparator::Operator, |mut f| {
                     f.for_kind(|f, kind| match kind {
@@ -770,6 +769,10 @@ pub mod simple {
                 }
             }
         });
+    }
+    pub fn format_compat(expr: &ExpressionResult, options: crate::FormatOptions) -> String {
+        let mut buf = String::new();
+        format_compat_with(expr, &mut buf, options);
         buf
     }
     #[cfg(test)]
@@ -780,7 +783,7 @@ pub mod simple {
         let result = crate::roll("-2d3 + 2").unwrap();
 
         let old_output =  crate::display::format(&result, format_cfg);
-        let new_output = format_compat_with(&result, format_cfg);
+        let new_output = format_compat(&result, format_cfg);
         assert_eq!(old_output, new_output);
     }
 }
