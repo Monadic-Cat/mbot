@@ -25,8 +25,9 @@ fn compare_formatting(c: &mut Criterion) {
         b.iter(|| {
             let mut buf = String::with_capacity(2000);
             mice::nfmt::simple::format_result(&dice_result, &mut buf, |mut f| {
-                f.terms(|mut f| {
-                    f.for_kind(|f, kind| {
+                f.if_many(|f| {
+                    f.terms(|mut f| {
+                        f.for_kind(|f, kind| {
                         use mice::nfmt::TermKind;
                         match kind {
                             TermKind::Dice => {
@@ -37,10 +38,8 @@ fn compare_formatting(c: &mut Criterion) {
                             TermKind::Constant => {
                                 f.total();
                             }
-                        }
-                    });
-                }).if_many(|f| {
-                    f.text(" = ");
+                        }});
+                    }).text(" = ");
                 }).total();
             });
         });
