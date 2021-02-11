@@ -24,6 +24,7 @@ itoa = "0.4.7"
 criterion = "0.3"
 wasm-bindgen = "0.2.50"
 js-sys = "0.3.27"
+itertools = "0.10.0"
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test = "0.2"

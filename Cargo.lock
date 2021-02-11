@@ -1082,6 +1082,7 @@ name = "mice"
 version = "0.10.0"
 dependencies = [
  "criterion",
+ "itertools 0.10.0",
  "itoa",
  "js-sys",
  "nom 5.1.2",

@@ -250,20 +250,31 @@ pub fn format_compat(expr: &ExpressionResult, options: crate::FormatOptions) -> 
 #[cfg(test)]
 #[test]
 fn old_compat() {
-    // TODO: use itertools cartesian product to test
-    // each dice expression with each possible FormatOptions configuration
-    let format_cfg = crate::FormatOptions::new().total_right();
+    use ::itertools::Itertools;
+    let format_cfgs = {
+        let d = crate::FormatOptions::new();
+        let totals = [d.total_left(), d.total_right(), d.no_total()];
+        totals.iter().flat_map(|cfg| {
+            vec![cfg.concise(), cfg.verbose()]
+        }).flat_map(|cfg| {
+            vec![cfg.term_commas(), cfg.term_pluses()]
+        }).flat_map(|cfg| {
+            vec![cfg.dice_parens(), cfg.no_term_parens()]
+        }).flat_map(|cfg| {
+            vec![cfg.term_list_parens(), cfg.no_term_list_parens()]
+        }).collect::<Vec<_>>()
+    };
 
     let results = [
         "1", "d6", "2d6", "1 + 1",
         "d6 + 1", "d6 + d6", "2d6 + d6",
         "-1", "-d6", "-2d6", "-1 + 1",
-        "-2d6 + 1", "-2d6 - 1"
+        "1 - 1", "-2d6 + 1", "-2d6 - 1"
     ].iter().map(|exp| crate::roll(exp).unwrap());
 
-    for result in results {
-        let old_output =  crate::display::format(&result, format_cfg);
-        let new_output = format_compat(&result, format_cfg);
+    for (result, cfg) in results.cartesian_product(format_cfgs) {
+        let old_output =  crate::display::format(&result, cfg);
+        let new_output = format_compat(&result, cfg);
         assert_eq!(old_output, new_output);
     }
 }
