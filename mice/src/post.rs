@@ -33,7 +33,12 @@ impl ExpressionResult {
     /// Afford some control of the output to the user,
     /// by allowing the specification of recognized customizations.
     pub fn format(&self, options: FormatOptions) -> String {
-        crate::display::format(self, options)
+        #[cfg(not(feature = "format_use_nfmt"))] {
+            crate::display::format(self, options)
+        }
+        #[cfg(feature = "format_use_nfmt")] {
+            crate::nfmt::format_compat(self, options)
+        }
     }
 }
 impl ExpressionResult {

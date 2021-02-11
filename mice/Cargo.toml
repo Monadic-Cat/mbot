@@ -44,3 +44,10 @@ thread_rng = []
 wasm = ["wasm-bindgen"]
 # Features:
 #  - wasm
+
+# WIP.
+# Switch out the old FormatOptions backend
+# to use nfmt through a compatibility layer.
+# Likely much faster, but not necessarily exactly
+# compatible yet.
+format_use_nfmt = []
