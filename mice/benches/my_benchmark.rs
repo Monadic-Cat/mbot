@@ -13,13 +13,13 @@ fn compare_formatting(c: &mut Criterion) {
     });
     group.bench_function("Simple New Backend", |b| {
         b.iter(|| {
-            mice::nfmt::simple::format_compat(&dice_result, format_cfg);
+            mice::nfmt::format_compat(&dice_result, format_cfg);
         });
     });
     let mut buf = String::with_capacity(2000);
     group.bench_function("Simple New Backend - With Reusing", |b| {
         b.iter(|| {
-            mice::nfmt::simple::format_compat_with(&dice_result, &mut buf, format_cfg);
+            mice::nfmt::format_compat_with(&dice_result, &mut buf, format_cfg);
             black_box(&buf);
             buf.clear();
         });
