@@ -179,7 +179,12 @@ pub fn format_compat_with(expr: &ExpressionResult, buf: &mut String, options: cr
     use crate::post::TotalPosition;
     format_result(expr, buf, |mut f| {
         let insert_terms = |f: &mut ExpressionFormatter| {
-            f.terms(TermSeparator::Operator, |mut f| {
+            let separator = match options.term_separators {
+                // Note that FormatOptions uses bad naming.
+                crate::post::TermSeparator::PlusSign => TermSeparator::Operator,
+                crate::post::TermSeparator::Comma => TermSeparator::Comma,
+            };
+            f.terms(separator, |mut f| {
                 f.for_kind(|f, kind| match kind {
                     TermKind::Dice => {
                         // TODO: finish this
