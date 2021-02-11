@@ -76,4 +76,4 @@ lto = true # Link Time Optimization
 codegen-units = 1 # Make less parallel permit more optimizations. Default is 16.
 
 [workspace]
-members = ["slash", "mice"]
+members = ["slash", "mice", "proc-macro-utils"]
