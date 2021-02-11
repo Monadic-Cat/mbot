@@ -567,6 +567,7 @@ pub mod simple {
     use crate::post::EvaluatedTerm;
     use crate::parse::Expr;
     use super::PartialSumSignDirective;
+    use super::TermKind;
     pub struct ExpressionFormatter<'a> {
         buf: &'a mut String,
         expr: &'a ExpressionResult,
@@ -662,11 +663,15 @@ pub mod simple {
             self
         }
         /// Insert things based on the kind of the term.
-        pub fn for_kind<F: Fn(&mut TermFormatter)>(&mut self, func: F) -> &mut Self {
-            func(self);
+        pub fn for_kind<F: Fn(&mut TermFormatter, super::TermKind)>(&mut self, func: F) -> &mut Self {
+            match self.term.1 {
+                EvaluatedTerm::Constant(_) => func(self, TermKind::Constant),
+                EvaluatedTerm::Die(_) => func(self, TermKind::Dice),
+            }
             self
         }
     }
+    /// Format a dice expression.
     pub fn format_result<F: Fn(ExpressionFormatter)>(expr: &ExpressionResult, buf: &mut String, func: F) {
         let formatter = ExpressionFormatter { buf, expr };
         func(formatter)
