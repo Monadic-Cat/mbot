@@ -21,6 +21,30 @@ fn compare_formatting(c: &mut Criterion) {
             buf.clear();
         });
     });
+    group.bench_function("Simple New Backend", |b| {
+        b.iter(|| {
+            let mut buf = String::with_capacity(2000);
+            mice::nfmt::simple::format_result(&dice_result, &mut buf, |mut f| {
+                f.terms(|mut f| {
+                    f.for_kind(|f, kind| {
+                        use mice::nfmt::TermKind;
+                        match kind {
+                            TermKind::Dice => {
+                                f.text("(").expression().text(" → ")
+                                    .partial_sums(mice::nfmt::PartialSumSignDirective::Plus)
+                                    .text(")");
+                            },
+                            TermKind::Constant => {
+                                f.total();
+                            }
+                        }
+                    });
+                }).if_many(|f| {
+                    f.text(" = ");
+                }).total();
+            });
+        });
+    });
     group.finish();
 }
 
