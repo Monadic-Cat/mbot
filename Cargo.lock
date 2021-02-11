@@ -1085,7 +1085,6 @@ dependencies = [
  "itoa",
  "js-sys",
  "nom 5.1.2",
- "proc-macro-utils",
  "rand",
  "thiserror",
  "wasm-bindgen",
@@ -1449,14 +1448,6 @@ name = "proc-macro-nested"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eba180dafb9038b050a4c280019bbedf9f2467b61e5d892dcad585bb57aadc5a"
-
-[[package]]
-name = "proc-macro-utils"
-version = "0.1.0"
-dependencies = [
- "proc-macro2 1.0.24",
- "quote 1.0.8",
-]
 
 [[package]]
 name = "proc-macro2"

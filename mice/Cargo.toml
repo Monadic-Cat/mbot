@@ -19,7 +19,6 @@ rand = "0.7.0"
 thiserror = "1.0.6"
 wasm-bindgen  = { version = "0.2.50", optional = true }
 itoa = "0.4.7"
-proc-macro-utils = { path = "../proc-macro-utils" }
 
 [dev-dependencies]
 criterion = "0.3"
