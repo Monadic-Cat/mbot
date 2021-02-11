@@ -45,6 +45,7 @@ pub struct ExpressionFormatter<'a> {
 pub struct TermFormatter<'a> {
     buf: &'a mut String,
     term: &'a (Expr, EvaluatedTerm),
+    is_first: bool
 }
 impl ExpressionFormatter<'_> {
     /// Insert the expression's total.
@@ -59,15 +60,7 @@ impl ExpressionFormatter<'_> {
         let ExpressionFormatter { buf, expr } = self;
         let mut pairs = expr.pairs().iter();
         if let Some(first) = pairs.next() {
-            // TODO: examine the necessity of this special case
-            if let TermSeparator::Operator = separator {
-                use crate::parse::Sign;
-                match first.0.sign {
-                    Sign::Negative => buf.push_str("-"),
-                    Sign::Positive => (),
-                }
-            }
-            let formatter = TermFormatter { buf, term: first };
+            let formatter = TermFormatter { buf, term: first, is_first: true, };
             func(formatter);
             for term in pairs {
                 match separator {
@@ -79,7 +72,7 @@ impl ExpressionFormatter<'_> {
                         buf.push_str(" ");
                     },
                 }
-                let formatter = TermFormatter { buf, term };
+                let formatter = TermFormatter { buf, term, is_first: false };
                 func(formatter)
             }
         }
@@ -117,7 +110,7 @@ impl TermFormatter<'_> {
     }
     /// Insert the term's partial sums.
     pub fn partial_sums(&mut self, directive: PartialSumSignDirective) -> &mut Self {
-        let Self { buf, term } = self;
+        let Self { buf, term, .. } = self;
         let mut parts = term.1.parts().iter();
         if let Some(first) = parts.next() {
             let _ = itoa::fmt(&mut *buf, *first);
@@ -138,7 +131,7 @@ impl TermFormatter<'_> {
     /// Insert the term's expression.
     pub fn expression(&mut self) -> &mut Self {
         use crate::parse::Term;
-        let Self { buf, term } = self;
+        let Self { buf, term, .. } = self;
         match term.0.term {
             Term::Dice(dice) => {
                 let _ = itoa::fmt(&mut *buf, dice.count());
@@ -185,6 +178,19 @@ pub fn format_compat_with(expr: &ExpressionResult, buf: &mut String, options: cr
                 crate::post::TermSeparator::Comma => TermSeparator::Comma,
             };
             f.terms(separator, |mut f| {
+                // Note: this relies on a private field.
+                // TODO: public API way to special case first term
+                if f.is_first {
+                    match options.term_separators {
+                        crate::post::TermSeparator::PlusSign => {
+                            match f.term.0.sign {
+                                crate::parse::Sign::Negative => { f.text("-"); },
+                                crate::parse::Sign::Positive => (),
+                            }
+                        },
+                        crate::post::TermSeparator::Comma => (),
+                    }
+                }
                 f.for_kind(|f, kind| match kind {
                     TermKind::Dice => {
                         // TODO: finish this
