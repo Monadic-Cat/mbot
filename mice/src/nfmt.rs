@@ -168,6 +168,8 @@ pub fn format_result<F: Fn(ExpressionFormatter)>(expr: &ExpressionResult, buf: &
     let formatter = ExpressionFormatter { buf, expr };
     func(formatter)
 }
+
+/// The same as [`format_compat`], but takes an output buffer argument.
 pub fn format_compat_with(expr: &ExpressionResult, buf: &mut String, options: crate::FormatOptions) {
     use crate::post::TotalPosition;
     format_result(expr, buf, |mut f| {
@@ -267,6 +269,12 @@ pub fn format_compat_with(expr: &ExpressionResult, buf: &mut String, options: cr
         }
     });
 }
+
+/// Format an evaluated dice expression, using the old [`FormatOptions`] for configuration.
+///
+/// Note that this is not bug for bug compatible with the old formatter.
+/// In roughly 8% of the tested cases, the two formatters disagree.
+/// Every single one of those cases is due to a mistake in the old formatter.
 pub fn format_compat(expr: &ExpressionResult, options: crate::FormatOptions) -> String {
     let mut buf = String::new();
     format_compat_with(expr, &mut buf, options);
