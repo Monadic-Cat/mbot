@@ -180,16 +180,17 @@ pub fn format_compat_with(expr: &ExpressionResult, buf: &mut String, options: cr
             f.terms(separator, |mut f| {
                 // Note: this relies on a private field.
                 // TODO: public API way to special case first term
-                if f.is_first {
-                    match options.term_separators {
-                        crate::post::TermSeparator::PlusSign => {
-                            match f.term.0.sign {
-                                crate::parse::Sign::Negative => { f.text("-"); },
-                                crate::parse::Sign::Positive => (),
-                            }
-                        },
-                        crate::post::TermSeparator::Comma => (),
-                    }
+                match options.term_separators {
+                    crate::post::TermSeparator::PlusSign => if f.is_first {
+                        match f.term.0.sign {
+                            crate::parse::Sign::Negative => { f.text("-"); },
+                            crate::parse::Sign::Positive => (),
+                        }
+                    },
+                    crate::post::TermSeparator::Comma => match f.term.0.sign {
+                        crate::parse::Sign::Negative => { f.text("-"); },
+                        crate::parse::Sign::Positive => (),
+                    },
                 }
                 f.for_kind(|f, kind| match kind {
                     TermKind::Dice => {
