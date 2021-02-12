@@ -297,11 +297,19 @@ fn old_compat() {
         "1 - 1", "-2d6 + 1", "-2d6 - 1"
     ].iter().map(|exp| crate::roll(exp).unwrap());
 
+    let mut failures = Vec::new();
+    let mut case_count = 0;
     for (result, cfg) in results.cartesian_product(format_cfgs) {
         let old_output =  crate::display::format(&result, cfg);
         let new_output = format_compat(&result, cfg);
-        assert_eq!(old_output, new_output);
+        if old_output != new_output {
+            failures.push((cfg, old_output, new_output));
+        }
+        case_count += 1;
     }
+    dbg!(&failures);
+    println!("Total Cases: {}, Failed Cases: {}", case_count, failures.len());
+    assert_eq!(0, failures.len());
 }
 
 #[doc(hidden)]
