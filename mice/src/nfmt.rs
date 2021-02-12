@@ -200,9 +200,22 @@ pub fn format_compat_with(expr: &ExpressionResult, buf: &mut String, options: cr
                         }
                         f.expression().text(" → ");
                         if options.summarize_terms {
+                            if !options.term_parentheses && matches!(f.term.0.sign, crate::parse::Sign::Negative) {
+                                f.text("-");
+                            }
                             f.total();
                         } else {
-                            f.partial_sums(PartialSumSignDirective::Plus);
+                            match options.term_separators {
+                                crate::post::TermSeparator::Comma if !options.term_parentheses => {
+                                    if f.is_first && matches!(f.term.0.sign, crate::parse::Sign::Negative) {
+                                        f.text("-");
+                                    }
+                                    f.partial_sums(PartialSumSignDirective::Same);
+                                }
+                                crate::post::TermSeparator::PlusSign | crate::post::TermSeparator::Comma => {
+                                    f.partial_sums(PartialSumSignDirective::Plus);
+                                }
+                            }
                         }
                         if options.term_parentheses {
                             f.text(")");
