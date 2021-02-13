@@ -22,6 +22,7 @@ pub enum ParseError {
     InvalidExpression,
 }
 
+#[cfg_attr(test, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct DiceTerm {
     /// Negative numbers of dice are
@@ -70,6 +71,7 @@ impl Display for ConstantTerm {
     }
 }
 
+#[cfg_attr(test, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub enum Term {
     Dice(DiceTerm),
@@ -84,6 +86,7 @@ impl Display for Term {
     }
 }
 
+#[cfg_attr(test, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy)]
 pub enum Sign {
     Positive,
@@ -120,7 +123,8 @@ impl Display for Sign {
     }
 }
 
-mod hidden{
+mod hidden {
+    #[cfg_attr(test, derive(serde::Serialize, serde::Deserialize))]
     #[derive(Debug, Copy, Clone)]
     pub struct Expr {
         pub(crate) term: super::Term,

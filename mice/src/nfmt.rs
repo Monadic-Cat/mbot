@@ -202,7 +202,9 @@ pub fn format_compat_with(expr: &ExpressionResult, buf: &mut String, options: cr
                         }
                         f.expression().text(" → ");
                         if options.summarize_terms {
-                            if !options.term_parentheses && matches!(f.term.0.sign, crate::parse::Sign::Negative) {
+                            if !options.term_parentheses &&
+                                matches!(f.term.0.sign, crate::parse::Sign::Negative)
+                            {
                                 f.text("-");
                             }
                             f.total();
@@ -280,9 +282,22 @@ pub fn format_compat(expr: &ExpressionResult, options: crate::FormatOptions) -> 
     format_compat_with(expr, &mut buf, options);
     buf
 }
+
+// jq '.[] | select(.buggy_old != null)' compat_cases.json
+// jq '.[] | select(.buggy_old != null) | { buggy: .buggy_old, expected: .expected_output }' compat_cases.json
 #[cfg(test)]
-#[test]
-fn old_compat() {
+#[derive(serde::Serialize, serde::Deserialize)]
+struct TestCase {
+    expression_result: crate::ExpressionResult,
+    format_cfg: crate::FormatOptions,
+    expected_output: String,
+    buggy_old: Option<String>
+}
+
+/// This should not be run automatically.
+#[allow(dead_code)]
+#[cfg(test)]
+fn regenerate_old_compat_cases() {
     use ::itertools::Itertools;
     let format_cfgs = {
         let d = crate::FormatOptions::new();
@@ -305,13 +320,33 @@ fn old_compat() {
         "1 - 1", "-2d6 + 1", "-2d6 - 1"
     ].iter().map(|exp| crate::roll(exp).unwrap());
 
-    let mut failures = Vec::new();
-    let mut case_count = 0;
+    let mut cases = Vec::new();
     for (result, cfg) in results.cartesian_product(format_cfgs) {
         let old_output =  crate::display::format(&result, cfg);
         let new_output = format_compat(&result, cfg);
-        if old_output != new_output {
-            failures.push((cfg, old_output, new_output));
+        cases.push(TestCase {
+            expression_result: result,
+            format_cfg: cfg,
+            expected_output: new_output.clone(),
+            buggy_old: (old_output.clone() != new_output).then(|| old_output.clone()),
+        });
+    }
+    ::std::fs::write("compat_cases.json", &::serde_json::to_vec(&cases).unwrap()).unwrap();
+}
+
+#[cfg(test)]
+#[test]
+fn old_compat() {
+    let test_cases: Vec<TestCase> = ::serde_json::from_str(
+        &::std::fs::read_to_string("compat_cases.json").unwrap()).unwrap();
+
+    let mut failures = Vec::new();
+    let mut case_count = 0;
+    for TestCase { expression_result, format_cfg, buggy_old, .. } in test_cases {
+        let old_output =  crate::display::format(&expression_result, format_cfg);
+        let new_output = format_compat(&expression_result, format_cfg);
+        if old_output != new_output && matches!(buggy_old, None) {
+            failures.push((format_cfg, old_output, new_output));
         }
         case_count += 1;
     }

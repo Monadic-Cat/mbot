@@ -10,6 +10,7 @@ pub(crate) type EResult = Result<ExpressionResult, Error>;
 
 /// The result of evaluating a dice expression.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[cfg_attr(test, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct ExpressionResult {
     /// Private field because `Expr`'s layout isn't final.
@@ -53,12 +54,15 @@ impl Display for ExpressionResult {
     }
 }
 
+#[cfg_attr(test, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum TotalPosition {
     Left,
     Right,
     Suppressed,
 }
+
+#[cfg_attr(test, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum TermSeparator {
     PlusSign,
@@ -86,6 +90,7 @@ pub(crate) enum TermSeparator {
 /// # Ok::<(), MiceError>(())
 /// ```
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[cfg_attr(test, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy)]
 pub struct FormatOptions {
     pub(crate) ignore_sign: bool,
@@ -182,6 +187,7 @@ impl Default for FormatOptions {
     }
 }
 
+#[cfg_attr(test, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct RolledDie {
     pub(crate) total: i64,
@@ -243,6 +249,7 @@ impl Display for RolledDie {
     }
 }
 
+#[cfg_attr(test, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub enum EvaluatedTerm {
     Die(RolledDie),
