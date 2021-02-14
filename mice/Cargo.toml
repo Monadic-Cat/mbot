@@ -53,4 +53,7 @@ wasm = ["wasm-bindgen"]
 # to use nfmt through a compatibility layer.
 # Likely much faster, but not necessarily exactly
 # compatible yet.
+# Note that this feature is not additive,
+# so using this may go wrong if any of your dependencies use `mice`
+# and depend very specifically on formatter output.
 format_use_nfmt = []
