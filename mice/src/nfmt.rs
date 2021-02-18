@@ -162,6 +162,13 @@ impl TermFormatter<'_> {
         }
         self
     }
+    // TODO: review this API
+    pub fn is_first(&self) -> bool {
+        self.is_first
+    }
+    pub fn get_sign(&self) -> crate::parse::Sign {
+        self.term.0.sign
+    }
 }
 /// Format a dice expression.
 pub fn format_result<F: Fn(ExpressionFormatter)>(expr: &ExpressionResult, buf: &mut String, func: F) {

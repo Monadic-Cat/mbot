@@ -2,7 +2,7 @@
 //! 
 //! in the form of "...normal text...(roll: &lt;dice expression>)...normal text..."
 use ::mice::parse::{dice, whitespace, Expression, InvalidDie};
-use ::mice::{ExpressionResult, FormatOptions};
+use ::mice::ExpressionResult;
 use ::nom::{bytes::complete::tag, multi::many0, sequence::tuple, branch::alt, IResult};
 use pulldown_cmark as cmark;
 
@@ -120,7 +120,42 @@ pub(crate) fn response_for(input: &str) -> Option<String> {
                 Err(InvalidDie) => Err(::mice::Error::InvalidDie),
             }).collect();
         Some(results.into_iter().map(|x| match x {
-            Ok(x) => x.format(FormatOptions::new().total_right()),
+            Ok(x) => {
+                use ::mice::nfmt;
+                use ::mice::nfmt::{TermKind, TermSeparator, PartialSumSignDirective};
+                use ::mice::parse::Sign;
+                use ::core::cell::Cell;
+                let mut buf = String::with_capacity(2000);
+                nfmt::format_result(&x, &mut buf, |mut f| {
+                    f.for_many(|f, many| {
+                        let kind = Cell::new(TermKind::Constant);
+                        f.terms(TermSeparator::Operator, |mut f| {
+                            if f.is_first() {
+                                match f.get_sign() {
+                                    Sign::Negative => { f.text("-"); },
+                                    Sign::Positive => (),
+                                }
+                            }
+                            f.for_kind(|f, k| {
+                                match k {
+                                    TermKind::Dice => {
+                                        f.text("(").expression().text(" → ")
+                                            .partial_sums(PartialSumSignDirective::Plus)
+                                            .text(")");
+                                    },
+                                    TermKind::Constant => { f.total(); }
+                                }
+                                kind.replace(k);
+                            });
+                        });
+                        if many || matches!(kind.into_inner(), TermKind::Dice) {
+                            f.text(" = ").total();
+                        }
+                    });
+                });
+                buf
+            }
+            // x.format(FormatOptions::new().total_right()),
             Err(e) => format!("{}", e),
         }).collect::<Vec<_>>().join("\n"))
     } else {
