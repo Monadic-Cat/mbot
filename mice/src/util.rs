@@ -34,11 +34,9 @@ fn evaluation_cost(dice: &Expression, cap: Option<i64>) -> i64 {
     let mut roll_count = 0;
     for term in dice.terms() {
         match term {
-            Term::Dice(d) => if d.size > 1 {
-                roll_count += d.number;
-            } else {
-                roll_count += 1;
-            },
+            // NOTE: this is a compromise on accuracy since
+            // formatting the output of many d1s has greater than constant cost.          
+            Term::Dice(d) => roll_count += d.number,
             // This branch only saves time
             // in the worst case - when there's
             // a truly obscene number of terms.
