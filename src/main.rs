@@ -17,6 +17,8 @@ mod turns;
 mod db;
 #[cfg(feature = "maddie_tools")]
 mod masks;
+#[cfg(feature = "plotting")]
+mod dist;
 
 #[cfg(feature = "turns_db")]
 use serenity::model::{channel::GuildChannel, id::MessageId, guild::{PartialGuild, Guild}};
@@ -247,6 +249,27 @@ async fn fate(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
     }
 }
 
+#[cfg(feature = "plotting")]
+#[command]
+async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
+    match ::mice::parse::dice(arg.message()) {
+        Ok((_, Ok(expression))) => {
+            // TODO: rate limiting
+            if !expression.exceeds_cap(200) {
+                let image = dist::draw(&expression, arg.message()).unwrap();
+                msg.channel_id.send_files(&ctx.http, ::core::iter::once(serenity::http::AttachmentType::Bytes {
+                    data: ::std::borrow::Cow::Borrowed(&*image),
+                    filename: String::from("plot.png"),
+                }), |m| m).await?;
+                Ok(())
+            } else {
+                reply(ctx, msg, "tried to DOS me.").await
+            }
+        },
+        Err(_) | Ok((_, Err(_))) => reply(ctx, msg, "invalid dice expression").await
+    }
+}
+
 #[command]
 async fn goodnight(ctx: &Context, msg: &Message) -> CommandResult {
     reply(ctx, msg, "Sleep is for the weak, but goodnight.").await
@@ -277,6 +300,11 @@ async fn in_dev_server(
     ping, potatoes, happy, po, to, literal, gargamel, roll, pinit, goodnight, fate
 )]
 struct Green;
+
+#[cfg(feature = "plotting")]
+#[group]
+#[commands(plot)]
+struct Plotting;
 
 // TODO: generalize this
 // a lot.
@@ -482,6 +510,8 @@ async fn main() {
             .group(&DMCOMMANDS_GROUP);
         #[cfg(feature = "maddie_tools")]
         let f = f.group(&masks::MADDIETOOLS_GROUP);
+        #[cfg(feature = "plotting")]
+        let f = f.group(&PLOTTING_GROUP);
         #[cfg(feature = "turns_db")]
         {
             f.group(&turns::GMTOOLS_GROUP).group(&turns::PLAYERTOOLS_GROUP)
