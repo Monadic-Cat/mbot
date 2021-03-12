@@ -366,3 +366,144 @@ pub(crate) fn wrap_dice(input: &str) -> Result<Expression, ParseError> {
         e.map_err(|e| e.into())
     }
 }
+
+mod new {
+    // A new parsing module, in my continuing effort to rework this entire thing.
+    // Note that all byte strings in this module are conventionally UTF-8.
+    // TODO: consider using the `bstr` crate
+    use ::id_arena::{Arena, Id};
+    use ::core_extensions::SliceExt;
+    // We could easily attach spans to these.
+    enum Op {
+        Plus,
+        Minus,
+    }
+    fn infix_binding_power(op: Op) -> (u8, u8) {
+        use Op::*;
+        match op {
+            Plus => (3, 4),
+            Minus => (3, 4),
+            // Multiplication might be 5 and 6
+        }
+    }
+    #[derive(Debug)]
+    enum Token {
+        Int(u64),
+        D,
+        Plus,
+        Minus,
+        Whitespace,
+    }
+    fn lex(input: &[u8]) -> (&[u8], Vec<Token>) {
+        enum State<'a> {
+            Normal,
+            Int(&'a [u8]),
+            // We don't care about whitespace, at least for now.
+            // This just throws it out.
+            Whitespace,
+        }
+        let mut tokens = Vec::with_capacity(input.len());
+        let mut state = State::Normal;
+        let mut cursor = input;
+        loop {
+            match state {
+                State::Normal => match cursor {
+                    [b'0'..=b'9', rest @ ..] => {
+                        state = State::Int(cursor);
+                        cursor = rest;
+                    },
+                    [b'd', rest @ ..] => {
+                        tokens.push(Token::D);
+                        cursor = rest;
+                    },
+                    [b'+', rest @ ..] => {
+                        tokens.push(Token::Plus);
+                        cursor = rest;
+                    },
+                    [b'-', rest @ ..] => {
+                        tokens.push(Token::Minus);
+                        cursor = rest;
+                    },
+                    [b'\t', rest @ ..] | [b' ', rest @ ..] => {
+                        tokens.push(Token::Whitespace);
+                        state = State::Whitespace;
+                        cursor = rest;
+                    },
+                    [_, rest @ ..] => break,
+                    [] => break,
+                },
+                State::Int(start) => match cursor {
+                    [b'0'..=b'9', rest @ ..] => cursor = rest,
+                    [..] => {
+                        let slice = &start[..start.offset_of_slice(cursor)];
+                        // TODO: handle too large
+                        tokens.push(Token::Int(slice.iter().fold(0, |a, b| (a * 10) + (b - b'0') as u64)));
+                        state = State::Normal;
+                        // Note that we're specifically choosing not to advance the cursor here.
+                    }
+                },
+                State::Whitespace => match cursor {
+                    [b'\t', rest @ ..] | [b' ', rest @ ..] => cursor = rest,
+                    [..] => state = State::Normal,
+                }
+            }
+        }
+        (cursor, tokens)
+    }
+    enum Term {
+        Constant,
+        DiceRoll,
+        Add(Id<Term>, Id<Term>),
+        Subtract(Id<Term>, Id<Term>),
+        UnaryNegate(Id<Term>),
+    }
+    // Fuck it. Dice expressions are programs.
+    pub struct Program {
+        // Note that `Program`s are intended to be correctly formed by construction.
+
+        // We allocate terms inside an arena so we can build trees without
+        // allocating for each node.
+        terms: Arena<Term>,
+        top: Id<Term>,
+    }
+    type ParseResult<I, O, E> = Result<(I, O), (I, E)>;
+
+    /// Dice program parser combinator.
+    /// Consumes input until it reaches unrecognizable tokens,
+    /// and attempts to build a dice program from the consumed input.
+    pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], Program, ()> {
+        struct UnaryOp(Option<Id<Term>>);
+        struct BinOp(Id<Term>, Option<Id<Term>>);
+        enum State {
+            // This is the only position that unary operators are allowed in.
+            // We could be more permissive than this, but the current goal is
+            // identical behavior to the old parser.
+            Front,
+            Normal,
+        }
+        let mut terms = Arena::<Term>::new();
+        let (rest, tokens) = dbg!(lex(input));
+        let mut state = State::Front;
+        let mut cursor = &tokens[..];
+        // To be used where we already know to expect a unary op.
+        fn consume_unary_op(terms: &mut Arena<Term>, op: Op, input: &[u8]) -> Id<Term>  {
+            todo!("consume unary operation")
+        }
+        loop {
+            match state {
+                State::Front => match cursor {
+                    // Unary operators:
+                    [Token::Plus, rest @ ..] => todo!("consume expression"),
+                    [Token::Minus, rest @ ..] => todo!("consume expression"),
+                    // The rest is identical for both Front and Normal states.
+                    [Token::Int(n), rest @ ..] => todo!("optionally consume rest of dice expression"),
+                    [Token::D, rest @ ..] => todo!("consume integer number of sides"),
+                    [Token::Whitespace, rest @ ..] => cursor = rest,
+                    [] => todo!("handle eof"),
+                },
+                State::Normal => todo!("handle normal position"),
+            }
+        }
+    }
+}
+pub use new::parse_expression;

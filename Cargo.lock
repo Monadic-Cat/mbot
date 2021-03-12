@@ -362,6 +362,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "core_extensions"
+version = "0.1.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a117e1ca5d83ff939487e48e143c6a642cebd01a88f472a4ec7dc4773690fda"
+dependencies = [
+ "rustc_version",
+ "serde",
+]
+
+[[package]]
 name = "cpuid-bool"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1073,6 +1083,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "id-arena"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25a2bc672d1148e28034f176e01fffebb08b35768468cc954630da77a1449005"
+
+[[package]]
 name = "idna"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1341,7 +1357,9 @@ dependencies = [
 name = "mice"
 version = "0.10.0"
 dependencies = [
+ "core_extensions",
  "criterion",
+ "id-arena",
  "itertools 0.10.0",
  "itoa",
  "js-sys",
