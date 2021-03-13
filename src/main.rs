@@ -253,7 +253,7 @@ async fn fate(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
 #[command]
 async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
     match ::mice::parse::dice(arg.message()) {
-        Ok((_, Ok(expression))) => {
+        Ok((input, Ok(expression))) if input.len() == 0 => {
             // TODO: rate limiting
             if !expression.exceeds_cap(200) {
                 use ::tokio::sync::Semaphore;
@@ -280,7 +280,8 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
                 reply(ctx, msg, "tried to DOS me.").await
             }
         },
-        Err(_) | Ok((_, Err(_))) => reply(ctx, msg, "invalid dice expression").await
+        Ok((_, Ok(_))) => reply(ctx, msg, "you've specified an invalid dice expression").await,
+        Err(_) | Ok((_, Err(_))) => reply(ctx, msg, "you've specified an invalid dice expression").await
     }
 }
 
