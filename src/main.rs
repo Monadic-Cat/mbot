@@ -41,7 +41,7 @@ use serenity::{
     prelude::*,
 };
 use std::sync::Arc;
-// use tokio::task;
+use tokio::task;
 
 async fn reply(ctx: &Context, msg: &Message, r: &str) -> CommandResult {
     let instance_name = std::env::var("INSTANCE_MESSAGE_PREFIX").unwrap_or_default();
@@ -256,7 +256,21 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
         Ok((_, Ok(expression))) => {
             // TODO: rate limiting
             if !expression.exceeds_cap(200) {
-                let image = dist::draw(&expression, arg.message()).unwrap();
+                use ::tokio::sync::Semaphore;
+                use ::once_cell::sync::Lazy;
+                // TODO: consider using finer grained permit counts,
+                // based on the relative cost of constructing a chart.
+                // The current thing is a stopgap solution meant to
+                // save us from being OOM killed.
+                // Additionally, consider reporting that we're under load
+                // and possibly canceling a plotting job,
+                // when not enough permits are available.
+                static REGION: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(3));
+                let permit = REGION.acquire().await;
+                let image = task::spawn_blocking(move || {
+                    dist::draw(&expression, arg.message()).unwrap()
+                }).await.expect("plotting doesn't panic");
+                drop(permit);
                 msg.channel_id.send_files(&ctx.http, ::core::iter::once(serenity::http::AttachmentType::Bytes {
                     data: ::std::borrow::Cow::Borrowed(&*image),
                     filename: String::from("plot.png"),

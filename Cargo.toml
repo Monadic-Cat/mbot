@@ -11,7 +11,7 @@ tokio = { version = "0.2", features = ["full"] }
 mice = { path = "./mice", features = ["format_use_nfmt"] }
 nom = "5.0"
 rand = "0.7"
-once_cell = "1.4"
+once_cell = "1.7.2"
 chrono = "0.4.11"
 fehler = { version = "1", optional = true }
 thiserror = "1"
