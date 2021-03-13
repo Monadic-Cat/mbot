@@ -265,7 +265,7 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
                 // Additionally, consider reporting that we're under load
                 // and possibly canceling a plotting job,
                 // when not enough permits are available.
-                static REGION: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(3));
+                static REGION: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
                 let permit = REGION.acquire().await;
                 let image = task::spawn_blocking(move || {
                     dist::draw(&expression, arg.message()).unwrap()
