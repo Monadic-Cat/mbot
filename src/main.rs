@@ -280,8 +280,7 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
                 reply(ctx, msg, "tried to DOS me.").await
             }
         },
-        Ok((_, Ok(_))) => reply(ctx, msg, "you've specified an invalid dice expression").await,
-        Err(_) | Ok((_, Err(_))) => reply(ctx, msg, "you've specified an invalid dice expression").await
+        _ => reply(ctx, msg, "you've specified an invalid dice expression").await
     }
 }
 
