@@ -373,12 +373,19 @@ mod new {
     // TODO: consider using the `bstr` crate
     use ::id_arena::{Arena, Id};
     use ::core_extensions::SliceExt;
+
+    /// Operators
     // We could easily attach spans to these.
     #[derive(Debug, Copy, Clone)]
     enum Op {
+        /// Addition
         Plus,
+        /// Subtraction
         Minus,
     }
+
+    /// A description of how tightly infix operators bind their arguments.
+    /// This is how we handle precedence.
     fn infix_binding_power(op: Op) -> (u8, u8) {
         use Op::*;
         match op {
@@ -387,6 +394,8 @@ mod new {
             // Multiplication might be 5 and 6
         }
     }
+
+    /// Units of input as segmented by the lexer.
     #[derive(Debug)]
     enum Token {
         Int(u64),
@@ -394,6 +403,8 @@ mod new {
         Op(Op),
         Whitespace,
     }
+
+    /// Lex a dice expression. Returns a slice reference to trailing unlexed input.
     fn lex(input: &[u8]) -> (&[u8], Vec<Token>) {
         enum State<'a> {
             Normal,
@@ -450,6 +461,8 @@ mod new {
         }
         (cursor, tokens)
     }
+
+    /// An AST node. This represents an expression as a tree of nodes stored in an [`Arena`].
     #[derive(Debug)]
     enum Term {
         Constant(u64),
@@ -462,6 +475,8 @@ mod new {
         UnarySubtract(Id<Term>),
         UnaryAdd(Id<Term>),
     }
+
+    /// A parsed dice program. The result of invoking `parse_expression` on something like `"3d6 + 4"`.
     // Fuck it. Dice expressions are programs.
     pub struct Program {
         // Note that `Program`s are intended to be correctly formed by construction.
@@ -471,6 +486,7 @@ mod new {
         terms: Arena<Term>,
         top: Id<Term>,
     }
+
     /// For debugging purposes.
     /// This writes out the parse tree starting from `top` as an S-expression.
     fn write_sexpr(terms: &Arena<Term>, top: Id<Term>, buf: &mut String) {
@@ -502,6 +518,7 @@ mod new {
             }
         }
     }
+
     impl Program {
         /// For debugging purposes.
         /// This writes out the parse tree of a program as an S-expression.
@@ -511,6 +528,9 @@ mod new {
             buf
         }
     }
+
+    /// The return type of a parser function that returns trailing unparsed input
+    /// on both success and failure.
     type ParseResult<I, O, E> = Result<(I, O), (I, E)>;
 
     /// Dice program parser combinator.
@@ -532,6 +552,7 @@ mod new {
                 }
             }
         }
+
         /// Scroll past whitespace.
         fn ignore_whitespace(input: &[Token]) -> &[Token] {
             let mut cursor = input;
@@ -540,6 +561,7 @@ mod new {
             }
             cursor
         }
+
         fn consume_expr<'a>(terms: &mut Arena<Term>, min_bp: u8, input: &'a [Token])
                         -> Result<(&'a [Token], Id<Term>), ()> {
             let (mut cursor, mut lhs) = match ignore_whitespace(input) {
@@ -556,6 +578,7 @@ mod new {
                 [x, ..] => todo!("handle invalid token in expression position: {:?}", x),
                 [] => todo!("handle eof in expression position"),
             };
+
             loop {
                 dbg!(&lhs);
                 let (rest, op) = match cursor {
