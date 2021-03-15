@@ -137,7 +137,8 @@ const ROLL_CAP: i64 = 10000;
 #[command]
 #[aliases("r")]
 async fn roll(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
-    mice::parse::parse_expression(arg.message().as_bytes());
+    mice::parse::parse_expression(arg.message().as_bytes()).iter()
+        .for_each(|(_, program)| { dbg!(program.fmt_sexpr()); });
     let dice = match reasoned_dice(arg.message()) {
         Ok((_, Err(e))) => return reply(ctx, msg, &format!("{}", e)).await,
         Ok((i, Ok(x))) => Ok((i, x)),

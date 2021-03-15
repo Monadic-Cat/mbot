@@ -374,6 +374,7 @@ mod new {
     use ::id_arena::{Arena, Id};
     use ::core_extensions::SliceExt;
     // We could easily attach spans to these.
+    #[derive(Debug, Copy, Clone)]
     enum Op {
         Plus,
         Minus,
@@ -390,8 +391,7 @@ mod new {
     enum Token {
         Int(u64),
         D,
-        Plus,
-        Minus,
+        Op(Op),
         Whitespace,
     }
     fn lex(input: &[u8]) -> (&[u8], Vec<Token>) {
@@ -417,11 +417,11 @@ mod new {
                         cursor = rest;
                     },
                     [b'+', rest @ ..] => {
-                        tokens.push(Token::Plus);
+                        tokens.push(Token::Op(Op::Plus));
                         cursor = rest;
                     },
                     [b'-', rest @ ..] => {
-                        tokens.push(Token::Minus);
+                        tokens.push(Token::Op(Op::Minus));
                         cursor = rest;
                     },
                     [b'\t', rest @ ..] | [b' ', rest @ ..] => {
@@ -450,12 +450,17 @@ mod new {
         }
         (cursor, tokens)
     }
+    #[derive(Debug)]
     enum Term {
-        Constant,
-        DiceRoll,
+        Constant(u64),
+        // This could conceivably have its arguments
+        // replaced by terms, and be turned into an operator
+        // in its own right. This could then allow strange expressions like `3d(d8)`.
+        DiceRoll(u64, u64),
         Add(Id<Term>, Id<Term>),
         Subtract(Id<Term>, Id<Term>),
-        UnaryNegate(Id<Term>),
+        UnarySubtract(Id<Term>),
+        UnaryAdd(Id<Term>),
     }
     // Fuck it. Dice expressions are programs.
     pub struct Program {
@@ -466,43 +471,136 @@ mod new {
         terms: Arena<Term>,
         top: Id<Term>,
     }
+    /// For debugging purposes.
+    /// This writes out the parse tree starting from `top` as an S-expression.
+    fn write_sexpr(terms: &Arena<Term>, top: Id<Term>, buf: &mut String) {
+        let mut write_op = |op: &str, lhs, rhs| {
+            buf.push_str("(");
+            buf.push_str(op);
+            buf.push_str(" ");
+            write_sexpr(terms, lhs, &mut *buf);
+            buf.push_str(" ");
+            write_sexpr(terms, rhs, &mut *buf);
+            buf.push_str(")");
+        };
+        match terms[top] {
+            Term::Constant(n) => { itoa::fmt(&mut *buf, n).unwrap(); },
+            Term::DiceRoll(count, faces) => {
+                itoa::fmt(&mut *buf, count).unwrap();
+                buf.push_str("d");
+                itoa::fmt(&mut *buf, faces).unwrap();
+            }
+            Term::Add(lhs, rhs) => write_op("+", lhs, rhs),
+            Term::Subtract(lhs, rhs) => write_op("-", lhs, rhs),
+            Term::UnaryAdd(arg) => {
+                buf.push_str("+");
+                write_sexpr(terms, arg, &mut *buf);
+            }
+            Term::UnarySubtract(arg) => {
+                buf.push_str("-");
+                write_sexpr(terms, arg, &mut *buf);
+            }
+        }
+    }
+    impl Program {
+        /// For debugging purposes.
+        /// This writes out the parse tree of a program as an S-expression.
+        pub fn fmt_sexpr(&self) -> String {
+            let mut buf = String::new();
+            write_sexpr(&self.terms, self.top, &mut buf);
+            buf
+        }
+    }
     type ParseResult<I, O, E> = Result<(I, O), (I, E)>;
 
     /// Dice program parser combinator.
     /// Consumes input until it reaches unrecognizable tokens,
     /// and attempts to build a dice program from the consumed input.
     pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], Program, ()> {
-        struct UnaryOp(Option<Id<Term>>);
-        struct BinOp(Id<Term>, Option<Id<Term>>);
-        enum State {
-            // This is the only position that unary operators are allowed in.
-            // We could be more permissive than this, but the current goal is
-            // identical behavior to the old parser.
-            Front,
-            Normal,
-        }
         let mut terms = Arena::<Term>::new();
         let (rest, tokens) = dbg!(lex(input));
-        let mut state = State::Front;
-        let mut cursor = &tokens[..];
         // To be used where we already know to expect a unary op.
-        fn consume_unary_op(terms: &mut Arena<Term>, op: Op, input: &[u8]) -> Id<Term>  {
-            todo!("consume unary operation")
-        }
-        loop {
-            match state {
-                State::Front => match cursor {
-                    // Unary operators:
-                    [Token::Plus, rest @ ..] => todo!("consume expression"),
-                    [Token::Minus, rest @ ..] => todo!("consume expression"),
-                    // The rest is identical for both Front and Normal states.
-                    [Token::Int(n), rest @ ..] => todo!("optionally consume rest of dice expression"),
-                    [Token::D, rest @ ..] => todo!("consume integer number of sides"),
-                    [Token::Whitespace, rest @ ..] => cursor = rest,
-                    [] => todo!("handle eof"),
+        fn consume_unary_op(terms: &mut Arena<Term>, op: Op, input: &[Token]) -> Result<Id<Term>, ()>  {
+            match op {
+                Op::Plus => {
+                    let term = Term::UnaryAdd(consume_expr(&mut *terms, 3, input)?.1);
+                    Ok(terms.alloc(term))
                 },
-                State::Normal => todo!("handle normal position"),
+                Op::Minus => {
+                    let term = Term::UnarySubtract(consume_expr(&mut *terms, 3, input)?.1);
+                    Ok(terms.alloc(term))
+                }
             }
+        }
+        /// Scroll past whitespace.
+        fn ignore_whitespace(input: &[Token]) -> &[Token] {
+            let mut cursor = input;
+            while let [Token::Whitespace, rest @ ..] = cursor {
+                cursor = rest;
+            }
+            cursor
+        }
+        fn consume_expr<'a>(terms: &mut Arena<Term>, min_bp: u8, input: &'a [Token])
+                        -> Result<(&'a [Token], Id<Term>), ()> {
+            let (mut cursor, mut lhs) = match ignore_whitespace(input) {
+                // Currently we parse a dice term like a terminal, but
+                // there is no reason we couldn't make `d` into an operator as well.
+                // That said, dice terms are liable to become much more complicated.
+                // For now, the extra flexibility that would come from that is
+                // not necessary or wanted.
+                [Token::Int(count), Token::D, Token::Int(faces), rest @ ..] => {
+                    (rest, Term::DiceRoll(*count, *faces))
+                },
+                [Token::Int(n), rest @ ..] => (rest, Term::Constant(*n)),
+                // TODO: return a more specific error here
+                [x, ..] => todo!("handle invalid token in expression position: {:?}", x),
+                [] => todo!("handle eof in expression position"),
+            };
+            loop {
+                dbg!(&lhs);
+                let (rest, op) = match cursor {
+                    [Token::Op(op), rest @ ..] => (rest, op),
+                    // TODO: return a more specific error here
+                    [Token::Whitespace, rest @ ..] => {
+                        cursor = rest;
+                        continue
+                    },
+                    [x, ..] => todo!("handle invalid token in operator position: {:?}", x),
+                    [] => break,
+                };
+                let (l_bp, r_bp) = infix_binding_power(*op);
+                if l_bp < min_bp {
+                    break
+                }
+
+                cursor = rest;
+                let (rest, rhs) = dbg!(consume_expr(&mut *terms, r_bp, cursor)?);
+                cursor = rest;
+                match op {
+                    Op::Plus => lhs = Term::Add(terms.alloc(lhs), rhs),
+                    Op::Minus => lhs = Term::Subtract(terms.alloc(lhs), rhs),
+                }
+            }
+            Ok((cursor, terms.alloc(lhs)))
+        }
+
+        let mut cursor = &tokens[..];
+        let result = loop {
+            match cursor {
+                // Ignore preceding whitespace.
+                [Token::Whitespace, rest @ ..] => cursor = rest,
+                // Note that unary operations are currently only permitted at the
+                // front of a dice expression. We could be more permissive than this,
+                // but the current goal is identical behavior to the old parser.
+                [Token::Op(op), rest @ ..] => break consume_unary_op(&mut terms, *op, rest),
+                all @ [Token::Int(_), ..] |
+                all @ [Token::D, ..] => break consume_expr(&mut terms, 2, all).map(|(_, x)| x),
+                [] => todo!("handle unexpected end of valid input"),
+            };
+        };
+        match dbg!(result) {
+            Ok(top) => Ok((rest, Program { terms, top })),
+            Err(()) => Err((rest, ())),
         }
     }
 }
