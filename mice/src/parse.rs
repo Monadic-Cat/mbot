@@ -373,26 +373,35 @@ mod new {
     // TODO: consider using the `bstr` crate
     use ::id_arena::{Arena, Id};
     use ::core_extensions::SliceExt;
+    use ::core::convert::TryFrom;
+    use ::core::convert::TryInto;
 
-    /// Operators
-    // We could easily attach spans to these.
-    #[derive(Debug, Copy, Clone)]
-    enum Op {
-        /// Addition
-        Plus,
-        /// Subtraction
-        Minus,
-    }
-
-    /// A description of how tightly infix operators bind their arguments.
-    /// This is how we handle precedence.
-    fn infix_binding_power(op: Op) -> (u8, u8) {
-        use Op::*;
-        match op {
-            Plus => (3, 4),
-            Minus => (3, 4),
-            // Multiplication might be 5 and 6
+    use ::proc_macro_helpers::decl_ops;
+    decl_ops! {
+        enum
+        /// Operators
+            #[derive(Debug, Clone, Copy)]
+            Op =
+        /// Unary operators
+            #[derive(Debug, Clone, Copy)]
+            UnaryOp
+        /// Binary operators
+            #[derive(Debug, Clone, Copy)]
+            BinOp {
+            /// Addition
+            Plus { unary: 3, binary: (3, 4) },
+            /// Subtraction
+            Minus { unary: 3, binary: (3, 4) },
+            // /// Multiplication
+            // Times { binary: (5, 6) },
         }
+        unary =>
+        /// A description of how tightly unary operators bind their arguments.
+        fn unary_binding_power(op) -> u8;
+        binary =>
+        /// A description of how tightly infix operators bind their arguments.
+        /// This is how we handle precedence.
+        fn infix_binding_power(op) -> (u8, u8);
     }
 
     /// Units of input as segmented by the lexer.
@@ -540,13 +549,13 @@ mod new {
         let mut terms = Arena::<Term>::new();
         let (rest, tokens) = dbg!(lex(input));
         // To be used where we already know to expect a unary op.
-        fn consume_unary_op(terms: &mut Arena<Term>, op: Op, input: &[Token]) -> Result<Id<Term>, ()>  {
+        fn consume_unary_op(terms: &mut Arena<Term>, op: UnaryOp, input: &[Token]) -> Result<Id<Term>, ()>  {
             match op {
-                Op::Plus => {
+                UnaryOp::Plus => {
                     let term = Term::UnaryAdd(consume_expr(&mut *terms, 3, input)?.1);
                     Ok(terms.alloc(term))
                 },
-                Op::Minus => {
+                UnaryOp::Minus => {
                     let term = Term::UnarySubtract(consume_expr(&mut *terms, 3, input)?.1);
                     Ok(terms.alloc(term))
                 }
@@ -582,7 +591,8 @@ mod new {
             loop {
                 dbg!(&lhs);
                 let (rest, op) = match cursor {
-                    [Token::Op(op), rest @ ..] => (rest, op),
+                    // TODO: return a more specific error here
+                    [Token::Op(op), rest @ ..] => (rest, BinOp::try_from(*op)?),
                     // TODO: return a more specific error here
                     [Token::Whitespace, rest @ ..] => {
                         cursor = rest;
@@ -591,7 +601,7 @@ mod new {
                     [x, ..] => todo!("handle invalid token in operator position: {:?}", x),
                     [] => break,
                 };
-                let (l_bp, r_bp) = infix_binding_power(*op);
+                let (l_bp, r_bp) = infix_binding_power(op);
                 if l_bp < min_bp {
                     break
                 }
@@ -600,8 +610,8 @@ mod new {
                 let (rest, rhs) = dbg!(consume_expr(&mut *terms, r_bp, cursor)?);
                 cursor = rest;
                 match op {
-                    Op::Plus => lhs = Term::Add(terms.alloc(lhs), rhs),
-                    Op::Minus => lhs = Term::Subtract(terms.alloc(lhs), rhs),
+                    BinOp::Plus => lhs = Term::Add(terms.alloc(lhs), rhs),
+                    BinOp::Minus => lhs = Term::Subtract(terms.alloc(lhs), rhs),
                 }
             }
             Ok((cursor, terms.alloc(lhs)))
@@ -615,7 +625,10 @@ mod new {
                 // Note that unary operations are currently only permitted at the
                 // front of a dice expression. We could be more permissive than this,
                 // but the current goal is identical behavior to the old parser.
-                [Token::Op(op), rest @ ..] => break consume_unary_op(&mut terms, *op, rest),
+                [Token::Op(op), rest @ ..] => break match (*op).try_into() {
+                    Ok(op) => consume_unary_op(&mut terms, op, rest),
+                    Err(()) => Err(()),
+                },
                 all @ [Token::Int(_), ..] |
                 all @ [Token::D, ..] => break consume_expr(&mut terms, 2, all).map(|(_, x)| x),
                 [] => todo!("handle unexpected end of valid input"),

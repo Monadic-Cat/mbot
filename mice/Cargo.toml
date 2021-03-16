@@ -21,6 +21,7 @@ wasm-bindgen  = { version = "0.2.50", optional = true }
 itoa = "0.4.7"
 core_extensions = "0.1.20"
 id-arena = "2.2.1"
+proc_macro_helpers = { path = "../proc_macro_helpers" }
 
 [dev-dependencies]
 criterion = "0.3"
