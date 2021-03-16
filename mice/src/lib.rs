@@ -137,14 +137,14 @@ fn seed_die_with<R: Rng>(a: &DiceTerm, rng: &mut R) -> Result<SeededDie, Overflo
         Ok(SeededDie {
             total,
             rng,
-            sides: a.sides() as _,
+            sides: a.sides(),
             quantity: a.count(),
             sign_part: Sign::Positive,
         })
     } else {
         Ok(SeededDie {
             total: a.sides(),
-            sides: a.sides() as _,
+            sides: a.sides(),
             sign_part: Sign::Positive,
             quantity: 1,
             rng,
