@@ -413,8 +413,11 @@ mod new {
         Whitespace,
     }
 
+    /// Parse error for an integer that's too large for our number type.
+    #[derive(Debug)]
+    struct TooLarge;
     /// Lex a dice expression. Returns a slice reference to trailing unlexed input.
-    fn lex(input: &[u8]) -> (&[u8], Vec<Token>) {
+    fn lex(input: &[u8]) -> (&[u8], Result<Vec<Token>, TooLarge>) {
         enum State<'a> {
             Normal,
             Int(&'a [u8]),
@@ -456,8 +459,13 @@ mod new {
                     [b'0'..=b'9', rest @ ..] => cursor = rest,
                     [..] => {
                         let slice = &start[..start.offset_of_slice(cursor)];
-                        // TODO: handle too large
-                        tokens.push(Token::Int(slice.iter().fold(0, |a, b| (a * 10) + (b - b'0') as u64)));
+                        use ::checked::Checked;
+                        tokens.push(Token::Int(match slice.iter().try_fold(0u64, |a, b| {
+                            *((Checked::from(a) * 10) + (b - b'0') as u64)
+                        }) {
+                            Some(x) => x,
+                            None => return (cursor, Err(TooLarge)),
+                        }));
                         state = State::Normal;
                         // Note that we're specifically choosing not to advance the cursor here.
                     }
@@ -468,7 +476,7 @@ mod new {
                 }
             }
         }
-        (cursor, tokens)
+        (cursor, Ok(tokens))
     }
 
     /// An AST node. This represents an expression as a tree of nodes stored in an [`Arena`].
@@ -548,6 +556,10 @@ mod new {
     pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], Program, ()> {
         let mut terms = Arena::<Term>::new();
         let (rest, tokens) = dbg!(lex(input));
+        let tokens = match tokens {
+            Ok(x) => x,
+            Err(TooLarge) => return Err((rest, ())),
+        };
         // To be used where we already know to expect a unary op.
         fn consume_unary_op(terms: &mut Arena<Term>, op: UnaryOp, input: &[Token]) -> Result<Id<Term>, ()>  {
             match op {

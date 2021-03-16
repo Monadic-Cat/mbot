@@ -234,6 +234,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "checked"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e82b46c41844dee0195a9eb4691446e58848996aa3a70d97f4966b48790bae69"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1379,6 +1388,7 @@ dependencies = [
 name = "mice"
 version = "0.10.0"
 dependencies = [
+ "checked",
  "core_extensions",
  "criterion",
  "id-arena",
