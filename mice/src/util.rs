@@ -36,7 +36,7 @@ fn evaluation_cost(dice: &Expression, cap: Option<i64>) -> i64 {
         match term {
             // NOTE: this is a compromise on accuracy since
             // formatting the output of many d1s has greater than constant cost.          
-            Term::Dice(d) => roll_count += d.number,
+            Term::Dice(d) => roll_count += d.count(),
             // This branch only saves time
             // in the worst case - when there's
             // a truly obscene number of terms.

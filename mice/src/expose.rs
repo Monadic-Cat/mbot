@@ -33,7 +33,7 @@ impl TryFrom<ExprTuple> for Expr {
 impl From<Expr> for ExprTuple {
     fn from(e: Expr) -> ExprTuple {
         let t = match e.term {
-            Term::Dice(x) => (x.number, x.size),
+            Term::Dice(x) => (x.count(), x.size),
             Term::Constant(x) => (x, 1),
         };
         match e.sign {

@@ -83,13 +83,13 @@ where
 {
     if a.size == 1 {
         Ok(RolledDie {
-            total: a.number,
-            parts: (0..a.number).map(|_| 1).collect(),
+            total: a.count(),
+            parts: (0..a.count()).map(|_| 1).collect(),
             sign_part: Sign::Positive,
         })
     } else {
         let mut total: i64 = 0;
-        let mut parts = Vec::with_capacity(a.number as usize);
+        let mut parts = Vec::with_capacity(a.count() as usize);
         // Rng::gen_range has an exlusive upper bound
         for _ in 0..a.number {
             let random = rng.gen_range(0, a.size) + 1;
@@ -129,16 +129,16 @@ fn seed_die_with<R: Rng>(a: &DiceTerm, rng: &mut R) -> Result<SeededDie, Overflo
     use ::rand::rngs::StdRng;
     use ::core::iter;
     let rng = StdRng::from_rng(rng).unwrap();
-    if a.number > 1 {
+    if a.count() > 1 {
         let mut trng = rng.clone();
         let mut terms = iter::from_fn(|| Some(trng.gen_range(0, a.sides()) + 1))
-            .take(a.number as usize).map(|x| x as i64);
+            .take(a.count() as usize).map(|x| x as i64);
         let total = terms.try_fold(0, i64::checked_add).ok_or(OverflowPositive)?;
         Ok(SeededDie {
             total,
             rng,
             sides: a.sides() as _,
-            quantity: a.number,
+            quantity: a.count(),
             sign_part: Sign::Positive,
         })
     } else {
