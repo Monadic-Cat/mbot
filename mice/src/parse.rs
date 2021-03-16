@@ -54,8 +54,8 @@ impl DiceTerm {
     pub fn count(&self) -> i64 {
         self.number
     }
-    pub fn sides(&self) -> u64 {
-        self.size as _
+    pub fn sides(&self) -> i64 {
+        self.size
     }
 }
 
@@ -80,7 +80,7 @@ pub enum Term {
 impl Display for Term {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            Term::Dice(x) => write!(f, "{}d{}", x.count(), x.size),
+            Term::Dice(x) => write!(f, "{}d{}", x.count(), x.sides()),
             Term::Constant(x) => write!(f, "{}", x),
         }
     }
