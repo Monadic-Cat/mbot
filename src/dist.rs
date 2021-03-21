@@ -22,7 +22,8 @@ const SAMPLE_SIZE: usize = 1_000_000;
 pub(crate) fn draw(exp: &Expression, caption: &str) -> Result<Box<[u8]>, MiceError> {
     // This is FAR too expensive computationally right now.
     let mut counts = HashMap::new();
-    let sample = iter::repeat_with(|| exp.roll().map(|x| x.total()))
+    let mut rng = ::rand::thread_rng();
+    let sample = iter::repeat_with(|| exp.roll_with(&mut rng).map(|x| x.total()))
         .inspect(|x| x.iter().for_each(|x| *counts.entry(*x).or_insert(0) += 1))
         .take(SAMPLE_SIZE).collect::<Result<Vec<_>, _>>()?;
     let max = *counts.values().max().unwrap() * 4 / 3;
