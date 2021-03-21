@@ -91,7 +91,6 @@ where
         let mut total: i64 = 0;
         let mut parts = Vec::with_capacity(a.number as usize);
         // Rng::gen_range has an exlusive upper bound
-        // Rng::gen includes the entire range of a type.
         for _ in 0..a.number {
             let random = rng.gen_range(0, a.size) + 1;
             total = total.checked_add(random).ok_or(OverflowPositive)?;
