@@ -69,7 +69,7 @@ maddie_tools = ["bot_commands"]
 
 # This feature adds support for plotting the probability
 # density distributions of dice expressions.
-plotting = ["plotters", "plotters-bitmap", "png"]
+plotting = ["plotters", "plotters-bitmap", "png", "rand/small_rng"]
 
 # I believe some parts of the cli_control feature may violate
 # the Discord Terms of Service, so tread with care.
