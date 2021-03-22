@@ -28,7 +28,7 @@ enum ParseError {
     InvalidCommand,
 }
 
-fn parse_command<'a>(input: &'a str) -> Result<Command<'a>, ParseError> {
+fn parse_command(input: &str) -> Result<Command<'_>, ParseError> {
     use nom::error::ErrorKind::TooLarge;
     use nom::Err::Failure;
     alt((
@@ -43,7 +43,7 @@ fn parse_command<'a>(input: &'a str) -> Result<Command<'a>, ParseError> {
             let (i, s) = take_while1(|c: char| c.is_digit(10))(i)?;
             let n = match s.parse::<u64>() {
                 Ok(x) => ChannelId(x),
-                Err(_) => Err(Failure((i, TooLarge)))?,
+                Err(_) => return Err(Failure((i, TooLarge))),
             };
             Ok((i, Command::SelectChannel(n)))
         },
@@ -93,12 +93,11 @@ async fn areadline(stdin: Arc<io::Stdin>) -> Result<String, ReadlineError> {
         Ok(input)
     })
     .await;
-    let output = match output {
+    match output {
         Ok(Ok(x)) => Ok(x),
         Ok(Err(e)) => Err(e.into()),
         Err(e) => Err(e.into()),
-    };
-    output
+    }
 }
 
 /// A terminal command loop.

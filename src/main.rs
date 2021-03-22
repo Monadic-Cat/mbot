@@ -89,6 +89,7 @@ const MAX_REPLY_LENGTH: usize = 1900;
 fn format_smart(exp: mice::ExpressionResult) -> String {
     let first = exp.format(MiceFormat::new().total_right());
     let second;
+    #[allow(clippy::blocks_in_if_conditions)]
     if first.len() < MAX_REPLY_LENGTH {
         first
     } else if {
@@ -176,7 +177,7 @@ async fn roll(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
                     return reply(ctx, msg, "tried to DOS me.").await
                 };
                 match res {
-                    Ok(x) => reply(ctx, msg, &format!("{}", format_smart(x))).await,
+                    Ok(x) => reply(ctx, msg, &format_smart(x)).await,
                     Err(x) => reply(ctx, msg, &format!("{}", x)).await,
                 }
             }
@@ -205,8 +206,8 @@ fn roll_fate(bonus: Option<i64>) -> FateResult {
     });
     FateResult {
         dice: results,
-        bonus: bonus,
         sum: sum + bonus.or(Some(0)).unwrap(),
+        bonus,
     }
 }
 
@@ -240,7 +241,7 @@ async fn fate(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
     match arg.parse::<i64>() {
         Ok(x) => reply(ctx, msg, &format!("{}", roll_fate(Some(x)))).await,
         Err(_) => {
-            if arg.message().len() == 0 {
+            if arg.message().is_empty() {
                 reply(ctx, msg, &format!("{}", roll_fate(None))).await
             } else {
                 reply(ctx, msg, "invalid bonus").await
@@ -253,7 +254,7 @@ async fn fate(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
 #[command]
 async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
     match ::mice::parse::dice(arg.message()) {
-        Ok((input, Ok(expression))) if input.len() == 0 => {
+        Ok((input, Ok(expression))) if input.is_empty() => {
             // TODO: rate limiting
             if !expression.exceeds_cap(200) {
                 use ::tokio::sync::Semaphore;
@@ -389,6 +390,7 @@ impl EventHandler for Handler {
     #[cfg(any(feature = "internal_rolls", feature = "turns_db"))]
     async fn message(&self, ctx: Context, msg: Message) {
         #[cfg(feature = "internal_rolls")] {
+            #[allow(clippy::single_match)]
             match internal_rolls::response_for(&msg.content) {
                 Some(x) => match reply(&ctx, &msg, &format!("\n{}", x)).await {
                     Ok(()) => (),
@@ -498,9 +500,8 @@ static SHARDS: OnceCell<Arc<Mutex<ShardManager>>> = OnceCell::new();
 #[cfg(any(feature = "cli_control", feature = "control_socket"))]
 pub(crate) async fn shutdown() {
     println!("Shutting down...");
-    match SHARDS.get() {
-        Some(shards) => shards.lock().await.shutdown_all().await,
-        None => (),
+    if let Some(shards) = SHARDS.get() {
+        shards.lock().await.shutdown_all().await
     }
     #[cfg(feature = "db")]
     db::shutdown().await;

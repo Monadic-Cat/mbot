@@ -104,7 +104,7 @@ pub(crate) fn message(input: &str) -> ParsedMessage {
 
 pub(crate) fn response_for(input: &str) -> Option<String> {
     let info = message(input);
-    if info.rolls.len() > 0 {
+    if !info.rolls.is_empty() {
         use ::mice::util::ExpressionExt;
         let cost: i64 = info.rolls.iter()
             .filter_map(|x| x.as_ref().ok())
