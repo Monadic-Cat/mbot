@@ -550,18 +550,49 @@ mod new {
     /// on both success and failure.
     type ParseResult<I, O, E> = Result<(I, O), (I, E)>;
 
+
+    // TODO: consider reporting what the token was
+    /// An invalid token was found in expression position.
+    struct InvalidTokenInExpr;
+    /// Reached end of token stream while in expression position.
+    struct UnexpectedEof;
+    #[derive(Debug)]
+    pub enum ExprError {
+        /// A parsed integer was too large for `u64`.
+        TooLarge,
+        InvalidTokenInExpr,
+        /// Reached end of token stream while in expression position.
+        // (Note that it isn't an error to encounter EOF in binary operator position.)
+        Eof,
+        /// Found a non binary operator in binary operator position.
+        InvalidBinOp,
+        /// Found an invalid token in binary operator position.
+        InvalidTokenInBinOp,
+        InvalidTokenInUnaryOp,
+    }
+    impl From<InvalidTokenInExpr> for ExprError {
+        fn from(InvalidTokenInExpr: InvalidTokenInExpr) -> Self {
+            Self::InvalidTokenInExpr
+        }
+    }
+    impl From<UnexpectedEof> for ExprError {
+        fn from(UnexpectedEof: UnexpectedEof) -> Self {
+            Self::Eof
+        }
+    }
+
     /// Dice program parser combinator.
     /// Consumes input until it reaches unrecognizable tokens,
     /// and attempts to build a dice program from the consumed input.
-    pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], Program, ()> {
+    pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], Program, ExprError> {
         let mut terms = Arena::<Term>::new();
         let (rest, tokens) = dbg!(lex(input));
         let tokens = match tokens {
             Ok(x) => x,
-            Err(TooLarge) => return Err((rest, ())),
+            Err(TooLarge) => return Err((rest, ExprError::TooLarge)),
         };
         // To be used where we already know to expect a unary op.
-        fn consume_unary_op(terms: &mut Arena<Term>, op: UnaryOp, input: &[Token]) -> Result<Id<Term>, ()>  {
+        fn consume_unary_op(terms: &mut Arena<Term>, op: UnaryOp, input: &[Token]) -> Result<Id<Term>, ExprError>  {
             match op {
                 UnaryOp::Plus => {
                     let term = Term::UnaryAdd(consume_expr(&mut *terms, 3, input)?.1);
@@ -584,7 +615,7 @@ mod new {
         }
 
         fn consume_expr<'a>(terms: &mut Arena<Term>, min_bp: u8, input: &'a [Token])
-                        -> Result<(&'a [Token], Id<Term>), ()> {
+                        -> Result<(&'a [Token], Id<Term>), ExprError> {
             let (mut cursor, mut lhs) = match ignore_whitespace(input) {
                 // Currently we parse a dice term like a terminal, but
                 // there is no reason we couldn't make `d` into an operator as well.
@@ -595,22 +626,21 @@ mod new {
                     (rest, Term::DiceRoll(*count, *faces))
                 },
                 [Token::Int(n), rest @ ..] => (rest, Term::Constant(*n)),
-                // TODO: return a more specific error here
-                [x, ..] => todo!("handle invalid token in expression position: {:?}", x),
-                [] => todo!("handle eof in expression position"),
+                [x, ..] => Err(InvalidTokenInExpr)?,
+                [] => Err(UnexpectedEof)?,
             };
 
             loop {
                 dbg!(&lhs);
                 let (rest, op) = match cursor {
-                    // TODO: return a more specific error here
-                    [Token::Op(op), rest @ ..] => (rest, BinOp::try_from(*op)?),
-                    // TODO: return a more specific error here
+                    [Token::Op(op), rest @ ..] => (rest, BinOp::try_from(*op).map_err(|()| {
+                        ExprError::InvalidBinOp
+                    })?),
                     [Token::Whitespace, rest @ ..] => {
                         cursor = rest;
                         continue
                     },
-                    [x, ..] => todo!("handle invalid token in operator position: {:?}", x),
+                    [x, ..] => Err(ExprError::InvalidTokenInBinOp)?,
                     [] => break,
                 };
                 let (l_bp, r_bp) = infix_binding_power(op);
@@ -639,16 +669,16 @@ mod new {
                 // but the current goal is identical behavior to the old parser.
                 [Token::Op(op), rest @ ..] => break match (*op).try_into() {
                     Ok(op) => consume_unary_op(&mut terms, op, rest),
-                    Err(()) => Err(()),
+                    Err(()) => Err(ExprError::InvalidTokenInUnaryOp),
                 },
                 all @ [Token::Int(_), ..] |
                 all @ [Token::D, ..] => break consume_expr(&mut terms, 2, all).map(|(_, x)| x),
-                [] => todo!("handle unexpected end of valid input"),
+                [] => break Err(ExprError::Eof),
             };
         };
         match dbg!(result) {
             Ok(top) => Ok((rest, Program { terms, top })),
-            Err(()) => Err((rest, ())),
+            Err(e) => Err((rest, e)),
         }
     }
 }
