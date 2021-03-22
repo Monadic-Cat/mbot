@@ -625,6 +625,7 @@ mod new {
                 [Token::Int(count), Token::D, Token::Int(faces), rest @ ..] => {
                     (rest, Term::DiceRoll(*count, *faces))
                 },
+                [Token::D, Token::Int(faces), rest @ ..] => (rest, Term::DiceRoll(1, *faces)),
                 [Token::Int(n), rest @ ..] => (rest, Term::Constant(*n)),
                 [x, ..] => Err(InvalidTokenInExpr)?,
                 [] => Err(UnexpectedEof)?,
