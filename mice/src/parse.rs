@@ -593,7 +593,7 @@ pub mod new {
     /// and attempts to build a dice program from the consumed input.
     pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], Program, ExprError> {
         let mut terms = Arena::<Term>::new();
-        let (rest, tokens) = dbg!(lex(input));
+        let (rest, tokens) = lex(input);
         let tokens = match tokens {
             Ok(x) => x,
             Err(TooLarge) => return Err((rest, ExprError::TooLarge)),
@@ -639,7 +639,6 @@ pub mod new {
             };
 
             loop {
-                dbg!(&lhs);
                 let (rest, op) = match cursor {
                     [Token::Op(op), rest @ ..] => (rest, BinOp::try_from(*op).map_err(|()| {
                         ExprError::InvalidBinOp
@@ -657,7 +656,7 @@ pub mod new {
                 }
 
                 cursor = rest;
-                let (rest, rhs) = dbg!(consume_expr(&mut *terms, r_bp, cursor)?);
+                let (rest, rhs) = consume_expr(&mut *terms, r_bp, cursor)?;
                 cursor = rest;
                 match op {
                     BinOp::Plus => lhs = Term::Add(terms.alloc(lhs), rhs),
@@ -684,7 +683,7 @@ pub mod new {
                 [] => break Err(ExprError::Eof),
             };
         };
-        match dbg!(result) {
+        match result {
             Ok(top) => Ok((rest, Program { terms, top })),
             Err(e) => Err((rest, e)),
         }
