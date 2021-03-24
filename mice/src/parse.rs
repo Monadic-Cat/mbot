@@ -367,7 +367,9 @@ pub(crate) fn wrap_dice(input: &str) -> Result<Expression, ParseError> {
     }
 }
 
-mod new {
+/// A new parsing module, in my continuing effort to rework this entire thing.
+/// Eventually, this will be the only parsing module in `mice`.
+pub mod new {
     // A new parsing module, in my continuing effort to rework this entire thing.
     // Note that all byte strings in this module are conventionally UTF-8.
     // TODO: consider using the `bstr` crate
@@ -688,4 +690,3 @@ mod new {
         }
     }
 }
-pub use new::parse_expression;
