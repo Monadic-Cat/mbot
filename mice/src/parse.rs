@@ -556,18 +556,24 @@ mod new {
     struct InvalidTokenInExpr;
     /// Reached end of token stream while in expression position.
     struct UnexpectedEof;
+
+    /// Expression parsing error.
     #[derive(Debug)]
     pub enum ExprError {
+        // TODO: consider splitting lexing errors out
+        // TODO: consider exposing the lexer separate from the parser as public API
         /// A parsed integer was too large for `u64`.
         TooLarge,
+        /// Encountered invalid token in expression position.
         InvalidTokenInExpr,
         /// Reached end of token stream while in expression position.
         // (Note that it isn't an error to encounter EOF in binary operator position.)
         Eof,
-        /// Found a non binary operator in binary operator position.
+        /// Encountered a non binary operator in binary operator position.
         InvalidBinOp,
-        /// Found an invalid token in binary operator position.
+        /// Encountered an invalid token in binary operator position.
         InvalidTokenInBinOp,
+        /// Encountered an invalid token in unary operator position.
         InvalidTokenInUnaryOp,
     }
     impl From<InvalidTokenInExpr> for ExprError {
