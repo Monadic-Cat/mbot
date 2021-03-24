@@ -378,6 +378,7 @@ mod new {
 
     use ::proc_macro_helpers::decl_ops;
     decl_ops! {
+        #[non_exhaustive]
         enum
         /// Operators
             #[derive(Debug, Clone, Copy)]

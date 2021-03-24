@@ -64,6 +64,8 @@ struct BindingPowerFnDecl {
 
 #[derive(Parse, Debug)]
 struct DeclOps {
+    #[call(Attribute::parse_outer)]
+    all_attrs: Vec<Attribute>,
     enum_token: Token![enum],
     #[call(Attribute::parse_outer)]
     sum_attrs: Vec<Attribute>,
@@ -111,8 +113,8 @@ macro_rules! dsp {
 pub fn decl_ops(input: ::proc_macro::TokenStream) -> ::proc_macro::TokenStream {
     let parse_input = input.clone();
     let parsed = syn::parse_macro_input!(parse_input as DeclOps);
-    let DeclOps { enum_token, sum_attrs, sum_ident, unary_attrs, unary_ident,
-                  binary_attrs, binary_ident, variants,
+    let DeclOps { all_attrs, enum_token, sum_attrs, sum_ident, unary_attrs,
+                  unary_ident, binary_attrs, binary_ident, variants,
                   unary_fn_decl: BindingPowerFnDecl {
                       fn_token: unary_fn_token,
                       fn_ident: unary_fn_ident,
@@ -204,14 +206,17 @@ pub fn decl_ops(input: ::proc_macro::TokenStream) -> ::proc_macro::TokenStream {
     });
     // TODO: assign brace and paren spans correctly
     (::quote::quote! {
+        #(#all_attrs)*
         #(#sum_attrs)*
         #enum_token #sum_ident {
             #(#sum_variant_idents),*
         }
+        #(#all_attrs)*
         #(#unary_attrs)*
         #enum_token #unary_ident {
             #(#unary_variant_idents),*
         }
+        #(#all_attrs)*
         #(#binary_attrs)*
         #enum_token #binary_ident {
             #(#binary_variant_idents),*
