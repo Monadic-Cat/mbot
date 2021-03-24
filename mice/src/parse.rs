@@ -379,15 +379,13 @@ mod new {
     use ::proc_macro_helpers::decl_ops;
     decl_ops! {
         #[non_exhaustive]
+        #[derive(Debug, Clone, Copy)]
         enum
         /// Operators
-            #[derive(Debug, Clone, Copy)]
             Op =
         /// Unary operators
-            #[derive(Debug, Clone, Copy)]
             UnaryOp
         /// Binary operators
-            #[derive(Debug, Clone, Copy)]
             BinOp {
             /// Addition
             Plus { unary: 3, binary: (3, 4) },
