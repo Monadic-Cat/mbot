@@ -481,8 +481,9 @@ pub mod new {
     }
 
     /// An AST node. This represents an expression as a tree of nodes stored in an [`Arena`].
+    #[non_exhaustive]
     #[derive(Debug)]
-    enum Term {
+    pub(crate) enum Term {
         Constant(u64),
         // This could conceivably have its arguments
         // replaced by terms, and be turned into an operator
@@ -496,13 +497,14 @@ pub mod new {
 
     /// A parsed dice program. The result of invoking `parse_expression` on something like `"3d6 + 4"`.
     // Fuck it. Dice expressions are programs.
+    // Note: I fully intend to expose the AST as public API.
     pub struct Program {
         // Note that `Program`s are intended to be correctly formed by construction.
 
         // We allocate terms inside an arena so we can build trees without
         // allocating for each node.
-        terms: Arena<Term>,
-        top: Id<Term>,
+        pub(crate) terms: Arena<Term>,
+        pub(crate) top: Id<Term>,
     }
 
     /// For debugging purposes.
