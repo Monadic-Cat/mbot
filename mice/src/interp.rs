@@ -22,10 +22,10 @@ impl ProgramOutput {
 
 pub fn interpret<R: Rng>(
     rng: &mut R,
-    Program { terms, top }: Program,
+    Program { terms, top }: &Program,
 ) -> Result<ProgramOutput, InterpError> {
     let mut outputs = Arena::new();
-    let top = interpret_term(rng, &terms, &mut outputs, top)?;
+    let top = interpret_term(rng, &terms, &mut outputs, *top)?;
     let total = outputs[top].total();
     Ok(ProgramOutput {
         total, outputs, top
