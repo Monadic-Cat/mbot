@@ -408,7 +408,8 @@ pub mod new {
     /// Units of input as segmented by the lexer.
     #[derive(Debug)]
     enum Token {
-        Int(u64),
+        /// This will never be negative. We use an [`i64`] here so numeric limits line up elsewhere.
+        Int(i64),
         D,
         Op(Op),
         Whitespace,
@@ -461,8 +462,8 @@ pub mod new {
                     [..] => {
                         let slice = &start[..start.offset_of_slice(cursor)];
                         use ::checked::Checked;
-                        tokens.push(Token::Int(match slice.iter().try_fold(0u64, |a, b| {
-                            *((Checked::from(a) * 10) + (b - b'0') as u64)
+                        tokens.push(Token::Int(match slice.iter().try_fold(0i64, |a, b| {
+                            *((Checked::from(a) * 10) + (b - b'0') as i64)
                         }) {
                             Some(x) => x,
                             None => return (cursor, Err(TooLarge)),
@@ -484,11 +485,11 @@ pub mod new {
     #[non_exhaustive]
     #[derive(Debug)]
     pub(crate) enum Term {
-        Constant(u64),
+        Constant(i64),
         // This could conceivably have its arguments
         // replaced by terms, and be turned into an operator
         // in its own right. This could then allow strange expressions like `3d(d8)`.
-        DiceRoll(u64, u64),
+        DiceRoll(i64, i64),
         Add(Id<Term>, Id<Term>),
         Subtract(Id<Term>, Id<Term>),
         UnarySubtract(Id<Term>),
