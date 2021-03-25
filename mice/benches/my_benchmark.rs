@@ -1,7 +1,18 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
 
 fn rolling_benchmark(c: &mut Criterion) {
-    c.bench_function("rolls", |b| b.iter(|| mice::roll(black_box("2d6"))));
+    let mut group = c.benchmark_group("Dice Rolling");
+    let expression = black_box(mice::parse::Expression::parse("2d6").unwrap().1.unwrap());
+    let (_, program) = black_box(mice::parse::new::parse_expression(b"2d6").unwrap());
+    let mut rng = ::rand::thread_rng();
+
+    group.bench_function("Old Roller", |b| {
+        b.iter(|| expression.roll_with(&mut rng));
+    });
+    
+    group.bench_function("New Roller", |b| {
+        b.iter(|| mice::interp::interpret(&mut rng, &program));
+    });
 }
 
 fn compare_formatting(c: &mut Criterion) {
