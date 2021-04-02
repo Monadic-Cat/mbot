@@ -4,11 +4,13 @@ use crate::parse::new::{Program, Term};
 use ::id_arena::{Arena, Id};
 use ::rand::Rng;
 
+#[derive(Debug)]
 pub enum InterpError {
     OverflowPositive,
     OverflowNegative,
 }
 
+#[derive(Debug)]
 pub struct ProgramOutput {
     total: i64,
     outputs: Arena<TermOutput>,
@@ -32,6 +34,7 @@ pub fn interpret<R: Rng>(
     })
 }
 
+#[derive(Debug)]
 enum TermOutput {
     Constant(i64),
     DiceRoll(i64, Option<Vec<i64>>),
