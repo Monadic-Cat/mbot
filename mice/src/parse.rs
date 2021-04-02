@@ -393,13 +393,13 @@ pub mod new {
             UnaryOp
         /// Binary operators
             BinOp {
-            /// Addition
-            Plus { unary: 3, binary: (3, 4) },
-            /// Subtraction
-            Minus { unary: 3, binary: (3, 4) },
-            // /// Multiplication
-            // Times { binary: (5, 6) },
-        }
+                /// Addition
+                Plus { unary: 3, binary: (3, 4) },
+                /// Subtraction
+                Minus { unary: 3, binary: (3, 4) },
+                // /// Multiplication
+                // Times { binary: (5, 6) },
+            }
         unary =>
         /// A description of how tightly unary operators bind their arguments.
         fn unary_binding_power(op) -> u8;
