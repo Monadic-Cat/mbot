@@ -116,6 +116,7 @@ pub fn decl_ops(input: ::proc_macro::TokenStream) -> ::proc_macro::TokenStream {
     let DeclOps { all_attrs, enum_token, sum_attrs, sum_ident, unary_attrs,
                   unary_ident, binary_attrs, binary_ident, variants,
                   unary_fn_decl: BindingPowerFnDecl {
+                      fn_attrs: unary_fn_attrs,
                       fn_token: unary_fn_token,
                       fn_ident: unary_fn_ident,
                       arg: unary_fn_arg,
@@ -124,6 +125,7 @@ pub fn decl_ops(input: ::proc_macro::TokenStream) -> ::proc_macro::TokenStream {
                       ..
                   },
                   binary_fn_decl: BindingPowerFnDecl {
+                      fn_attrs: binary_fn_attrs,
                       fn_token: binary_fn_token,
                       fn_ident: binary_fn_ident,
                       arg: binary_fn_arg,
@@ -221,11 +223,13 @@ pub fn decl_ops(input: ::proc_macro::TokenStream) -> ::proc_macro::TokenStream {
         #enum_token #binary_ident {
             #(#binary_variant_idents),*
         }
+        #(#unary_fn_attrs)*
         #unary_fn_token #unary_fn_ident ( #unary_fn_arg : #unary_ident ) #unary_fn_ret_arrow #unary_ret_ty {
             match #unary_fn_arg {
                 #(#unary_variant_power_arms),*
             }
         }
+        #(#binary_fn_attrs)*
         #binary_fn_token #binary_fn_ident ( #binary_fn_arg : #binary_ident )
         #binary_fn_ret_arrow #binary_ret_ty {
             match #binary_fn_arg {
