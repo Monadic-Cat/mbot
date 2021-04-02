@@ -605,11 +605,11 @@ pub mod new {
         fn consume_unary_op(terms: &mut Arena<Term>, op: UnaryOp, input: &[Token]) -> Result<Id<Term>, ExprError>  {
             match op {
                 UnaryOp::Plus => {
-                    let term = Term::UnaryAdd(consume_expr(&mut *terms, 3, input)?.1);
+                    let term = Term::UnaryAdd(consume_expr(&mut *terms, unary_binding_power(op), input)?.1);
                     Ok(terms.alloc(term))
                 },
                 UnaryOp::Minus => {
-                    let term = Term::UnarySubtract(consume_expr(&mut *terms, 3, input)?.1);
+                    let term = Term::UnarySubtract(consume_expr(&mut *terms, unary_binding_power(op), input)?.1);
                     Ok(terms.alloc(term))
                 }
             }
