@@ -1,18 +1,26 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, BenchmarkGroup};
 
 fn rolling_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Dice Rolling");
-    let expression = black_box(mice::parse::Expression::parse("2d6").unwrap().1.unwrap());
-    let (_, program) = black_box(mice::parse::new::parse_expression(b"2d6").unwrap());
     let mut rng = ::rand::thread_rng();
 
-    group.bench_function("Old Roller", |b| {
-        b.iter(|| expression.roll_with(&mut rng));
-    });
-    
-    group.bench_function("New Roller", |b| {
-        b.iter(|| mice::interp::interpret(&mut rng, &program));
-    });
+    let mut rollers = |mut group: BenchmarkGroup<_>, program_text| {
+        let expression = black_box(mice::parse::Expression::parse(program_text).unwrap().1.unwrap());
+        let (_, program) = black_box(mice::parse::new::parse_expression(program_text.as_bytes()).unwrap());
+        group.bench_function("Old Roller", |b| {
+            b.iter(|| expression.roll_with(&mut rng));
+        });
+        
+        group.bench_function("New Roller", |b| {
+            b.iter(|| mice::interp::interpret(&mut rng, &program));
+        });
+    };
+
+    let mut wg = |gn, t| rollers(c.benchmark_group(gn), t);
+    wg("Dice Rolling - Small Expression", "2d6");
+    wg("Dice Rolling - Medium Expression", "2d6 + 4d4 + 9");
+    wg("Dice Rolling - Large Expression", "3d9 + 9d4 - 2d1 + 40d7");
+    wg("Dice Rolling - Absurdly Large Expression", "3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7");
+    wg("Dice Rolling - Expensive But Short Expression", "10000d100");
 }
 
 fn compare_formatting(c: &mut Criterion) {
