@@ -380,6 +380,10 @@ pub mod new {
 
     use ::proc_macro_helpers::decl_ops;
     decl_ops! {
+        // TODO: if Token::D becomes an operator,
+        // we may wish to encode whitespace sensitivity here,
+        // so we can continue requiring the absence of whitespace
+        // inside dice terms.
         #[non_exhaustive]
         #[derive(Debug, Clone, Copy)]
         enum
