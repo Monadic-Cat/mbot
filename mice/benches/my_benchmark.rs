@@ -1,7 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, BenchmarkGroup};
 
 fn rolling_benchmark(c: &mut Criterion) {
-    let mut rng = ::rand::thread_rng();
+    use ::rand::SeedableRng;
+    let mut rng = ::rand::rngs::SmallRng::from_entropy();
 
     let mut rollers = |mut group: BenchmarkGroup<_>, program_text| {
         let expression = black_box(mice::parse::Expression::parse(program_text).unwrap().1.unwrap());
