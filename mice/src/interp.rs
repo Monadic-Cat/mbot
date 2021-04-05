@@ -20,6 +20,12 @@ impl ProgramOutput {
     pub fn total(&self) -> i64 {
         self.total
     }
+    pub fn top(&self) -> &TermOutput {
+        &self.outputs[self.top]
+    }
+    pub fn get(&self, id: Id<TermOutput>) -> &TermOutput {
+        &self.outputs[id]
+    }
 }
 
 pub fn interpret<R: Rng>(
@@ -34,8 +40,9 @@ pub fn interpret<R: Rng>(
     })
 }
 
+#[non_exhaustive]
 #[derive(Debug)]
-enum TermOutput {
+pub enum TermOutput {
     Constant(i64),
     DiceRoll(i64, Option<Vec<i64>>),
     Add(i64, Id<TermOutput>, Id<TermOutput>),

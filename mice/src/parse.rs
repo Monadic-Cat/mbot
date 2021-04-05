@@ -399,6 +399,10 @@ pub mod new {
                 Minus { unary: 3, binary: (3, 4) },
                 // /// Multiplication
                 // Times { binary: (5, 6) },
+                // In order to have general operators that work on
+                // non integers (like 'k' in '4d6k3'), we're gonna need
+                // a type checker. Some restricted forms of these don't
+                // require that, but might as well point it out.
             }
         unary =>
         /// A description of how tightly unary operators bind their arguments.
