@@ -1,5 +1,4 @@
 //! # mice, messing with dice
-//! The heading obviates the need for a body.
 //!
 //! This crate is written primarily for my own
 //! usage, and will likely obtain extensions related
