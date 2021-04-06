@@ -26,6 +26,11 @@ pub(crate) fn draw(exp: &Expression, caption: &str) -> Result<Box<[u8]>, MiceErr
         use ::rand::SeedableRng;
         ::rand::rngs::SmallRng::from_entropy()
     };
+    // TODO: prove no overflow
+    // TODO: compute range analytically
+    // explosions will be annoying here.
+    // perhaps we should enable more precise handling and higher caps
+    // when misbehaving things like explosions aren't present.
     let sample = iter::repeat_with(|| exp.roll_with(&mut rng).map(|x| x.total()))
         .inspect(|x| x.iter().for_each(|x| *counts.entry(*x).or_insert(0) += 1))
         .take(SAMPLE_SIZE).collect::<Result<Vec<_>, _>>()?;
