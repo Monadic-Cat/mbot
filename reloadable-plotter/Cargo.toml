@@ -1,0 +1,30 @@
+[package]
+name = "reloadable-plotter"
+version = "0.1.0"
+authors = ["Monadic Cat <greenmonadcat@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+libc = "0.2.93"
+mice = { path = "../mice" }
+rand = "0.7"
+plotters-bitmap = { version = "0.3.0", optional = true }
+png = { version = "0.16.8", optional = true }
+
+[dependencies.plotters]
+version = "0.3.0"
+optional = true
+default-features = false
+features = ["bitmap_encoder", "histogram", "ttf"]
+
+# TODO: feature gate plotter so we can pull this in as a dep of mbot
+# and unify the relevant type declarations, without requiring the plotter
+# itself be built with mbot.
+[features]
+default = ["actual_plotter"]
+actual_plotter = ["plotters", "plotters-bitmap", "png", "rand/small_rng"]

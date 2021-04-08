@@ -1266,9 +1266,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.81"
+version = "0.2.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1482821306169ec4d07f6aca392a4681f66c75c9918aa49641a2595db64053cb"
+checksum = "9385f66bf6105b241aa65a61cb923ef20efc665cb9f9bb50ac2f0c4b7f378d41"
 
 [[package]]
 name = "libsqlite3-sys"
@@ -1349,6 +1349,7 @@ dependencies = [
  "fehler",
  "foretry",
  "indexmap",
+ "libc",
  "log",
  "mice",
  "nom 5.1.2",
@@ -2050,6 +2051,18 @@ name = "regex-syntax"
 version = "0.6.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b181ba2dcf07aaccad5448e8ead58db5b742cf85dfe035e2227f137a539a189"
+
+[[package]]
+name = "reloadable-plotter"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "mice",
+ "plotters",
+ "plotters-bitmap",
+ "png 0.16.8",
+ "rand",
+]
 
 [[package]]
 name = "reqwest"

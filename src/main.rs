@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "reloadable_plotter"), forbid(unsafe_code))]
 use mice::FormatOptions as MiceFormat;
 use ::mice::util::ExpressionExt;
 mod initiative;
@@ -258,6 +258,25 @@ async fn fate(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
 #[cfg(feature = "plotting")]
 #[command]
 async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
+    {
+        fn timed<F, R>(func: F) -> R
+        where F: FnOnce() -> R {
+            use ::std::time::Instant;
+            let first = Instant::now();
+            let result = func();
+            let second = Instant::now();
+            dbg!(second - first);
+            result
+        }
+        use dist::reloadable::Plotter;
+        let plot = timed(|| Plotter::lock());
+        let prepared = dbg!(plot.prep(arg.message()));
+        match prepared {
+            // this should spawn_blocking
+            Ok(prepared) => timed(|| plot.draw(prepared)),
+            Err(dist::reloadable::InvalidExpression) => todo!("handle invalid expression"),
+        };
+    }
     match ::mice::parse::dice(arg.message()) {
         Ok((input, Ok(expression))) if input.is_empty() => {
             // TODO: rate limiting
