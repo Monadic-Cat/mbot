@@ -34,7 +34,10 @@ pub mod reloadable {
     use ::std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
     #[derive(Debug)]
-    pub struct InvalidExpression;
+    pub enum PreparationError {
+        InvalidExpression,
+        TooExpensive,
+    }
     pub enum Overflow {
         Positive,
         Negative,
@@ -50,7 +53,7 @@ pub mod reloadable {
         module: RwLockReadGuard<'a, Option<Plotter>>,
     }
     impl<'a> PlotGuard<'a> {
-        pub fn prep(&self, expression: &str) -> Result<Prepared<'a>, InvalidExpression> {
+        pub fn prep(&self, expression: &str) -> Result<Prepared<'a>, PreparationError> {
             (self.module.as_ref().unwrap().prep)(self, expression)
         }
         pub fn draw(&self, prepared: Prepared<'a>) -> Result<FFIVecU8<'a>, Overflow> {
@@ -74,7 +77,7 @@ pub mod reloadable {
         // via this API, by simply not exposing references to those function pointers.
         // That way, they can't escape the module lifetime bound, expressed via PlotGuard<'a>.
         /// Parse and otherwise prepare a dice expression for execution.
-        pub prep: Box<dyn for<'a> Fn(&PlotGuard<'a>, &str) -> Result<Prepared<'a>, InvalidExpression> + Send + Sync>,
+        pub prep: Box<dyn for<'a> Fn(&PlotGuard<'a>, &str) -> Result<Prepared<'a>, PreparationError> + Send + Sync>,
         pub draw: Box<dyn for<'a> Fn(&PlotGuard<'a>, Prepared<'a>) -> Result<FFIVecU8<'a>, Overflow> + Send + Sync>,
         handle: LibraryHandle,
         // Prevent external construction.
@@ -127,7 +130,8 @@ pub mod reloadable {
                     // Safety: FFI.
                     match unsafe { prep_expr(expression.as_bytes().as_ptr(), len) } {
                         PrepRet::Ok(x) => Ok(x),
-                        PrepRet::InvalidExpression => Err(InvalidExpression),
+                        PrepRet::InvalidExpression => Err(PreparationError::InvalidExpression),
+                        PrepRet::TooExpensive => Err(PreparationError::TooExpensive),
                     }
                 }),
                 // Safety: Note that generally invariants that are enforced by construction
@@ -232,6 +236,7 @@ pub mod reloadable {
     pub enum PrepRet<'a> {
         Ok(Prepared<'a>),
         InvalidExpression,
+        TooExpensive,
     }
 
     /// Owning pointer to prepared dice program.

@@ -269,12 +269,14 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
             result
         }
         use dist::reloadable::Plotter;
+        use dist::reloadable::PreparationError;
         let plot = timed(|| Plotter::lock());
         let prepared = dbg!(plot.prep(arg.message()));
         match prepared {
             // this should spawn_blocking
             Ok(prepared) => timed(|| plot.draw(prepared)),
-            Err(dist::reloadable::InvalidExpression) => todo!("handle invalid expression"),
+            Err(PreparationError::InvalidExpression) => todo!("handle invalid expression"),
+            Err(PreparationError::TooExpensive) => todo!("handle too expensive expression"),
         };
     }
     match ::mice::parse::dice(arg.message()) {

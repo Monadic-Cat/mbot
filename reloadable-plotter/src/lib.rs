@@ -87,10 +87,13 @@ impl Prepared<'static> {
         unsafe { *Box::from_raw(ptr.cast::<T>()) }
     }
 }
+
+// TODO: consider using the abi_stable crate for FFI safe non exhaustive enums.
 #[repr(u8, C)]
 pub enum PrepRet<'a> {
     Ok(Prepared<'a>),
     InvalidExpression,
+    TooExpensive,
 }
 
 #[repr(u8, C)]
