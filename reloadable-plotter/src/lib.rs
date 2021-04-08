@@ -6,7 +6,7 @@ use ::core::marker::PhantomData;
 // instead of doing this ourselves.
 /// A FFI wrapper for the raw parts of a [`Vec<T>`](::std::vec::Vec).
 #[repr(C)]
-pub struct FFIVecU8<'a> {
+pub struct FfiVecU8<'a> {
     ptr: *mut u8,
     length: usize,
     capacity: usize,
@@ -22,14 +22,14 @@ pub struct FFIVecU8<'a> {
 extern "C" fn free_ffi_vec(ptr: *mut u8, length: usize, capacity: usize) {
     let _ = unsafe { Vec::from_raw_parts(ptr, length, capacity) };
 }
-impl<'a> FFIVecU8<'a> {
+impl<'a> FfiVecU8<'a> {
     // Only allowed on this side of the FFI.
-    fn from_vec(mut vec: Vec<u8>) -> FFIVecU8<'static> {
+    fn from_vec(mut vec: Vec<u8>) -> FfiVecU8<'static> {
         // Correctness (and Safety in free_ffi_vec): This is how std implements Vec::into_raw_parts,
         // so I'm guessing the order used doesn't mess with provenance.
         let (ptr, length, capacity) = (vec.as_mut_ptr(), vec.len(), vec.capacity());
         ::core::mem::forget(vec);
-        FFIVecU8 {
+        FfiVecU8 {
             ptr, length, capacity,
             free_function: free_ffi_vec,
             _free_function_lifetime: PhantomData
@@ -40,7 +40,7 @@ impl<'a> FFIVecU8<'a> {
     //     unsafe { Vec::from_raw_parts(ptr, length, capacity) }
     // }
 }
-impl<'a> Drop for FFIVecU8<'a> {
+impl<'a> Drop for FfiVecU8<'a> {
     fn drop(&mut self) {
         // Safety: Just calling vector drop via FFI.
         // This passes back the data we were given via the same FFI.
@@ -48,14 +48,14 @@ impl<'a> Drop for FFIVecU8<'a> {
         unsafe { (self.free_function)(self.ptr, self.length, self.capacity); }
     }
 }
-impl<'a> Deref for FFIVecU8<'a> {
+impl<'a> Deref for FfiVecU8<'a> {
     type Target = [u8];
     fn deref(&self) -> &Self::Target {
-        // Safety: ptr and length are guaranteed to be valid and correct, by construction of FFIVecU8.
+        // Safety: ptr and length are guaranteed to be valid and correct, by construction of FfiVecU8.
         unsafe { ::core::slice::from_raw_parts(self.ptr, self.length) }
     }
 }
-impl<'a> DerefMut for FFIVecU8<'a> {
+impl<'a> DerefMut for FfiVecU8<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         // Safety: See Deref impl above.
         unsafe { ::core::slice::from_raw_parts_mut(self.ptr, self.length) }
@@ -95,7 +95,7 @@ pub enum PrepRet<'a> {
 
 #[repr(u8, C)]
 pub enum DrawRet<'a> {
-    Ok(FFIVecU8<'a>),
+    Ok(FfiVecU8<'a>),
     OverflowPositive,
     OverflowNegative,
 }
@@ -107,9 +107,12 @@ struct Program {
     caption: String,
 }
 
+/// # Safety
+/// Must be called with a valid pointer and length for a UTF-8 slice
 #[cfg(any(feature = "actual_plotter", doc))]
 #[no_mangle]
-pub extern "C" fn prep_expr(expression: *const u8, length: usize) -> PrepRet<'static> {
+pub unsafe extern "C" fn prep_expr(expression: *const u8, length: usize) -> PrepRet<'static> {
+    #![allow(unused_unsafe)]
     // Safety: This is given to us from a &str on the other side of the FFI.
     let expression = unsafe { ::core::slice::from_raw_parts(expression, length) };
     // Safety: This is given to us from a &str on the other side of the FFI.
@@ -132,7 +135,7 @@ pub extern "C" fn draw_impl(prepared: Prepared<'static>) -> DrawRet<'static> {
     let Program { expression, caption } = expression;
     use ::mice::prelude::MiceError;
     match plot_impl::draw(&expression, &caption) {
-        Ok(buffer) => DrawRet::Ok(FFIVecU8::from_vec(buffer)),
+        Ok(buffer) => DrawRet::Ok(FfiVecU8::from_vec(buffer)),
         Err(MiceError::OverflowPositive(_)) => DrawRet::OverflowPositive,
         Err(MiceError::OverflowNegative(_)) => DrawRet::OverflowNegative,
         Err(MiceError::InvalidExpression(_)) => unreachable!("we check for this inside prep_expr"),
