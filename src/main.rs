@@ -273,8 +273,9 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
         let plot = timed(|| Plotter::lock());
         let prepared = dbg!(plot.prep(arg.message()));
         match prepared {
-            // this should spawn_blocking
-            Ok(prepared) => timed(|| plot.draw(prepared)),
+            // Can't spawn blocking since the RwLockReadGuard inside PlotGuard isn't Send.
+            // So, we use the current thread instead.
+            Ok(prepared) => task::block_in_place(|| timed(|| plot.draw(prepared))),
             Err(PreparationError::InvalidExpression) => todo!("handle invalid expression"),
             Err(PreparationError::TooExpensive) => todo!("handle too expensive expression"),
         };

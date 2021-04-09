@@ -92,7 +92,8 @@ pub mod reloadable {
     use ::core::sync::atomic::{AtomicBool, Ordering};
     // Guard against multiple loading.
     static FIRST_LOADED: AtomicBool = AtomicBool::new(false);
-    #[allow(dead_code)]
+    // TODO: I may prefer a lock that strongly prioritizes writers.
+    // In any case, I *do* want a way to force through fixes for vulnerabilities.
     static PLOTTER: Lazy<RwLock<Option<Plotter>>> = Lazy::new(|| {
         // Safety: This is the only place this function is allowed to be called.
         RwLock::new(Some(unsafe { Plotter::load_first() }))
@@ -178,12 +179,25 @@ pub mod reloadable {
         /// Wait for all users of the plotting module to finish,
         /// then reload it.
         pub fn reload() {
-            let _guard = PLOTTER.write();
-            todo!("hot reloading")
+            extern "C" {
+                fn dlclose(handle: LibraryHandle) -> c_int;
+            }
+            let mut guard = PLOTTER.write().unwrap();
+            match guard.take() {
+                Some(plotter) => unsafe { dlclose(plotter.handle); },
+                None => (),
+            }
+            *guard = unsafe { Some(Self::load()) };
         }
         pub fn unload() {
-            let _guard = PLOTTER.write();
-            todo!("module unloading")
+            extern "C" {
+                fn dlclose(handle: LibraryHandle) -> c_int;
+            }
+            let mut guard = PLOTTER.write().unwrap();
+            let plotter = guard.take();
+            // TODO: consider making unload idempotent
+            // Safety: This is the handle we got from dlopen above, so it should be valid.
+            unsafe { dlclose(plotter.unwrap().handle) };
         }
     }
 
