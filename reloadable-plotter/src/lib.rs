@@ -123,7 +123,12 @@ pub unsafe extern "C" fn prep_expr(expression: *const u8, length: usize) -> Prep
     let caption = String::from(expression);
     match ::mice::parse::dice(expression) {
         Ok((input, Ok(expression))) if input.is_empty() => {
-            PrepRet::Ok(Prepared::from(Program { expression, caption }))
+            use ::mice::util::ExpressionExt;
+            if !expression.exceeds_cap(200) {
+                PrepRet::Ok(Prepared::from(Program { expression, caption }))
+            } else {
+                PrepRet::TooExpensive
+            }
         },
         _ => PrepRet::InvalidExpression,
     }
