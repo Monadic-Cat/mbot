@@ -19,9 +19,13 @@ pub struct FfiVecU8<'a> {
     free_function: extern "C" fn(*mut u8, usize, usize),
     _free_function_lifetime: PhantomData<&'a dyn Fn(*mut u8, usize, usize)>,
 }
+
+#[cfg(any(feature = "actual_plotter", doc))]
 extern "C" fn free_ffi_vec(ptr: *mut u8, length: usize, capacity: usize) {
     let _ = unsafe { Vec::from_raw_parts(ptr, length, capacity) };
 }
+
+#[cfg(any(feature = "actual_plotter", doc))]
 impl<'a> FfiVecU8<'a> {
     // Only allowed on this side of the FFI.
     fn from_vec(mut vec: Vec<u8>) -> FfiVecU8<'static> {
@@ -66,11 +70,14 @@ impl<'a> DerefMut for FfiVecU8<'a> {
 #[repr(transparent)]
 pub struct Prepared<'a> {
     /// Type erased owning pointer to prepared dice program.
+    #[cfg_attr(not(feature = "actual_plotter"), allow(dead_code))]
     ptr: *mut c_void,
     // Inside the dynamic module, this lifetime is essentially forever.
     // It's only on the other side of the FFI that this lifetime becomes relevant.
     _guard_lifetime: PhantomData<&'a ()>,
 }
+
+#[cfg(any(feature = "actual_plotter", doc))]
 impl Prepared<'static> {
     fn from<T>(val: T) -> Self {
         let boxed = Box::new(val);
@@ -103,6 +110,7 @@ pub enum DrawRet<'a> {
     OverflowNegative,
 }
 
+#[cfg(any(feature = "actual_plotter", doc))]
 struct Program {
     expression: ::mice::parse::Expression,
     // We heap allocate here because the input message string slice is not enforced to live

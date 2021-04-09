@@ -11,8 +11,8 @@ crate-type = ["rlib", "cdylib"]
 
 [dependencies]
 libc = "0.2.93"
-mice = { path = "../mice" }
-rand = "0.7"
+mice = { path = "../mice", optional = true }
+rand = { version = "0.7", optional = true }
 plotters-bitmap = { version = "0.3.0", optional = true }
 png = { version = "0.16.8", optional = true }
 
@@ -27,4 +27,4 @@ features = ["bitmap_encoder", "histogram", "ttf"]
 # itself be built with mbot.
 [features]
 default = ["actual_plotter"]
-actual_plotter = ["plotters", "plotters-bitmap", "png", "rand/small_rng"]
+actual_plotter = ["plotters", "plotters-bitmap", "png", "rand", "rand/small_rng", "mice"]
