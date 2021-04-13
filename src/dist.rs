@@ -31,7 +31,7 @@ pub mod reloadable {
     use ::libc::c_int;
     use ::core::marker::PhantomData;
     use ::once_cell::sync::Lazy;
-    use ::std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+    use ::std::sync::{RwLock, RwLockReadGuard};
 
     #[derive(Debug)]
     pub enum PreparationError {
@@ -64,7 +64,7 @@ pub mod reloadable {
     #[derive(Copy, Clone)]
     #[repr(transparent)]
     struct LibraryHandle {
-        ptr: *const c_void,
+        _ptr: *const c_void,
     }
     
     /// Owning container for the dynamically loaded plotting module.
@@ -189,6 +189,7 @@ pub mod reloadable {
             }
             *guard = unsafe { Some(Self::load()) };
         }
+        #[allow(dead_code)]
         pub fn unload() {
             extern "C" {
                 fn dlclose(handle: LibraryHandle) -> c_int;
