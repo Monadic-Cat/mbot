@@ -94,8 +94,20 @@ impl Machine {
         use Instruction::*;
         match instruction {
             Value(value) => self.stack.push(value),
-            // TODO: have way to save partial sums
-            DiceRoll(count, sides) => todo!("stack machine dice rolling"),
+            DiceRoll(count, sides) => {
+                if sides == 1 {
+                    self.stack.push(count);
+                } else {
+                    let mut total: i64 = 0;
+                    for _ in 0..count {
+                        // TODO: have way to save partial sums
+                        let random = rng.gen_range(0, sides) + 1;
+                        total = total.checked_add(random)
+                            .ok_or(Overflow::Positive)?;
+                    }
+                    self.stack.push(total);
+                }
+            },
             Add => {
                 // Note: These are guaranteed to exist due to how the tree is constructed.
                 let (left, right) = (self.stack.pop().unwrap(), self.stack.pop().unwrap());
