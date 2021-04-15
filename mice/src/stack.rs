@@ -1,4 +1,5 @@
-//! A stack machine for dice programs.
+//! A stack machine for dice programs. Currently just interprets the stack machine bytecode,
+//! but is already faster than the other two interpreters in all benchmarks.
 use crate::parse::new::{Program, Term};
 use ::id_arena::Arena;
 use ::rand::Rng;
