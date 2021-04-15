@@ -115,7 +115,11 @@ impl Machine {
                 self.stack.push(match left.checked_add(right) {
                     Some(x) => x,
                     None => {
-                        todo!("stack addition overflow")
+                        if left > 0 || right > 0 {
+                            return Err(Overflow::Positive)
+                        } else {
+                            return Err(Overflow::Negative)
+                        }
                     }
                 });
             }
@@ -125,7 +129,11 @@ impl Machine {
                 self.stack.push(match left.checked_sub(right) {
                     Some(x) => x,
                     None => {
-                        todo!("stack subtraction overflow")
+                        if left > 0 || right < 0 {
+                            return Err(Overflow::Positive)
+                        } else {
+                            return Err(Overflow::Negative)
+                        }
                     }
                 });
             }
