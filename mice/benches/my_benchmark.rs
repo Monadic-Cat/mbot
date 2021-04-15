@@ -7,12 +7,20 @@ fn rolling_benchmark(c: &mut Criterion) {
     let mut rollers = |mut group: BenchmarkGroup<_>, program_text| {
         let expression = black_box(mice::parse::Expression::parse(program_text).unwrap().1.unwrap());
         let (_, program) = black_box(mice::parse::new::parse_expression(program_text.as_bytes()).unwrap());
+        let stack_program = black_box(mice::stack::compile(&program));
         group.bench_function("Old Roller", |b| {
-            b.iter(|| expression.roll_with(&mut rng));
+            b.iter(|| black_box(expression.roll_with(&mut rng)));
         });
         
-        group.bench_function("New Roller", |b| {
-            b.iter(|| mice::interp::interpret(&mut rng, &program));
+        group.bench_function("New AST Roller", |b| {
+            b.iter(|| black_box(mice::interp::interpret(&mut rng, &program)));
+        });
+
+        group.bench_function("New Stack Machine Roller", |b| {
+            b.iter(|| {
+                let mut machine = ::mice::stack::Machine::new();
+                let _ = black_box(machine.eval_with(&mut rng, &stack_program));
+            });
         });
     };
 
