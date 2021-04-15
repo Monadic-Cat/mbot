@@ -31,13 +31,14 @@ pub mod reloadable {
     use ::libc::c_int;
     use ::core::marker::PhantomData;
     use ::once_cell::sync::Lazy;
-    use ::std::sync::{RwLock, RwLockReadGuard};
+    use ::parking_lot::{RwLock, RwLockReadGuard};
 
     #[derive(Debug)]
     pub enum PreparationError {
         InvalidExpression,
         TooExpensive,
     }
+    #[derive(Debug)]
     pub enum Overflow {
         Positive,
         Negative,
@@ -166,8 +167,7 @@ pub mod reloadable {
         /// Ensure the plotting module is loaded and lock it for use.
         #[allow(dead_code)]
         pub fn lock<'a>() -> PlotGuard<'a> {
-            // TODO: decide whether to propagate poisoning
-            let guard = PLOTTER.read().unwrap();
+            let guard = PLOTTER.read();
             // TODO: decide whether to put this check in the return type,
             // instead of panicking
             match *guard {
@@ -182,7 +182,7 @@ pub mod reloadable {
             extern "C" {
                 fn dlclose(handle: LibraryHandle) -> c_int;
             }
-            let mut guard = PLOTTER.write().unwrap();
+            let mut guard = PLOTTER.write();
             match guard.take() {
                 Some(plotter) => unsafe { dlclose(plotter.handle); },
                 None => (),
@@ -194,7 +194,7 @@ pub mod reloadable {
             extern "C" {
                 fn dlclose(handle: LibraryHandle) -> c_int;
             }
-            let mut guard = PLOTTER.write().unwrap();
+            let mut guard = PLOTTER.write();
             let plotter = guard.take();
             // TODO: consider making unload idempotent
             // Safety: This is the handle we got from dlopen above, so it should be valid.
@@ -240,13 +240,18 @@ pub mod reloadable {
             unsafe { ::core::slice::from_raw_parts_mut(self.ptr, self.length) }
         }
     }
+    unsafe impl<'a> Send for FFIVecU8<'a> {}
+    unsafe impl<'a> Sync for FFIVecU8<'a> {}
 
+    // These are, in fact, constructed, on the other side of FFI.
+    #[allow(dead_code)]
     #[repr(u8, C)]
     pub enum DrawRet<'a> {
         Ok(FFIVecU8<'a>),
         OverflowPositive,
         OverflowNegative,
     }
+    #[allow(dead_code)]
     #[repr(u8, C)]
     pub enum PrepRet<'a> {
         Ok(Prepared<'a>),
@@ -262,6 +267,7 @@ pub mod reloadable {
         _ptr: *mut c_void,
         _guard_lifetime: PhantomData<&'a ()>,
     }
+    unsafe impl<'a> Send for Prepared<'a> {}
     // // Note that there are very few proof obligations here.
     // extern "C" {
     //     fn prep_expr(expression: *const u8, length: usize) -> PrepRet<'static>;

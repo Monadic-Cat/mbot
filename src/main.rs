@@ -275,15 +275,7 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
         match prepared {
             // Can't spawn blocking since the RwLockReadGuard inside PlotGuard isn't Send.
             // So, we use the current thread instead.
-            Ok(prepared) => task::block_in_place(|| timed(|| plot.draw(prepared))),
-            Err(PreparationError::InvalidExpression) => todo!("handle invalid expression"),
-            Err(PreparationError::TooExpensive) => todo!("handle too expensive expression"),
-        };
-    }
-    match ::mice::parse::dice(arg.message()) {
-        Ok((input, Ok(expression))) if input.is_empty() => {
-            // TODO: rate limiting
-            if !expression.exceeds_cap(200) {
+            Ok(prepared) => {
                 use ::tokio::sync::Semaphore;
                 use ::once_cell::sync::Lazy;
                 // TODO: consider using finer grained permit counts,
@@ -296,19 +288,22 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
                 static REGION: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
                 let permit = REGION.acquire().await;
                 let image = task::spawn_blocking(move || {
-                    dist::draw(&expression, arg.message()).unwrap()
-                }).await.expect("plotting doesn't panic");
+                    timed(|| plot.draw(prepared))
+                }).await.unwrap().unwrap();
                 drop(permit);
                 msg.channel_id.send_files(&ctx.http, ::core::iter::once(serenity::http::AttachmentType::Bytes {
                     data: ::std::borrow::Cow::Borrowed(&*image),
                     filename: String::from("plot.png"),
                 }), |m| m).await?;
                 Ok(())
-            } else {
+            },
+            Err(PreparationError::InvalidExpression) => {
+                reply(ctx, msg, "you've specified an invalid dice expression").await
+            },
+            Err(PreparationError::TooExpensive) => {
                 reply(ctx, msg, "tried to DOS me.").await
             }
-        },
-        _ => reply(ctx, msg, "you've specified an invalid dice expression").await
+        }
     }
 }
 
