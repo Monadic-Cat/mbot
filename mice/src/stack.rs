@@ -18,12 +18,12 @@ macro_rules! assert_dice_roll_terminal {
 }
 
 /// Perform a postorder traveral of a program's AST.
-pub fn postorder<F>(program: &Program, visit: F)
+pub fn postorder<F>(program: &Program, mut visit: F)
 where
     F: FnMut(&Term),
 {
     let Program { top, terms } = program;
-    fn postorder_term<F>(term: &Term, arena: &Arena<Term>, mut visit: F)
+    fn postorder_term<F>(term: &Term, arena: &Arena<Term>, visit: &mut F)
     where
         F: FnMut(&Term),
     {
@@ -33,17 +33,17 @@ where
             node @ Constant(_) => visit(node),
             node @ DiceRoll(_, _) => visit(node),
             Add(left, right) | Subtract(left, right) => {
-                postorder_term(&arena[*left], arena, &mut visit);
-                postorder_term(&arena[*right], arena, &mut visit);
+                postorder_term(&arena[*left], arena, &mut *visit);
+                postorder_term(&arena[*right], arena, &mut *visit);
                 visit(term);
             },
             UnaryAdd(only) | UnarySubtract(only) => {
-                postorder_term(&arena[*only], arena, &mut visit);
+                postorder_term(&arena[*only], arena, &mut *visit);
                 visit(term);
             },
         }
     }
-    postorder_term(&terms[*top], terms, visit);
+    postorder_term(&terms[*top], terms, &mut visit);
 }
 
 pub struct StackProgram(Vec<Instruction>);
