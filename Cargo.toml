@@ -70,6 +70,7 @@ maddie_tools = ["bot_commands"]
 
 # This feature adds support for plotting the probability
 # density distributions of dice expressions.
+# Also, incurs the additional system dependencies of
 plotting = ["plotters", "plotters-bitmap", "png", "rand/small_rng"]
 
 # This feature gates unsafe code used to make the dice roll PDF plotter hot reloadable.

@@ -45,6 +45,7 @@ pub mod prelude;
 pub mod util;
 pub mod nfmt;
 pub mod interp;
+pub mod stack;
 
 #[derive(::thiserror::Error, Debug, Clone, Copy)]
 #[error("sum is too high for `i64`")]

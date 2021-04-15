@@ -705,6 +705,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "fixed-str"
+version = "0.1.0"
+source = "git+https://github.com/Monadic-Cat/fixed-str?branch=melo#6319de133ac3ff9ee1206fd138ee0a12b47f6a5e"
+
+[[package]]
 name = "flate2"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1392,11 +1397,13 @@ dependencies = [
  "checked",
  "core_extensions",
  "criterion",
+ "fixed-str",
  "id-arena",
  "itertools 0.10.0",
  "itoa",
  "js-sys",
  "nom 5.1.2",
+ "once_cell",
  "proc_macro_helpers",
  "rand",
  "serde",

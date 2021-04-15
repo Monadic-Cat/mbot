@@ -142,3 +142,75 @@ fn interpret_term<R: Rng>(
         }
     }
 }
+
+// I'm having fun writing compatibility layers between things only I use. 🙃
+/// A compatibility layer between [`ExpressionResult`](crate::ExpressionResult) and
+/// [`ProgramOutput`]. Meant to allow code that uses [`nfmt`](crate::nfmt)
+/// to switch to the new dice program stuff with minimal changes.
+mod compat {
+    use crate::parse::Expr;
+    use crate::post::EvaluatedTerm;
+    use crate::ExpressionResult;
+    use super::ProgramOutput;
+    use ::core::cell::RefCell;
+    use ::once_cell::unsync::Lazy;
+    trait Formatter {
+        fn total(&mut self) -> &mut Self;
+    }
+}
+
+/// A low level formatting API for dice program output.
+mod fmt {
+    
+}
+
+/// Just enough `nfmt` to let the inline roll commands formatting code work.
+mod nfmt {
+    use super::ProgramOutput;
+    use ::core::mem::MaybeUninit;
+    use ::core::pin::Pin;
+    use fixed_str::Str;
+    struct OverflowedCapacity<'p, 's> {
+        unformatted: &'p [ProgramOutput],
+        formatted: Vec<&'s str>,
+    }
+    // TODO: move stack allocated collection of strings to an appropriate crate
+    struct Strings<const CAPACITY: usize, const IDX: usize> {
+        buf: Str<CAPACITY>,
+        index: [MaybeUninit<*const str>; IDX],
+        count: usize,
+    }
+    impl<const C: usize, const I: usize> Strings<C, I> {
+        fn new() -> Self {
+            Self {
+                buf: Str::zeroed(),
+                index: [MaybeUninit::uninit(); I],
+                count: 0,
+            }
+        }
+        fn push(self: Pin<&mut Self>, text: &str) {
+            todo!()
+        }
+        fn get(self: Pin<&Self>, idx: usize) -> Option<&str> {
+            todo!()
+        }
+    }
+
+    /// frick it, let's see how hard it is to format these off the bare AST anyway
+    /// this takes a [`&mut Str<2000>`] because Discord's message length limit is 2000 UTF-8 bytes
+    fn fmt_internal_rolls<'a, 'r>(rolls: &'r [ProgramOutput], buf: &'a mut Str<2000>)
+                              -> Result<Vec<&'a str>, OverflowedCapacity<'r, 'a>> {
+        let mut roll_ptrs = Vec::new();
+        let mut cursor = buf.as_slice_mut();
+        fn fmt_internal_roll<'a, 'r>(roll: &'r ProgramOutput, buf: &'a mut str)
+                                 -> Result<(&'a mut str, &'a str), OverflowedCapacity<'r, 'a>> {
+            todo!()
+        }
+        for roll in rolls {
+            let (remaining_capacity, ptr) = fmt_internal_roll(roll, cursor)?;
+            cursor = remaining_capacity;
+            roll_ptrs.push(ptr);
+        }
+        Ok(roll_ptrs)
+    }
+}

@@ -492,7 +492,7 @@ pub mod new {
     /// An AST node. This represents an expression as a tree of nodes stored in an [`Arena`].
     #[non_exhaustive]
     #[derive(Debug)]
-    pub(crate) enum Term {
+    pub enum Term {
         Constant(i64),
         // This could conceivably have its arguments
         // replaced by terms, and be turned into an operator
