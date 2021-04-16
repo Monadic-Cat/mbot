@@ -140,7 +140,7 @@ async fn roll(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
     mice::parse::new::parse_expression(arg.message().as_bytes()).iter()
         .for_each(|(_, program)| {
             dbg!(program.fmt_sexpr());
-            dbg!(mice::interp::interpret(&mut ::rand::thread_rng(), program));
+            let _ = dbg!(mice::interp::interpret(&mut ::rand::thread_rng(), program));
         });
     let dice = match reasoned_dice(arg.message()) {
         Ok((_, Err(e))) => return reply(ctx, msg, &format!("{}", e)).await,
@@ -259,18 +259,19 @@ async fn fate(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
 #[command]
 async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
     {
-        fn timed<F, R>(func: F) -> R
-        where F: FnOnce() -> R {
-            use ::std::time::Instant;
-            let first = Instant::now();
-            let result = func();
-            let second = Instant::now();
-            dbg!(second - first);
-            result
+        macro_rules! timed {
+            ($e:expr) => ({
+                use ::std::time::Instant;
+                let first = Instant::now();
+                let result = $e;
+                let second = Instant::now();
+                dbg!(second - first);
+                result
+            })
         }
         use dist::reloadable::Plotter;
         use dist::reloadable::PreparationError;
-        let plot = timed(|| Plotter::lock());
+        let plot = timed!(Plotter::lock());
         let prepared = dbg!(plot.prep(arg.message()));
         match prepared {
             // Can't spawn blocking since the RwLockReadGuard inside PlotGuard isn't Send.
@@ -288,7 +289,7 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
                 static REGION: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
                 let permit = REGION.acquire().await;
                 let image = task::spawn_blocking(move || {
-                    timed(|| plot.draw(prepared))
+                    timed!(plot.draw(prepared))
                 }).await.unwrap().unwrap();
                 drop(permit);
                 msg.channel_id.send_files(&ctx.http, ::core::iter::once(serenity::http::AttachmentType::Bytes {
