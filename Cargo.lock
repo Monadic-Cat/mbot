@@ -1367,6 +1367,7 @@ dependencies = [
  "pulldown-cmark",
  "quote 1.0.9",
  "rand",
+ "reloadable-plotter",
  "serde",
  "serde_json",
  "serenity",

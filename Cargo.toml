@@ -26,6 +26,12 @@ png = { version = "0.16.8", optional = true }
 libc = { version = "0.2.93", optional = true }
 parking_lot = { version = "0.11.1", features = ["send_guard"] }
 
+[dependencies.reloadable-plotter]
+path = "./reloadable-plotter"
+default-features = false
+features = ["ffi_external"]
+optional = true
+
 [dependencies.plotters]
 version = "0.3.0"
 optional = true
@@ -75,7 +81,7 @@ maddie_tools = ["bot_commands"]
 plotting = ["plotters", "plotters-bitmap", "png", "rand/small_rng"]
 
 # This feature gates unsafe code used to make the dice roll PDF plotter hot reloadable.
-reloadable_plotter = ["libc"]
+reloadable_plotter = ["libc", "reloadable-plotter"]
 
 # I believe some parts of the cli_control feature may violate
 # the Discord Terms of Service, so tread with care.

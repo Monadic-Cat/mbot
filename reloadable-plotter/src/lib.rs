@@ -65,8 +65,11 @@ impl<'a> DerefMut for FfiVecU8<'a> {
         unsafe { ::core::slice::from_raw_parts_mut(self.ptr, self.length) }
     }
 }
+unsafe impl<'a> Send for FfiVecU8<'a> {}
+unsafe impl<'a> Sync for FfiVecU8<'a> {}
 
 /// Owning pointer to prepared dice program.
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct Prepared<'a> {
     /// Type erased owning pointer to prepared dice program.
@@ -76,6 +79,7 @@ pub struct Prepared<'a> {
     // It's only on the other side of the FFI that this lifetime becomes relevant.
     _guard_lifetime: PhantomData<&'a ()>,
 }
+unsafe impl<'a> Send for Prepared<'a> {}
 
 #[cfg(any(feature = "actual_plotter", doc))]
 impl Prepared<'static> {

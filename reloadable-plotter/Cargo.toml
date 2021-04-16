@@ -26,5 +26,11 @@ features = ["bitmap_encoder", "histogram", "ttf"]
 # and unify the relevant type declarations, without requiring the plotter
 # itself be built with mbot.
 [features]
-default = ["actual_plotter"]
+default = ["actual_plotter", "ffi_internal"]
+# The actual plotter implementation.
 actual_plotter = ["plotters", "plotters-bitmap", "png", "rand", "rand/small_rng", "mice"]
+# The FFI declarations and such required for dynamic loading, from a library user perspective.
+# This stuff may end up in another crate, if I generalize it enough to be used elsewhere.
+ffi_external = []
+# The FFI declarations and such required for dynamic loading, from the library perspective.
+ffi_internal = []
