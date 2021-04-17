@@ -210,9 +210,18 @@ pub mod plot_impl {
         // explosions will be annoying here.
         // perhaps we should enable more precise handling and higher caps
         // when misbehaving things like explosions aren't present.
-        let sample = iter::repeat_with(|| exp.roll_with(&mut rng).map(|x| x.total()))
+        use ::mice::stack::Overflow;
+        // Note: This is guaranteed not to fail, since parse_expression accepts
+        // a superset of the language Expression accepts.
+        let program = ::mice::parse::new::parse_expression(caption.as_bytes()).unwrap().1;
+        let stack_program = ::mice::stack::compile(&program);
+        let mut machine = ::mice::stack::Machine::new();
+        let sample = iter::repeat_with(|| machine.eval_with(&mut rng, &stack_program))
             .inspect(|x| x.iter().for_each(|x| *counts.entry(*x).or_insert(0) += 1))
-            .take(SAMPLE_SIZE).collect::<Result<Vec<_>, _>>()?;
+            .take(SAMPLE_SIZE).collect::<Result<Vec<_>, _>>().map_err(|e| match e {
+                Overflow::Positive => MiceError::OverflowPositive(::mice::OverflowPositive),
+                Overflow::Negative => MiceError::OverflowNegative(::mice::OverflowNegative),
+            })?;
         let max = *counts.values().max().unwrap() * 4 / 3;
         // Note: We could *definitely* reuse this buffer.
         let mut buffer = vec!(0u8; BUFFER_WIDTH);
