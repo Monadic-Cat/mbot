@@ -1,0 +1,36 @@
+[package]
+name = "reloadable-plotter"
+version = "0.1.0"
+authors = ["Monadic Cat <greenmonadcat@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+libc = "0.2.93"
+mice = { path = "../mice", optional = true }
+rand = { version = "0.7", optional = true }
+plotters-bitmap = { version = "0.3.0", optional = true }
+png = { version = "0.16.8", optional = true }
+
+[dependencies.plotters]
+version = "0.3.0"
+optional = true
+default-features = false
+features = ["bitmap_encoder", "histogram", "ttf"]
+
+# TODO: feature gate plotter so we can pull this in as a dep of mbot
+# and unify the relevant type declarations, without requiring the plotter
+# itself be built with mbot.
+[features]
+default = ["actual_plotter", "ffi_internal"]
+# The actual plotter implementation.
+actual_plotter = ["plotters", "plotters-bitmap", "png", "rand", "rand/small_rng", "mice"]
+# The FFI declarations and such required for dynamic loading, from a library user perspective.
+# This stuff may end up in another crate, if I generalize it enough to be used elsewhere.
+ffi_external = []
+# The FFI declarations and such required for dynamic loading, from the library perspective.
+ffi_internal = ["actual_plotter"]

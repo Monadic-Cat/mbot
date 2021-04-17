@@ -21,6 +21,8 @@ enum Command<'a> {
     SayImplicitChannel(&'a str),
     SelectChannel(ChannelId),
     ListGuilds,
+    #[cfg(feature = "plotting")]
+    ReloadPlotter,
     Shutdown,
 }
 
@@ -52,6 +54,8 @@ fn parse_command(input: &str) -> Result<Command<'_>, ParseError> {
             Ok((i, Command::ListGuilds))
         },
         |i| tag("shutdown")(i).map(|(i, _)| (i, Command::Shutdown)),
+        #[cfg(feature = "plotting")]
+        |i| tag("reload plotter")(i).map(|(i, _)| (i, Command::ReloadPlotter)),
     ))(input)
     .map_err(|_| ParseError::InvalidCommand)
     .map(|(_, x)| x)
@@ -156,6 +160,10 @@ pub(crate) async fn command_loop(ctx: Context, ready: Ready) -> Result<Never, Er
                     Err(x) => println!("[ERROR]: {:#?}", x),
                 }
             }
+            #[cfg(feature = "plotting")]
+            Command::ReloadPlotter => {
+                ::tokio::task::spawn_blocking(|| crate::dist::Plotter::reload()).await.unwrap();
+            },
             Command::Shutdown => crate::shutdown().await,
         };
 

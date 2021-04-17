@@ -1,0 +1,17 @@
+[package]
+name = "proc_macro_helpers"
+version = "0.1.0"
+authors = ["Monadic Cat <greenmonadcat@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+derive-syn-parse = "0.1.4"
+syn = "1.0.64"
+proc-macro2 = "1.0.24"
+quote = "1.0.9"
+derivative = "2.2.0"

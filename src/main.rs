@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "reloadable_plotter"), forbid(unsafe_code))]
 use mice::FormatOptions as MiceFormat;
 use ::mice::util::ExpressionExt;
 mod initiative;
@@ -137,6 +137,11 @@ const ROLL_CAP: i64 = 10000;
 #[command]
 #[aliases("r")]
 async fn roll(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
+    mice::parse::new::parse_expression(arg.message().as_bytes()).iter()
+        .for_each(|(_, program)| {
+            dbg!(program.fmt_sexpr());
+            let _ = dbg!(mice::interp::interpret(&mut ::rand::thread_rng(), program));
+        });
     let dice = match reasoned_dice(arg.message()) {
         Ok((_, Err(e))) => return reply(ctx, msg, &format!("{}", e)).await,
         Ok((i, Ok(x))) => Ok((i, x)),
@@ -253,10 +258,23 @@ async fn fate(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
 #[cfg(feature = "plotting")]
 #[command]
 async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
-    match ::mice::parse::dice(arg.message()) {
-        Ok((input, Ok(expression))) if input.is_empty() => {
-            // TODO: rate limiting
-            if !expression.exceeds_cap(200) {
+    {
+        macro_rules! timed {
+            ($e:expr) => ({
+                use ::std::time::Instant;
+                let first = Instant::now();
+                let result = $e;
+                let second = Instant::now();
+                dbg!(second - first);
+                result
+            })
+        }
+        use dist::Plotter;
+        use dist::PreparationError;
+        let plot = timed!(Plotter::lock());
+        let prepared = dbg!(plot.prep(arg.message()));
+        match prepared {
+            Ok(prepared) => {
                 use ::tokio::sync::Semaphore;
                 use ::once_cell::sync::Lazy;
                 // TODO: consider using finer grained permit counts,
@@ -269,19 +287,22 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
                 static REGION: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
                 let permit = REGION.acquire().await;
                 let image = task::spawn_blocking(move || {
-                    dist::draw(&expression, arg.message()).unwrap()
-                }).await.expect("plotting doesn't panic");
+                    timed!(plot.draw(prepared))
+                }).await.unwrap().unwrap();
                 drop(permit);
                 msg.channel_id.send_files(&ctx.http, ::core::iter::once(serenity::http::AttachmentType::Bytes {
                     data: ::std::borrow::Cow::Borrowed(&*image),
                     filename: String::from("plot.png"),
                 }), |m| m).await?;
                 Ok(())
-            } else {
+            },
+            Err(PreparationError::InvalidExpression) => {
+                reply(ctx, msg, "you've specified an invalid dice expression").await
+            },
+            Err(PreparationError::TooExpensive) => {
                 reply(ctx, msg, "tried to DOS me.").await
             }
-        },
-        _ => reply(ctx, msg, "you've specified an invalid dice expression").await
+        }
     }
 }
 
