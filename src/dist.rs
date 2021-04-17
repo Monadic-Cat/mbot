@@ -11,14 +11,13 @@
 // the exact code being loaded dynamically here, so we use the same plotting
 // code regardless of whether we're able to dynamically load it.
 #[cfg(feature = "reloadable_plotter")]
-pub mod reloadable {
+mod reloadable {
     use ::core::ffi::c_void;
     use ::std::os::raw::c_char;
     use ::libc::c_int;
     use ::once_cell::sync::Lazy;
     use ::parking_lot::{RwLock, RwLockReadGuard};
-    use ::reloadable_plotter::{FfiVecU8, Prepared, PrepRet, DrawRet};
-
+    use ::reloadable_plotter::ffi::{FfiVecU8, Prepared, PrepRet, DrawRet};
 
     #[derive(Debug)]
     pub enum PreparationError {
@@ -65,8 +64,8 @@ pub mod reloadable {
         // via this API, by simply not exposing references to those function pointers.
         // That way, they can't escape the module lifetime bound, expressed via PlotGuard<'a>.
         /// Parse and otherwise prepare a dice expression for execution.
-        pub prep: Box<dyn for<'a> Fn(&PlotGuard<'a>, &str) -> Result<Prepared<'a>, PreparationError> + Send + Sync>,
-        pub draw: Box<dyn for<'a> Fn(&PlotGuard<'a>, Prepared<'a>) -> Result<FfiVecU8<'a>, Overflow> + Send + Sync>,
+        prep: Box<dyn for<'a> Fn(&PlotGuard<'a>, &str) -> Result<Prepared<'a>, PreparationError> + Send + Sync>,
+        draw: Box<dyn for<'a> Fn(&PlotGuard<'a>, Prepared<'a>) -> Result<FfiVecU8<'a>, Overflow> + Send + Sync>,
         handle: LibraryHandle,
         // Prevent external construction.
         _priv: (),
@@ -189,3 +188,106 @@ pub mod reloadable {
         }
     }
 }
+
+/// A shim for the reloadable API with a statically linked plotter.
+/// For use on platforms where we don't support dynamic loading,
+/// or when we don't want to deal with the hassle of deploying more than a single binary.
+#[cfg(feature = "static_plotter")]
+mod nonreloadable {
+    use ::core::marker::PhantomData;
+    use ::core::ops::{Deref, DerefMut};
+    pub use ::reloadable_plotter::plot_impl::PreparationError;
+    use ::reloadable_plotter::plot_impl;
+
+    /// A pretender shim for the real `FfiVecU8` type used when dynamic loading.
+    pub struct FfiVecU8<'a> {
+        vec: Vec<u8>,
+        _lifetime: PhantomData<&'a (dyn Fn(*mut u8, usize, usize) + Send + Sync)>
+    }
+    impl<'a> Deref for FfiVecU8<'a> {
+        type Target = [u8];
+        fn deref(&self) -> &Self::Target {
+            self.vec.deref()
+        }
+    }
+    impl<'a> DerefMut for FfiVecU8<'a> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            self.vec.deref_mut()
+        }
+    }
+    
+
+    #[derive(Debug)]
+    pub enum Overflow {
+        Positive,
+        Negative,
+    }
+
+    pub struct Plotter {
+        _priv: (),
+    }
+    impl Plotter {
+        pub fn lock<'a>() -> PlotGuard<'a> {
+            PlotGuard {
+                _who_cares: PhantomData,
+            }
+        }
+        pub fn reload() {
+            eprintln!("Attempted reload of statically linked plotter.")
+        }
+        #[allow(dead_code)]
+        pub fn unload() {
+            eprintln!("Attempted unload of statically linked plotter.")
+        }
+    }
+
+    pub struct PlotGuard<'a> {
+        _who_cares: PhantomData<&'a (dyn Fn() + Send + Sync)>,
+    }
+    impl<'a> PlotGuard<'a> {
+        pub fn prep(&self, expression: &str) -> Result<Prepared<'a>, PreparationError> {
+            match plot_impl::prepare_expression(expression) {
+                Ok(program) => Ok(Prepared {
+                    program,
+                    _guard_lifetime: PhantomData,
+                }),
+                Err(e) => Err(e),
+            }
+        }
+        pub fn draw(&self, prepared: Prepared<'a>) -> Result<FfiVecU8<'a>, Overflow> {
+            use ::mice::prelude::MiceError;
+            let Prepared { program, .. } = prepared;
+            match plot_impl::draw(&program) {
+                Ok(vec) => Ok(FfiVecU8 {
+                    vec,
+                    _lifetime: PhantomData,
+                }),
+                Err(MiceError::OverflowPositive(_)) => Err(Overflow::Positive),
+                Err(MiceError::OverflowNegative(_)) => Err(Overflow::Negative),
+                Err(MiceError::InvalidExpression(_)) => unreachable!("we check for this inside prep"),
+                Err(MiceError::InvalidDie) => unreachable!("the current mice parser cannot produce dice with negative sides"),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct Prepared<'a> {
+        program: ::reloadable_plotter::plot_impl::PreparedProgram,
+        _guard_lifetime: PhantomData<&'a ()>,
+    }
+}
+
+
+#[cfg(all(feature = "plotting", not(feature = "reloadable_plotter"), not(feature = "static_plotter")))]
+compile_error!("To enable dice plotting, you must select either the reloadable_plotter or static_plotter feature.");
+
+#[cfg(all(feature = "reloadable_plotter", feature = "static_plotter"))]
+compile_error!("The reloadable_plotter and static_plotter features are mutually exclusive. You must select either one or the other, not both.");
+
+// The interfaces for these two things are not entirely compatible,
+// but the way they are used is intended to be.
+#[cfg(feature = "reloadable_plotter")]
+pub use reloadable::{Plotter, PreparationError};
+
+#[cfg(feature = "static_plotter")]
+pub use nonreloadable::{Plotter, PreparationError};

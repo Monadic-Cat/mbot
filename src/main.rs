@@ -269,8 +269,8 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
                 result
             })
         }
-        use dist::reloadable::Plotter;
-        use dist::reloadable::PreparationError;
+        use dist::Plotter;
+        use dist::PreparationError;
         let plot = timed!(Plotter::lock());
         let prepared = dbg!(plot.prep(arg.message()));
         match prepared {

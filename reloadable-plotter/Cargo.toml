@@ -33,4 +33,4 @@ actual_plotter = ["plotters", "plotters-bitmap", "png", "rand", "rand/small_rng"
 # This stuff may end up in another crate, if I generalize it enough to be used elsewhere.
 ffi_external = []
 # The FFI declarations and such required for dynamic loading, from the library perspective.
-ffi_internal = []
+ffi_internal = ["actual_plotter"]

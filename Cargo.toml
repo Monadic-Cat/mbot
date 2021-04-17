@@ -29,7 +29,7 @@ parking_lot = { version = "0.11.1", features = ["send_guard"] }
 [dependencies.reloadable-plotter]
 path = "./reloadable-plotter"
 default-features = false
-features = ["ffi_external"]
+features = []
 optional = true
 
 [dependencies.plotters]
@@ -59,7 +59,7 @@ proc-macro2 = "1"
 titlecase = "1.1.0"
 
 [features]
-default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools", "plotting", "reloadable_plotter"]
+default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools", "plotting", "static_plotter"]
 bot_commands = []
 db = ["sqlx"]
 # This feature is incomplete.
@@ -78,10 +78,14 @@ maddie_tools = ["bot_commands"]
 # This feature adds support for plotting the probability
 # density distributions of dice expressions.
 # Also, incurs the additional system dependencies of
-plotting = ["plotters", "plotters-bitmap", "png", "rand/small_rng"]
+plotting = ["reloadable-plotter"]
 
 # This feature gates unsafe code used to make the dice roll PDF plotter hot reloadable.
-reloadable_plotter = ["libc", "reloadable-plotter"]
+reloadable_plotter = ["libc", "plotting", "reloadable-plotter/ffi_external"]
+
+# This feature statically links the dice roll PDF plotter.
+# Ideally, no unsafe code should be enabled via this cfg path. (Not the case yet.)
+static_plotter = ["plotting", "reloadable-plotter/actual_plotter"]
 
 # I believe some parts of the cli_control feature may violate
 # the Discord Terms of Service, so tread with care.

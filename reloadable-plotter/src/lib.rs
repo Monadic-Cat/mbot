@@ -1,172 +1,161 @@
-use ::core::ops::{Deref, DerefMut};
-use ::core::ffi::c_void;
-use ::core::marker::PhantomData;
-
-// It wouldn't be a bad idea to pull in an FFI helper library,
-// instead of doing this ourselves.
-/// A FFI wrapper for the raw parts of a [`Vec<T>`](::std::vec::Vec).
-#[repr(C)]
-pub struct FfiVecU8<'a> {
-    ptr: *mut u8,
-    length: usize,
-    capacity: usize,
-    // Since we want to free this using whatever allocator the
-    // dynamically loaded module used to allocate it,
-    // we need to make sure we don't keep it around longer than
-    // that module, so we can pass it back.
-    // TODO: determine if this needs to instead hold a handle
-    // to more stuff.
-    free_function: extern "C" fn(*mut u8, usize, usize),
-    _free_function_lifetime: PhantomData<&'a dyn Fn(*mut u8, usize, usize)>,
-}
-
-#[cfg(any(feature = "actual_plotter", doc))]
-extern "C" fn free_ffi_vec(ptr: *mut u8, length: usize, capacity: usize) {
-    let _ = unsafe { Vec::from_raw_parts(ptr, length, capacity) };
-}
-
-#[cfg(any(feature = "actual_plotter", doc))]
-impl<'a> FfiVecU8<'a> {
-    // Only allowed on this side of the FFI.
-    fn from_vec(mut vec: Vec<u8>) -> FfiVecU8<'static> {
-        // Correctness (and Safety in free_ffi_vec): This is how std implements Vec::into_raw_parts,
-        // so I'm guessing the order used doesn't mess with provenance.
-        let (ptr, length, capacity) = (vec.as_mut_ptr(), vec.len(), vec.capacity());
-        ::core::mem::forget(vec);
-        FfiVecU8 {
-            ptr, length, capacity,
-            free_function: free_ffi_vec,
-            _free_function_lifetime: PhantomData
-        }
+#[cfg(any(feature = "ffi_internal", feature = "ffi_external"))]
+pub mod ffi {
+    use ::core::ops::{Deref, DerefMut};
+    use ::core::ffi::c_void;
+    use ::core::marker::PhantomData;
+    // It wouldn't be a bad idea to pull in an FFI helper library,
+    // instead of doing this ourselves.
+    /// A FFI wrapper for the raw parts of a [`Vec<T>`](::std::vec::Vec).
+    #[repr(C)]
+    pub struct FfiVecU8<'a> {
+        ptr: *mut u8,
+        length: usize,
+        capacity: usize,
+        // Since we want to free this using whatever allocator the
+        // dynamically loaded module used to allocate it,
+        // we need to make sure we don't keep it around longer than
+        // that module, so we can pass it back.
+        // TODO: determine if this needs to instead hold a handle
+        // to more stuff.
+        free_function: extern "C" fn(*mut u8, usize, usize),
+        _free_function_lifetime: PhantomData<&'a dyn Fn(*mut u8, usize, usize)>,
     }
-    // // Only allowed on this side of the FFI.
-    // fn into_vec(Self { ptr, length, capacity, .. }: Self) -> Vec<u8> {
-    //     unsafe { Vec::from_raw_parts(ptr, length, capacity) }
-    // }
-}
-impl<'a> Drop for FfiVecU8<'a> {
-    fn drop(&mut self) {
-        // Safety: Just calling vector drop via FFI.
-        // This passes back the data we were given via the same FFI.
-        #[allow(unused_unsafe)]
-        unsafe { (self.free_function)(self.ptr, self.length, self.capacity); }
+
+    #[cfg(feature = "ffi_internal")]
+    extern "C" fn free_ffi_vec(ptr: *mut u8, length: usize, capacity: usize) {
+        let _ = unsafe { Vec::from_raw_parts(ptr, length, capacity) };
     }
-}
-impl<'a> Deref for FfiVecU8<'a> {
-    type Target = [u8];
-    fn deref(&self) -> &Self::Target {
-        // Safety: ptr and length are guaranteed to be valid and correct, by construction of FfiVecU8.
-        unsafe { ::core::slice::from_raw_parts(self.ptr, self.length) }
-    }
-}
-impl<'a> DerefMut for FfiVecU8<'a> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        // Safety: See Deref impl above.
-        unsafe { ::core::slice::from_raw_parts_mut(self.ptr, self.length) }
-    }
-}
-unsafe impl<'a> Send for FfiVecU8<'a> {}
-unsafe impl<'a> Sync for FfiVecU8<'a> {}
 
-/// Owning pointer to prepared dice program.
-#[derive(Debug)]
-#[repr(transparent)]
-pub struct Prepared<'a> {
-    /// Type erased owning pointer to prepared dice program.
-    #[cfg_attr(not(feature = "actual_plotter"), allow(dead_code))]
-    ptr: *mut c_void,
-    // Inside the dynamic module, this lifetime is essentially forever.
-    // It's only on the other side of the FFI that this lifetime becomes relevant.
-    _guard_lifetime: PhantomData<&'a ()>,
-}
-unsafe impl<'a> Send for Prepared<'a> {}
-
-#[cfg(any(feature = "actual_plotter", doc))]
-impl Prepared<'static> {
-    fn from<T>(val: T) -> Self {
-        let boxed = Box::new(val);
-        Self {
-            ptr: Box::into_raw(boxed).cast(),
-            _guard_lifetime: PhantomData,
-        }
-    }
-    /// # Safety
-    /// The [`Prepared`] must have been produced from a value of type `T`.
-    unsafe fn into<T>(self) -> T {
-        let Self { ptr, .. } = self;
-        #[allow(unused_unsafe)]
-        unsafe { *Box::from_raw(ptr.cast::<T>()) }
-    }
-}
-
-// TODO: consider using the abi_stable crate for FFI safe non exhaustive enums.
-#[repr(u8, C)]
-pub enum PrepRet<'a> {
-    Ok(Prepared<'a>),
-    InvalidExpression,
-    TooExpensive,
-}
-
-#[repr(u8, C)]
-pub enum DrawRet<'a> {
-    Ok(FfiVecU8<'a>),
-    OverflowPositive,
-    OverflowNegative,
-}
-
-#[cfg(any(feature = "actual_plotter", doc))]
-struct Program {
-    expression: ::mice::parse::Expression,
-    // We heap allocate here because the input message string slice is not enforced to live
-    // as long as this loaded module. (Nor would it make sense for it to be.)
-    caption: String,
-}
-
-/// # Safety
-/// Must be called with a valid pointer and length for a UTF-8 slice
-#[cfg(any(feature = "actual_plotter", doc))]
-#[no_mangle]
-pub unsafe extern "C" fn prep_expr(expression: *const u8, length: usize) -> PrepRet<'static> {
-    #![allow(unused_unsafe)]
-    // Safety: This is given to us from a &str on the other side of the FFI.
-    let expression = unsafe { ::core::slice::from_raw_parts(expression, length) };
-    // Safety: This is given to us from a &str on the other side of the FFI.
-    let expression = unsafe { ::core::str::from_utf8_unchecked(expression) };
-    let caption = String::from(expression);
-    match ::mice::parse::dice(expression) {
-        Ok((input, Ok(expression))) if input.is_empty() => {
-            use ::mice::util::ExpressionExt;
-            if !expression.exceeds_cap(200) {
-                PrepRet::Ok(Prepared::from(Program { expression, caption }))
-            } else {
-                PrepRet::TooExpensive
+    // The stuff in this impl block is only allowed on this side of the FFI.
+    // It's private, and cfg-ed out for external users.
+    #[cfg(feature = "ffi_internal")]
+    impl<'a> FfiVecU8<'a> {
+        fn from_vec(mut vec: Vec<u8>) -> FfiVecU8<'static> {
+            // Correctness (and Safety in free_ffi_vec): This is how std implements Vec::into_raw_parts,
+            // so I'm guessing the order used doesn't mess with provenance.
+            let (ptr, length, capacity) = (vec.as_mut_ptr(), vec.len(), vec.capacity());
+            ::core::mem::forget(vec);
+            FfiVecU8 {
+                ptr, length, capacity,
+                free_function: free_ffi_vec,
+                _free_function_lifetime: PhantomData
             }
-        },
-        _ => PrepRet::InvalidExpression,
+        }
+        // // Only allowed on this side of the FFI.
+        // fn into_vec(Self { ptr, length, capacity, .. }: Self) -> Vec<u8> {
+        //     unsafe { Vec::from_raw_parts(ptr, length, capacity) }
+        // }
+    }
+    impl<'a> Drop for FfiVecU8<'a> {
+        fn drop(&mut self) {
+            // Safety: Just calling vector drop via FFI.
+            // This passes back the data we were given via the same FFI.
+            #[allow(unused_unsafe)]
+            unsafe { (self.free_function)(self.ptr, self.length, self.capacity); }
+        }
+    }
+    impl<'a> Deref for FfiVecU8<'a> {
+        type Target = [u8];
+        fn deref(&self) -> &Self::Target {
+            // Safety: ptr and length are guaranteed to be valid and correct, by construction of FfiVecU8.
+            unsafe { ::core::slice::from_raw_parts(self.ptr, self.length) }
+        }
+    }
+    impl<'a> DerefMut for FfiVecU8<'a> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            // Safety: See Deref impl above.
+            unsafe { ::core::slice::from_raw_parts_mut(self.ptr, self.length) }
+        }
+    }
+    unsafe impl<'a> Send for FfiVecU8<'a> {}
+    unsafe impl<'a> Sync for FfiVecU8<'a> {}
+
+    /// Owning pointer to prepared dice program.
+    #[derive(Debug)]
+    #[repr(transparent)]
+    pub struct Prepared<'a> {
+        /// Type erased owning pointer to prepared dice program.
+        #[cfg_attr(not(feature = "actual_plotter"), allow(dead_code))]
+        ptr: *mut c_void,
+        // Inside the dynamic module, this lifetime is essentially forever.
+        // It's only on the other side of the FFI that this lifetime becomes relevant.
+        _guard_lifetime: PhantomData<&'a ()>,
+    }
+    unsafe impl<'a> Send for Prepared<'a> {}
+
+    #[cfg(feature = "ffi_internal")]
+    impl Prepared<'static> {
+        // This is an inherent impl to avoid accidental leakage.
+        fn from<T>(val: T) -> Self {
+            let boxed = Box::new(val);
+            Self {
+                ptr: Box::into_raw(boxed).cast(),
+                _guard_lifetime: PhantomData,
+            }
+        }
+        /// # Safety
+        /// The [`Prepared`] must have been produced from a value of type `T`.
+        unsafe fn into<T>(self) -> T {
+            let Self { ptr, .. } = self;
+            #[allow(unused_unsafe)]
+            unsafe { *Box::from_raw(ptr.cast::<T>()) }
+        }
+    }
+
+    // TODO: consider using the abi_stable crate for FFI safe non exhaustive enums.
+    #[repr(u8, C)]
+    pub enum PrepRet<'a> {
+        Ok(Prepared<'a>),
+        InvalidExpression,
+        TooExpensive,
+    }
+
+    #[repr(u8, C)]
+    pub enum DrawRet<'a> {
+        Ok(FfiVecU8<'a>),
+        OverflowPositive,
+        OverflowNegative,
+    }
+
+    /// # Safety
+    /// Must be called with a valid pointer and length for a UTF-8 slice
+    #[cfg(feature = "ffi_internal")]
+    #[no_mangle]
+    pub unsafe extern "C" fn prep_expr(expression: *const u8, length: usize) -> PrepRet<'static> {
+        #![allow(unused_unsafe)]
+        use crate::plot_impl;
+        // Safety: This is given to us from a &str on the other side of the FFI.
+        let expression = unsafe { ::core::slice::from_raw_parts(expression, length) };
+        // Safety: This is given to us from a &str on the other side of the FFI.
+        let expression = unsafe { ::core::str::from_utf8_unchecked(expression) };
+        match plot_impl::prepare_expression(expression) {
+            Ok(prepared) => PrepRet::Ok(Prepared::from(prepared)),
+            Err(plot_impl::PreparationError::TooExpensive) => PrepRet::TooExpensive,
+            Err(plot_impl::PreparationError::InvalidExpression) => PrepRet::InvalidExpression,
+        }
+    }
+
+    #[cfg(feature = "ffi_internal")]
+    #[no_mangle]
+    pub extern "C" fn draw_impl(prepared: Prepared<'static>) -> DrawRet<'static> {
+        use crate::plot_impl;
+        // Safety: This is the same type as provided by `prep_expr`,
+        // and the other side of the FFI is obligated to give us what we hand out.
+        let expression: plot_impl::PreparedProgram = unsafe { prepared.into() };
+        use ::mice::prelude::MiceError;
+        match plot_impl::draw(&expression) {
+            Ok(buffer) => DrawRet::Ok(FfiVecU8::from_vec(buffer)),
+            Err(MiceError::OverflowPositive(_)) => DrawRet::OverflowPositive,
+            Err(MiceError::OverflowNegative(_)) => DrawRet::OverflowNegative,
+            Err(MiceError::InvalidExpression(_)) => unreachable!("we check for this inside prep_expr"),
+            Err(MiceError::InvalidDie) => unreachable!("the current mice parser cannot produce dice with negative sides"),
+        }
     }
 }
 
-#[cfg(any(feature = "actual_plotter", doc))]
-#[no_mangle]
-pub extern "C" fn draw_impl(prepared: Prepared<'static>) -> DrawRet<'static> {
-    // Safety: This is the same type as provided by `prep_expr`,
-    // and the other side of the FFI is obligated to give us what we hand out.
-    let expression: Program = unsafe { prepared.into() };
-    let Program { expression, caption } = expression;
-    use ::mice::prelude::MiceError;
-    match plot_impl::draw(&expression, &caption) {
-        Ok(buffer) => DrawRet::Ok(FfiVecU8::from_vec(buffer)),
-        Err(MiceError::OverflowPositive(_)) => DrawRet::OverflowPositive,
-        Err(MiceError::OverflowNegative(_)) => DrawRet::OverflowNegative,
-        Err(MiceError::InvalidExpression(_)) => unreachable!("we check for this inside prep_expr"),
-        Err(MiceError::InvalidDie) => unreachable!("the current mice parser cannot produce dice with negative sides"),
-    }
-}
 
-#[cfg(any(feature = "actual_plotter", doc))]
-mod plot_impl {
-
-    use ::mice::parse::Expression;
+#[cfg(feature = "actual_plotter")]
+pub mod plot_impl {
     use ::mice::prelude::MiceError;
     use ::std::collections::HashMap;
     use ::core::iter;
@@ -179,7 +168,37 @@ mod plot_impl {
     const BUFFER_WIDTH: usize = (RESOLUTION.0 * RESOLUTION.1) as usize * <RGBPixel as PixelFormat>::PIXEL_SIZE;
     const SAMPLE_SIZE: usize = 1_000_000;
 
-    pub(crate) fn draw(exp: &Expression, caption: &str) -> Result<Vec<u8>, MiceError> {
+    #[derive(Debug)]
+    pub struct PreparedProgram {
+        expression: ::mice::parse::Expression,
+        // We heap allocate here because the input message string slice is not enforced to live
+        // as long as this loaded module. (Nor would it make sense for it to be.)
+        caption: String,
+    }
+
+    #[derive(Debug)]
+    pub enum PreparationError {
+        InvalidExpression,
+        TooExpensive,
+    }
+
+    pub fn prepare_expression(expression: &str) -> Result<PreparedProgram, PreparationError> {
+        let caption = String::from(expression);
+        match ::mice::parse::dice(expression) {
+            Ok((input, Ok(expression))) if input.is_empty() => {
+                use ::mice::util::ExpressionExt;
+                if !expression.exceeds_cap(200) {
+                    Ok(PreparedProgram { expression, caption })
+                } else {
+                    Err(PreparationError::TooExpensive)
+                }
+            },
+            _ => Err(PreparationError::InvalidExpression),
+        }
+    }
+
+    pub fn draw(exp: &PreparedProgram) -> Result<Vec<u8>, MiceError> {
+        let PreparedProgram { expression, caption } = exp;
         // This is FAR too expensive computationally right now.
         let mut counts = HashMap::new();
         let mut rng = {
