@@ -307,6 +307,19 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
 }
 
 #[command]
+async fn dot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
+    match ::mice::parse::new::parse_expression(arg.message().as_bytes()) {
+        Ok((input, program)) if input.is_empty() => {
+            let mut dot_ast = String::from("```dot\n");
+            dot_ast.push_str(&::mice::viz::make_dot(&program));
+            dot_ast.push_str("```");
+            reply(ctx, msg, &dot_ast).await
+        },
+        Ok(_) | Err(_) => reply(ctx, msg, "you've specified an invalid dice expression").await
+    }
+}
+
+#[command]
 async fn goodnight(ctx: &Context, msg: &Message) -> CommandResult {
     reply(ctx, msg, "Sleep is for the weak, but goodnight.").await
 }
@@ -333,7 +346,7 @@ async fn in_dev_server(
 #[cfg(feature = "bot_commands")]
 #[group]
 #[commands(
-    ping, potatoes, happy, po, to, literal, gargamel, roll, pinit, goodnight, fate
+    ping, potatoes, happy, po, to, literal, gargamel, roll, pinit, goodnight, fate, dot
 )]
 struct Green;
 
