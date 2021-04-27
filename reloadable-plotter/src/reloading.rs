@@ -21,11 +21,11 @@ macro_rules! link {
 
 decl_module! {
     // Associate feature gates with runtime reloading functionality and what not.
-    if all(feature = "reloadable_plotter", feature = "static_plotter") {
+    if #[cfg(all(feature = "reloadable_plotter", feature = "static_plotter"))] {
         compile_error!("The reloadable_plotter and static_plotter features are mutually exclusive. You must select either one or the other, not both.");
-    } else if feature = "reloadable_plotter" {
+    } else if #[cfg(feature = "reloadable_plotter")] {
         reloadable("libreloadable_plotter.so")
-    } else if feature = "static_plotter" {
+    } else if #[cfg(feature = "static_plotter")] {
         static
     } else {
         compile_error!("To enable dice plotting, you must select either the reloadable_plotter or static_plotter feature.");
