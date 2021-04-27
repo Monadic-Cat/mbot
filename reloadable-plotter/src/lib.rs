@@ -1,3 +1,5 @@
+pub mod reloading;
+
 #[cfg(any(feature = "ffi_internal", feature = "ffi_external"))]
 pub mod ffi {
     use ::core::ops::{Deref, DerefMut};
