@@ -1,4 +1,6 @@
 //! Some proper support for runtime reloadable shared libraries.
+//! I can't paper over the existence of FFI, but I can generate
+//! module guard types and automatically prevent data races on the code being reloaded.
 
 /// Declare a runtime reloadable module.
 #[macro_export]
