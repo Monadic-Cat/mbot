@@ -1,3 +1,5 @@
+//! Some proper support for runtime reloadable shared libraries.
+
 /// Declare a runtime reloadable module.
 #[macro_export]
 macro_rules! decl_module {
@@ -28,8 +30,10 @@ decl_module! {
     }
     // Name module, special module guard lifetime, guard, and guard type.
     let guard: PlotGuard<'module> = Plot::lock(&'module self);
-    fn prep(&guard, expression: &str) -> Result<Prepared<'module>, PreparationError>;
-    fn draw(&guard, prepared: Prepared<'module>) -> Result<FfiVecU8<'a>, Overflow>;
+    // RStr is a FFI safe equivalent of &str.
+    // We introduce a special '=>' operator to indicate automatic conversion for FFI.
+    fn prep(&guard, expression: &str => RStr<'_>) -> PrepRet => Result<Prepared<'module>, PreparationError>;
+    fn draw(&guard, prepared: Prepared<'module>) -> DrawRet => Result<FfiVecU8<'a>, Overflow>;
 }
 
 // TODO: come up with an interface that's compatible with preemption
