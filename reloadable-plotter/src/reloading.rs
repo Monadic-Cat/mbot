@@ -34,8 +34,8 @@ decl_module! {
     let guard: PlotGuard<'module> = Plot::lock(&'module self);
     // RStr is a FFI safe equivalent of &str.
     // We introduce a special '=>' operator to indicate automatic conversion for FFI.
-    fn prep(&guard, expression: &str => RStr<'_>) -> PrepRet => Result<Prepared<'module>, PreparationError>;
-    fn draw(&guard, prepared: Prepared<'module>) -> DrawRet => Result<FfiVecU8<'a>, Overflow>;
+    fn prep(&guard, expression: &str => RStr<'_>) -> PrepRet<'module> => Result<Prepared<'module>, PreparationError>;
+    fn draw(&guard, prepared: Prepared<'module>) -> DrawRet<'module> => Result<FfiVecU8<'a>, Overflow>;
 }
 
 // TODO: come up with an interface that's compatible with preemption
