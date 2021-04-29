@@ -7,9 +7,6 @@
 
 // Important Note: This feature currently does not even attempt to support
 // more than Linux (glibc) on x86_64 and armhf.
-// In the future, I intend to make it possible to statically compile in
-// the exact code being loaded dynamically here, so we use the same plotting
-// code regardless of whether we're able to dynamically load it.
 #[cfg(feature = "reloadable_plotter")]
 mod reloadable {
     use ::core::ffi::c_void;
