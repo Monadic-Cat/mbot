@@ -24,18 +24,15 @@ mod dist;
 use serenity::model::{channel::GuildChannel, id::MessageId, guild::{PartialGuild, Guild}};
 use serenity::{
     framework::standard::{
-        macros::{check, command, group},
+        macros::{command, group},
         Args,
-        CheckResult, // CommandError,
-        CommandOptions,
         CommandResult,
-        Reason,
         StandardFramework,
     },
     model::{
         channel::Message,
         gateway::Ready,
-        id::{ChannelId, GuildId},
+        id::ChannelId,
     },
     client::bridge::gateway::ShardManager,
     prelude::*,
@@ -324,24 +321,24 @@ async fn goodnight(ctx: &Context, msg: &Message) -> CommandResult {
     reply(ctx, msg, "Sleep is for the weak, but goodnight.").await
 }
 
-#[check]
-#[name = "in_dev_server"]
-async fn in_dev_server(
-    _: &Context,
-    msg: &Message,
-    _: &mut Args,
-    opts: &CommandOptions,
-) -> CheckResult {
-    match msg.guild_id {
-        Some(GuildId(579886740097990657)) | Some(GuildId(695085554940772432)) => {
-            CheckResult::Success
-        }
-        _ => CheckResult::Failure(Reason::Log(format!(
-            "attempted to use {} outside dev server",
-            opts.names[0]
-        ))),
-    }
-}
+// #[check]
+// #[name = "in_dev_server"]
+// async fn in_dev_server(
+//     _: &Context,
+//     msg: &Message,
+//     _: &mut Args,
+//     opts: &CommandOptions,
+// ) -> CheckResult {
+//     match msg.guild_id {
+//         Some(GuildId(579886740097990657)) | Some(GuildId(695085554940772432)) => {
+//             CheckResult::Success
+//         }
+//         _ => CheckResult::Failure(Reason::Log(format!(
+//             "attempted to use {} outside dev server",
+//             opts.names[0]
+//         ))),
+//     }
+// }
 
 #[cfg(feature = "bot_commands")]
 #[group]
