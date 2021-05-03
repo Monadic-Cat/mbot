@@ -13,6 +13,8 @@ crate-type = ["rlib", "cdylib"]
 libc = "0.2.93"
 mice = { path = "../mice", optional = true }
 rand = { version = "0.7", optional = true }
+rand_core = { version = "0.5", optional = true }
+sobol = { version = "1.0.2", optional = true }
 plotters-bitmap = { version = "0.3.0", optional = true }
 png = { version = "0.16.8", optional = true }
 
@@ -28,7 +30,7 @@ features = ["bitmap_encoder", "histogram", "ttf"]
 [features]
 default = ["actual_plotter", "ffi_internal"]
 # The actual plotter implementation.
-actual_plotter = ["plotters", "plotters-bitmap", "png", "rand", "rand/small_rng", "mice"]
+actual_plotter = ["plotters", "plotters-bitmap", "png", "rand", "rand/small_rng", "mice", "sobol", "rand_core"]
 # The FFI declarations and such required for dynamic loading, from a library user perspective.
 # This stuff may end up in another crate, if I generalize it enough to be used elsewhere.
 ffi_external = []

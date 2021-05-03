@@ -199,14 +199,72 @@ pub mod plot_impl {
         }
     }
 
+    /// A hacky [`Rng`](::rand::Rng) implementation for a Sobol sequence.
+    mod sobol {
+        trait UnsafeUnwrap {
+            type Output;
+            unsafe fn unchecked(self) -> Self::Output;
+        }
+        impl<T> UnsafeUnwrap for Option<T> {
+            type Output = T;
+            unsafe fn unchecked(self) -> Self::Output {
+                match self {
+                    Some(x) => x,
+                    #[allow(unused_unsafe)]
+                    None => unsafe { ::core::hint::unreachable_unchecked() }
+                }
+            }
+        }
+        impl<T, E> UnsafeUnwrap for Result<T, E> {
+            type Output = T;
+            unsafe fn unchecked(self) -> Self::Output {
+                match self {
+                    Ok(x) => x,
+                    #[allow(unused_unsafe)]
+                    Err(_) => unsafe { ::core::hint::unreachable_unchecked() }
+                }
+            }
+        }
+        use ::sobol::{Sobol, params::JoeKuoD6};
+        use ::rand::RngCore;
+        use ::rand_core::impls;
+        pub struct SobolRng {
+            generator: ::sobol::Sobol<u64>,
+        }
+        impl SobolRng {
+            pub fn new() -> Self {
+                Self { generator: Sobol::new(1, &JoeKuoD6::minimal()) }
+            }
+        }
+        impl RngCore for SobolRng {
+            fn next_u32(&mut self) -> u32 {
+                impls::next_u32_via_fill(self)
+            }
+            fn next_u64(&mut self) -> u64 {
+                match self.generator.next() {
+                    Some(x) => x[0],
+                    None => {
+                        self.generator = Sobol::new(1, &JoeKuoD6::minimal());
+                        // Safety: I know for a fact that this sequence is non-empty
+                        // when it is first initialized.
+                        (unsafe { self.generator.next().unchecked() })[0]
+                    }
+                }
+            }
+            fn fill_bytes(&mut self, dest: &mut [u8]) {
+                impls::fill_bytes_via_next(self, dest)
+            }
+            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), ::rand::Error> {
+                Ok(self.fill_bytes(dest))
+            }
+        }
+    }
+
     pub fn draw(exp: &PreparedProgram) -> Result<Vec<u8>, MiceError> {
         let PreparedProgram { expression, caption } = exp;
         // This is FAR too expensive computationally right now.
         let mut counts = HashMap::new();
-        let mut rng = {
-            use ::rand::SeedableRng;
-            ::rand::rngs::SmallRng::from_entropy()
-        };
+        let mut rng = sobol::SobolRng::new();
         // TODO: prove no overflow
         // TODO: compute range analytically
         // explosions will be annoying here.
