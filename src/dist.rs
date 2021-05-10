@@ -103,9 +103,13 @@ mod reloadable {
                 fn dlsym(handle: LibraryHandle, symbol: *const c_char) -> *const c_void;
             }
             // TODO: consider parameterizing the filename of the shared object somehow
-            // Safety: lol idk
+            // Safety: This is actually safe, just FFI.
             let handle = unsafe { dlopen(cs!("libreloadable_plotter.so"), ::libc::RTLD_LAZY) };
             // The lifetimes on these are wrong, but the correct ones can't be named until later.
+            // Safety: This is only safe if the dlopen-ed object exists, but I guarantee that
+            // externally. That said, the failure if that object does not exist is predictably
+            // a segfault. No sneaky UB will occur, if only because I do not catch segfaults.
+            // TODO: explicitly handle shared object nonexistence
             let prep_expr: extern "C" fn(*const u8, usize) -> PrepRet<'static>
                 = unsafe { ::core::mem::transmute(dlsym(handle, cs!("prep_expr"))) };
             let draw_impl: extern "C" fn(Prepared) -> DrawRet<'static> = unsafe { ::core::mem::transmute(dlsym(handle, cs!("draw_impl"))) };
@@ -167,6 +171,8 @@ mod reloadable {
             }
             let mut guard = PLOTTER.write();
             match guard.take() {
+                // Safety: The RwLockWriteGuard ensures no one is running the code
+                // we're unloading here, and the handle we get is valid by construction.
                 Some(plotter) => unsafe { dlclose(plotter.handle); },
                 None => (),
             }
