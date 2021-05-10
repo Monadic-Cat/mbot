@@ -26,7 +26,7 @@ decl_module! {
     } else if #[cfg(feature = "reloadable_plotter")] {
         reloadable("libreloadable_plotter.so")
     } else if #[cfg(feature = "static_plotter")] {
-        static
+        static(crate::ffi)
     } else {
         compile_error!("To enable dice plotting, you must select either the reloadable_plotter or static_plotter feature.");
     }
