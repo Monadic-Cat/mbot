@@ -15,6 +15,7 @@ mice = { path = "../mice", optional = true }
 rand = { version = "0.7", optional = true }
 plotters-bitmap = { version = "0.3.0", optional = true }
 png = { version = "0.16.8", optional = true }
+proc_macro_helpers = { path = "../proc_macro_helpers" }
 
 [dependencies.plotters]
 version = "0.3.0"

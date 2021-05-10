@@ -19,23 +19,38 @@ macro_rules! link {
     ($($t:tt)*) => {}
 }
 
-decl_module! {
-    // Associate feature gates with runtime reloading functionality and what not.
-    if #[cfg(all(feature = "reloadable_plotter", feature = "static_plotter"))] {
-        compile_error!("The reloadable_plotter and static_plotter features are mutually exclusive. You must select either one or the other, not both.");
-    } else if #[cfg(feature = "reloadable_plotter")] {
-        reloadable("libreloadable_plotter.so")
-    } else if #[cfg(feature = "static_plotter")] {
-        static(crate::ffi)
-    } else {
-        compile_error!("To enable dice plotting, you must select either the reloadable_plotter or static_plotter feature.");
-    }
+// #[cfg(all(feature = "reloadable_plotter", feature = "static_plotter"))]
+// compile_error!("The reloadable_plotter and static_plotter features are mutually exclusive. You must select either one or the other, not both.");
+// #[cfg(not(any(feature = "reloadable_plotter", feature = "static_plotter")))]
+// compile_error!("To enable dice plotting, you must select either the reloadable_plotter or static_plotter feature.");
+
+use ::proc_macro_helpers::reloadable;
+
+#[cfg_attr(all(feature = "reloadable_plotter", feature = "static_plotter"), cfg(not(all())))]
+#[cfg_attr(not(any(feature = "reloadable_plotter", feature = "static_plotter")), cfg(not(all())))]
+#[cfg_attr(feature = "reloadable_plotter", reloadable("libreloadable_plotter.so"))]
+#[cfg_attr(feature = "static_plotter", reloadable(static(crate::ffi)))]
+// This module declaration is `unsafe` because it currently assumes that
+// the FFI signatures written within are correct.
+// That said, I intend to emit assertions to verify this inside automated testing.
+unsafe mod plotter {
     // Name module, special module guard lifetime, guard, and guard type.
-    let guard: PlotGuard<'module> = Plot::lock(&'module self);
-    // RStr is a FFI safe equivalent of &str.
-    // We introduce a special '=>' operator to indicate automatic conversion for FFI.
-    fn prep(&guard, expression: &str => RStr<'_>) -> PrepRet<'module> => Result<Prepared<'module>, PreparationError>;
-    fn draw(&guard, prepared: Prepared<'module>) -> DrawRet<'module> => Result<FfiVecU8<'a>, Overflow>;
+    #[module]
+    struct Plot;
+    impl Plot {
+        #[global_lock]
+        fn lock<'module>() -> PlotGuard<'module>;
+    }
+    #[guard]
+    struct PlotGuard<'module>;
+    impl<'module> PlotGuard<'module> {
+        // RStr is a FFI safe equivalent of &str.
+        // We introduce a special `convert!` macro to indicate automatic conversion for FFI.
+        fn prep(&self, expression: convert![&str => RStr<'_>])
+                -> convert![PrepRet<'module> => Result<Prepared<'module>, PreparationError>];
+        fn draw(&self, prepared: Prepared<'module>)
+                -> convert![DrawRet<'module> => Result<FfiVecU8<'a>, Overflow>];
+    }
 }
 
 // TODO: come up with an interface that's compatible with preemption

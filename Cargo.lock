@@ -2079,6 +2079,7 @@ dependencies = [
  "plotters",
  "plotters-bitmap",
  "png 0.16.8",
+ "proc_macro_helpers",
  "rand",
 ]
 
