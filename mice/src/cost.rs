@@ -13,6 +13,9 @@ pub enum Price {
 pub trait Cost<Ctx> {
     fn cost(&self) -> Price;
 }
+pub fn cost<Ctx, T: Cost<Ctx>>(thing: &T) -> Price {
+    <T as Cost<Ctx>>::cost(thing)
+}
 
 use crate::parse::new::Program;
 use crate::stack::postorder;

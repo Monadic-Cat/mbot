@@ -172,7 +172,7 @@ pub mod plot_impl {
 
     #[derive(Debug)]
     pub struct PreparedProgram {
-        expression: ::mice::parse::Expression,
+        program: ::mice::parse::new::Program,
         // We heap allocate here because the input message string slice is not enforced to live
         // as long as this loaded module. (Nor would it make sense for it to be.)
         caption: String,
@@ -186,13 +186,14 @@ pub mod plot_impl {
 
     pub fn prepare_expression(expression: &str) -> Result<PreparedProgram, PreparationError> {
         let caption = String::from(expression);
-        match ::mice::parse::dice(expression) {
-            Ok((input, Ok(expression))) if input.is_empty() => {
-                use ::mice::util::ExpressionExt;
-                if !expression.exceeds_cap(200) {
-                    Ok(PreparedProgram { expression, caption })
-                } else {
-                    Err(PreparationError::TooExpensive)
+        match ::mice::parse::new::parse_expression(expression.as_bytes()) {
+            Ok((input, program)) if input.is_empty() => {
+                use ::mice::cost::{cost, StackInterp, Price};
+                match cost::<StackInterp, _>(&program) {
+                    Price::Bounded(price) if price <= 200 => Ok(PreparedProgram {
+                        program, caption,
+                    }),
+                    _ => Err(PreparationError::TooExpensive),
                 }
             },
             _ => Err(PreparationError::InvalidExpression),
@@ -200,7 +201,7 @@ pub mod plot_impl {
     }
 
     pub fn draw(exp: &PreparedProgram) -> Result<Vec<u8>, MiceError> {
-        let PreparedProgram { expression, caption } = exp;
+        let PreparedProgram { program, caption } = exp;
         // This is FAR too expensive computationally right now.
         let mut counts = HashMap::new();
         let mut rng = {
@@ -213,9 +214,6 @@ pub mod plot_impl {
         // perhaps we should enable more precise handling and higher caps
         // when misbehaving things like explosions aren't present.
         use ::mice::stack::Overflow;
-        // Note: This is guaranteed not to fail, since parse_expression accepts
-        // a superset of the language Expression accepts.
-        let program = ::mice::parse::new::parse_expression(caption.as_bytes()).unwrap().1;
         let stack_program = ::mice::stack::compile(&program);
         let mut machine = ::mice::stack::Machine::new();
         let sample = iter::repeat_with(|| machine.eval_with(&mut rng, &stack_program))

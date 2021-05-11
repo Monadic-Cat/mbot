@@ -513,6 +513,7 @@ pub mod new {
     /// A parsed dice program. The result of invoking `parse_expression` on something like `"3d6 + 4"`.
     // Fuck it. Dice expressions are programs.
     // Note: I fully intend to expose the AST as public API.
+    #[derive(Debug)]
     pub struct Program {
         // Note that `Program`s are intended to be correctly formed by construction.
 
