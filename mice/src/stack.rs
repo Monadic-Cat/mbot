@@ -21,30 +21,31 @@ macro_rules! assert_dice_roll_terminal {
 /// Perform a postorder traveral of a program's AST.
 pub fn postorder<F>(program: &Program, mut visit: F)
 where
-    F: FnMut(&Term),
+    F: FnMut(&Term, Option<&Term>),
 {
     let Program { top, terms } = program;
-    fn postorder_term<F>(term: &Term, arena: &Arena<Term>, visit: &mut F)
+    fn postorder_term<F>(term: &Term, parent: Option<&Term>, arena: &Arena<Term>, visit: &mut F)
     where
-        F: FnMut(&Term),
+        F: FnMut(&Term, Option<&Term>),
     {
         use Term::*;
         assert_dice_roll_terminal!();
         match term {
-            node @ Constant(_) => visit(node),
-            node @ DiceRoll(_, _) => visit(node),
+            node @ Constant(_) => visit(node, parent),
+            node @ DiceRoll(_, _) => visit(node, parent),
+            KeepHigh(roll, _) => visit(&arena[*roll], Some(term)),
             Add(left, right) | Subtract(left, right) => {
-                postorder_term(&arena[*left], arena, &mut *visit);
-                postorder_term(&arena[*right], arena, &mut *visit);
-                visit(term);
+                postorder_term(&arena[*left], Some(term), arena, &mut *visit);
+                postorder_term(&arena[*right], Some(term), arena, &mut *visit);
+                visit(term, parent);
             },
             UnaryAdd(only) | UnarySubtract(only) => {
-                postorder_term(&arena[*only], arena, &mut *visit);
-                visit(term);
+                postorder_term(&arena[*only], Some(term), arena, &mut *visit);
+                visit(term, parent);
             },
         }
     }
-    postorder_term(&terms[*top], terms, &mut visit);
+    postorder_term(&terms[*top], None, terms, &mut visit);
 }
 
 pub struct StackProgram(Vec<Instruction>);
@@ -52,23 +53,40 @@ pub struct StackProgram(Vec<Instruction>);
 enum Instruction {
     Value(i64),
     DiceRoll(i64, i64),
+    // This currently gets a special instruction so we can maintain performance.
+    DiceRollKeepHigh {
+        count: i64,
+        sides: i64,
+        keep_count: i64,
+    },
     Add,
     Subtract,
-    UnaryAdd,
     UnarySubtract,
+    NoOp,
 }
 
 /// Compile a dice program to run on the stack machine.
 pub fn compile(program: &Program) -> StackProgram {
     let mut instructions = Vec::with_capacity(program.terms.len());
-    postorder(program, |term| {
+    postorder(program, |term, parent| {
         use Term::*;
         let next = match term {
             Constant(value) => Instruction::Value(*value),
-            DiceRoll(count, sides) => Instruction::DiceRoll(*count, *sides),
+            DiceRoll(count, sides) => match parent {
+                Some(KeepHigh(_, keep_count)) => Instruction::DiceRollKeepHigh {
+                    count: *count,
+                    sides: *sides,
+                    keep_count: *keep_count,
+                },
+                _ => Instruction::DiceRoll(*count, *sides),
+            },
+            KeepHigh(_, _) => Instruction::NoOp,
             Add(_, _) => Instruction::Add,
             Subtract(_, _) => Instruction::Subtract,
-            UnaryAdd(_) => Instruction::UnaryAdd,
+            // Unary addition is a no-op, so we compile it to one.
+            // If I were slightly less lazy, these would just not be pushed
+            // into the instruction listing.
+            UnaryAdd(_) => Instruction::NoOp,
             UnarySubtract(_) => Instruction::UnarySubtract,
         };
         instructions.push(next);
@@ -109,6 +127,24 @@ impl Machine {
                     self.stack.push(total);
                 }
             },
+            DiceRollKeepHigh { count, sides, keep_count } => {
+                if keep_count == 0 {
+                    self.stack.push(0);
+                } else if sides == 1 {
+                    self.stack.push(::core::cmp::min(count, keep_count));
+                } else {
+                    let mut partials = Vec::<i64>::with_capacity(keep_count as _);
+                    for _ in 0..count {
+                        // TODO: have way to save partial sums
+                        let random = rng.gen_range(0, sides) + 1;
+                        partials.push(random);
+                        partials.sort_unstable();
+                        partials.truncate(keep_count as _);
+                    }
+                    let total: i64 = partials.iter().sum();
+                    self.stack.push(total);
+                }
+            },
             Add => {
                 // Note: These are guaranteed to exist due to how the tree is constructed.
                 let (left, right) = (self.stack.pop().unwrap(), self.stack.pop().unwrap());
@@ -137,13 +173,12 @@ impl Machine {
                     }
                 });
             }
-            // Unary adding is actually a no-op.
-            UnaryAdd => (),
             UnarySubtract => {
                 // Note: This is guaranteed to exist due to how the tree is constructed.
                 let only = self.stack.pop().unwrap();
                 self.stack.push(only.checked_neg().ok_or(Overflow::Positive)?);
             }
+            NoOp => (),
         }
         Ok(())
     }

@@ -36,7 +36,9 @@ pub fn interpret<R: Rng>(
     let top = interpret_term(rng, &terms, &mut outputs, *top)?;
     let total = outputs[top].total();
     Ok(ProgramOutput {
-        total, outputs, top
+        total,
+        outputs,
+        top,
     })
 }
 
@@ -45,6 +47,11 @@ pub fn interpret<R: Rng>(
 pub enum TermOutput {
     Constant(i64),
     DiceRoll(i64, Option<Vec<i64>>),
+    KeepHigh {
+        total: i64,
+        keep_count: i64,
+        roll: Id<TermOutput>,
+    },
     Add(i64, Id<TermOutput>, Id<TermOutput>),
     Subtract(i64, Id<TermOutput>, Id<TermOutput>),
     UnarySubtract(i64, Id<TermOutput>),
@@ -56,6 +63,7 @@ impl TermOutput {
         *match self {
             Constant(total)
             | DiceRoll(total, ..)
+            | KeepHigh { total, .. }
             | Add(total, ..)
             | Subtract(total, ..)
             | UnarySubtract(total, ..)
@@ -86,6 +94,45 @@ fn interpret_term<R: Rng>(
                     parts.push(random);
                 }
                 Ok(term_outputs.alloc(TermOutput::DiceRoll(total, Some(parts))))
+            }
+        }
+        Term::KeepHigh(roll, count) => {
+            let roll = interpret_term(rng, terms, term_outputs, roll)?;
+            match &mut term_outputs[roll] {
+                TermOutput::DiceRoll(total, partials) => match partials {
+                    Some(partials) => {
+                        use ::core_extensions::SliceExt;
+                        partials.sort_unstable();
+                        let total = partials.slice_lossy(0..(count as _), ()).iter().sum();
+                        Ok(term_outputs.alloc(TermOutput::KeepHigh {
+                            total,
+                            // Note that the saved `keep_count` isn't guaranteed
+                            // to match the actual number of partial sums.
+                            // 4d6k5 will only keep 4 dice, but `keep_count` will be 5.
+                            keep_count: count,
+                            roll,
+                        }))
+                    }
+                    None => if count >= 1 {
+                        let total = *total;
+                        Ok(term_outputs.alloc(TermOutput::KeepHigh {
+                            total,
+                            // Note that we preserve the behavior of the above branch,
+                            // where `keep_count` is the same as requested,
+                            // not what is actually received, here.
+                            // d6k3 will only keep 1 die, but `keep_count` will be 3.
+                            keep_count: count,
+                            roll,
+                        }))
+                    } else {
+                        Ok(term_outputs.alloc(TermOutput::KeepHigh {
+                            total: 0,
+                            keep_count: count,
+                            roll,
+                        }))
+                    },
+                },
+                _ => unreachable!("nesting of dice operators is currently not permitted"),
             }
         }
         Term::Add(left, right) => {

@@ -75,6 +75,16 @@ pub fn make_dot(program: &Program) -> String {
                 push_edge(graph, &id, &right_id);
                 id
             },
+            Term::KeepHigh(roll, count) => {
+                let id = gen.next();
+                push_node(graph, &id, String::from("k"));
+                let roll_id = write_dot(graph, gen, terms, &terms[*roll]);
+                push_edge(graph, &id, &roll_id);
+                let count_id = gen.next();
+                push_node(graph, &count_id, format!("{}", count));
+                push_edge(graph, &id, &count_id);
+                id
+            },
             Term::Add(left, right) => write_op(graph, gen, String::from("+"), left, Some(right)),
             Term::Subtract(left, right) => write_op(graph, gen, String::from("-"), left, Some(right)),
             Term::UnarySubtract(only) => write_op(graph, gen, String::from("-"), only, None),
