@@ -419,6 +419,7 @@ pub mod new {
         /// This will never be negative. We use an [`i64`] here so numeric limits line up elsewhere.
         Int(i64),
         D,
+        K,
         Op(Op),
         Whitespace,
     }
@@ -447,6 +448,10 @@ pub mod new {
                     },
                     [b'd', rest @ ..] => {
                         tokens.push(Token::D);
+                        cursor = rest;
+                    },
+                    [b'k', rest @ ..] => {
+                        tokens.push(Token::K);
                         cursor = rest;
                     },
                     [b'+', rest @ ..] => {
@@ -498,6 +503,7 @@ pub mod new {
         // replaced by terms, and be turned into an operator
         // in its own right. This could then allow strange expressions like `3d(d8)`.
         DiceRoll(i64, i64),
+        KeepHigh(Id<Term>, i64),
         Add(Id<Term>, Id<Term>),
         Subtract(Id<Term>, Id<Term>),
         UnarySubtract(Id<Term>),
@@ -535,6 +541,15 @@ pub mod new {
                 buf.push_str("d");
                 itoa::fmt(&mut *buf, faces).unwrap();
             }
+            Term::KeepHigh(roll, count) => {
+                buf.push_str("(");
+                buf.push_str("k");
+                buf.push_str(" ");
+                write_sexpr(terms, roll, &mut *buf);
+                buf.push_str(" ");
+                itoa::fmt(&mut *buf, count).unwrap();
+                buf.push_str(")");
+            },
             Term::Add(lhs, rhs) => write_op("+", lhs, rhs),
             Term::Subtract(lhs, rhs) => write_op("-", lhs, rhs),
             Term::UnaryAdd(arg) => {
@@ -640,6 +655,16 @@ pub mod new {
                 // That said, dice terms are liable to become much more complicated.
                 // For now, the extra flexibility that would come from that is
                 // not necessary or wanted.
+                [Token::Int(count), Token::D, Token::Int(faces), Token::K, Token::Int(keep_count), rest @ ..] => {
+                    let roll = Term::DiceRoll(*count, *faces);
+                    let keep_high = Term::KeepHigh(terms.alloc(roll), *keep_count);
+                    (rest, keep_high)
+                },
+                [Token::D, Token::Int(faces), Token::K, Token::Int(keep_count), rest @ ..] => {
+                    let roll = Term::DiceRoll(1, *faces);
+                    let keep_high = Term::KeepHigh(terms.alloc(roll), *keep_count);
+                    (rest, keep_high)
+                },
                 [Token::Int(count), Token::D, Token::Int(faces), rest @ ..] => {
                     (rest, Term::DiceRoll(*count, *faces))
                 },
@@ -689,6 +714,7 @@ pub mod new {
                     Ok(op) => consume_unary_op(&mut terms, op, rest),
                     Err(()) => Err(ExprError::InvalidTokenInUnaryOp),
                 },
+                [Token::K, ..] => break Err(ExprError::InvalidTokenInUnaryOp),
                 all @ [Token::Int(_), ..] |
                 all @ [Token::D, ..] => break consume_expr(&mut terms, 2, all).map(|(_, x)| x),
                 [] => break Err(ExprError::Eof),
