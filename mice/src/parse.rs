@@ -593,6 +593,8 @@ pub mod new {
         TooLarge,
         /// Encountered invalid token in expression position.
         InvalidTokenInExpr,
+        /// `d0`s are not valid dice.
+        InvalidDie,
         /// Reached end of token stream while in expression position.
         // (Note that it isn't an error to encounter EOF in binary operator position.)
         Eof,
@@ -649,6 +651,15 @@ pub mod new {
 
         fn consume_expr<'a>(terms: &mut Arena<Term>, min_bp: u8, input: &'a [Token])
                         -> Result<(&'a [Token], Id<Term>), ExprError> {
+            // Ideally we'd enforce this check via a constrained constructor
+            // for dice terms, but I'm doing a quick fix lol.
+            macro_rules! check_faces {
+                ($faces:expr) => {
+                    if $faces <= 0 {
+                        return Err(ExprError::InvalidDie)
+                    }
+                }
+            }
             let (mut cursor, mut lhs) = match ignore_whitespace(input) {
                 // Currently we parse a dice term like a terminal, but
                 // there is no reason we couldn't make `d` into an operator as well.
@@ -656,19 +667,25 @@ pub mod new {
                 // For now, the extra flexibility that would come from that is
                 // not necessary or wanted.
                 [Token::Int(count), Token::D, Token::Int(faces), Token::K, Token::Int(keep_count), rest @ ..] => {
+                    check_faces!(*faces);
                     let roll = Term::DiceRoll(*count, *faces);
                     let keep_high = Term::KeepHigh(terms.alloc(roll), *keep_count);
                     (rest, keep_high)
                 },
                 [Token::D, Token::Int(faces), Token::K, Token::Int(keep_count), rest @ ..] => {
+                    check_faces!(*faces);
                     let roll = Term::DiceRoll(1, *faces);
                     let keep_high = Term::KeepHigh(terms.alloc(roll), *keep_count);
                     (rest, keep_high)
                 },
                 [Token::Int(count), Token::D, Token::Int(faces), rest @ ..] => {
+                    check_faces!(*faces);
                     (rest, Term::DiceRoll(*count, *faces))
                 },
-                [Token::D, Token::Int(faces), rest @ ..] => (rest, Term::DiceRoll(1, *faces)),
+                [Token::D, Token::Int(faces), rest @ ..] => {
+                    check_faces!(*faces);
+                    (rest, Term::DiceRoll(1, *faces))
+                },
                 [Token::Int(n), rest @ ..] => (rest, Term::Constant(*n)),
                 [x, ..] => Err(InvalidTokenInExpr)?,
                 [] => Err(UnexpectedEof)?,
