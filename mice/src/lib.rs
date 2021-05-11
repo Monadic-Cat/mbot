@@ -47,6 +47,7 @@ pub mod nfmt;
 pub mod interp;
 pub mod stack;
 pub mod viz;
+pub mod cost;
 
 #[derive(::thiserror::Error, Debug, Clone, Copy)]
 #[error("sum is too high for `i64`")]
