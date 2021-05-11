@@ -102,7 +102,7 @@ fn interpret_term<R: Rng>(
                 TermOutput::DiceRoll(total, partials) => match partials {
                     Some(partials) => {
                         use ::core_extensions::SliceExt;
-                        partials.sort_unstable();
+                        partials.sort_unstable_by(|a, b| b.cmp(a));
                         let total = partials.slice_lossy(0..(count as _), ()).iter().sum();
                         Ok(term_outputs.alloc(TermOutput::KeepHigh {
                             total,

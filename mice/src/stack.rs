@@ -138,7 +138,7 @@ impl Machine {
                         // TODO: have way to save partial sums
                         let random = rng.gen_range(0, sides) + 1;
                         partials.push(random);
-                        partials.sort_unstable();
+                        partials.sort_unstable_by(|a, b| b.cmp(a));
                         partials.truncate(keep_count as _);
                     }
                     let total: i64 = partials.iter().sum();
