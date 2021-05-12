@@ -32,11 +32,11 @@ pub mod ffi {
     // It's private, and cfg-ed out for external users.
     #[cfg(feature = "ffi_internal")]
     impl<'a> FfiVecU8<'a> {
-        fn from_vec(mut vec: Vec<u8>) -> FfiVecU8<'static> {
+        fn from_vec(vec: Vec<u8>) -> FfiVecU8<'static> {
             // Correctness (and Safety in free_ffi_vec): This is how std implements Vec::into_raw_parts,
             // so I'm guessing the order used doesn't mess with provenance.
+            let mut vec = ::core::mem::ManuallyDrop::new(vec);
             let (ptr, length, capacity) = (vec.as_mut_ptr(), vec.len(), vec.capacity());
-            ::core::mem::forget(vec);
             FfiVecU8 {
                 ptr, length, capacity,
                 free_function: free_ffi_vec,
