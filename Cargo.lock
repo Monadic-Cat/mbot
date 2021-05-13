@@ -299,6 +299,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmice"
+version = "0.1.0"
+dependencies = [
+ "mice 0.8.0",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1398,7 +1405,7 @@ dependencies = [
  "indexmap",
  "libc",
  "log",
- "mice",
+ "mice 0.10.0",
  "nom 5.1.2",
  "once_cell",
  "parking_lot",
@@ -1432,6 +1439,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f83fb6581e8ed1f85fd45c116db8405483899489e38406156c25eb743554361d"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "mice"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4057a740a9b06f0487fbc3f8330dbce4e3ed3d60ad2fcc0504c6d2e0a1b3d61"
+dependencies = [
+ "nom 5.1.2",
+ "rand",
+ "thiserror",
 ]
 
 [[package]]
@@ -2075,7 +2093,7 @@ name = "reloadable-plotter"
 version = "0.1.0"
 dependencies = [
  "libc",
- "mice",
+ "mice 0.10.0",
  "plotters",
  "plotters-bitmap",
  "png 0.16.8",
@@ -2477,7 +2495,7 @@ name = "slash"
 version = "0.1.0"
 dependencies = [
  "futures 0.3.14",
- "mice",
+ "mice 0.10.0",
  "reqwest 0.10.10",
  "ron",
  "serde",
