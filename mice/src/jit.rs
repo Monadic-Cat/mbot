@@ -72,6 +72,7 @@ fn pcg() {
         let intermediate = bcx.ins().ushr_imm(oldstate, 18);
         let intermediate = bcx.ins().bxor(intermediate, oldstate);
         let xorshifted = bcx.ins().ushr_imm(intermediate, 27);
+        let xorshifted = bcx.ins().ireduce(ir::types::I32, xorshifted);
         let rot = bcx.ins().ushr_imm(oldstate, 59);
         let intermediate_a = bcx.ins().ushr(xorshifted, rot);
         let intermediate_b = bcx.ins().ineg(rot);
@@ -92,6 +93,7 @@ fn pcg() {
     {
         use frontend::FunctionBuilder;
         use ir::InstBuilder;
+        use ir::condcodes::IntCC;
         let mut bcx: FunctionBuilder = FunctionBuilder::new(&mut ctx.func, &mut func_ctx);
         let block = bcx.create_block();
         bcx.switch_to_block(block);
@@ -103,8 +105,48 @@ fn pcg() {
         // Note that this this requires we ensure the bound_param is not zero
         // that assurance is currently given by our disallowing d0s at parse time.
         let threshold = bcx.ins().urem(threshold, bound_param);
-        // something something br_icmp
-        // let cst = bcx.ins().
+        let for_loop_block = bcx.create_block();
+        bcx.ins().jump(for_loop_block, &[rng_param, threshold, bound_param]);
+        bcx.seal_block(block);  // We're done with this block, so seal it.
+        bcx.switch_to_block(for_loop_block);
+        bcx.append_block_param(for_loop_block, ptr_type);
+        bcx.append_block_param(for_loop_block, ir::types::I32);
+        bcx.append_block_param(for_loop_block, ir::types::I32);
+        let rng_param = bcx.block_params(for_loop_block)[0];
+        let threshold_param = bcx.block_params(for_loop_block)[1];
+        let bound_param = bcx.block_params(for_loop_block)[2];
+        let attempt = bcx.ins().call(local_func, &[rng_param]);
+        let attempt = {
+            let results = bcx.inst_results(attempt);
+            assert_eq!(results.len(), 1);
+            results[0].clone()
+        };
+        // Since this is to jump back to the start of the loop,
+        // I invert the condition written in pcg_basic.c.
+        let _br_icmp = bcx.ins().br_icmp(IntCC::UnsignedLessThan, attempt, threshold_param,
+                                         for_loop_block, &[rng_param, threshold_param, bound_param]);
+        let end_block = bcx.create_block();
+        bcx.ins().jump(end_block, &[attempt, bound_param]);
+        bcx.seal_block(for_loop_block);
+        bcx.switch_to_block(end_block);
+        bcx.append_block_param(end_block, ir::types::I32);
+        bcx.append_block_param(end_block, ir::types::I32);
+        let output = bcx.block_params(end_block)[0];
+        let bound = bcx.block_params(end_block)[1];
+        let output = bcx.ins().urem(output, bound);
+        bcx.ins().return_(&[output]);
     }
-    dbg!(ctx.func);
+    dbg!(&ctx.func);
+    module.define_function(func_bounded_rand, &mut ctx, &mut trap_sink, &mut stack_map_sink).unwrap();
+    module.clear_context(&mut ctx);
+
+    // Perform linking.
+    module.finalize_definitions();
+
+    let code_bounded_rand = module.get_finalized_function(func_bounded_rand);
+    let ptr_bounded_rand = unsafe {
+        ::core::mem::transmute::<_, extern "sysv64" fn(*mut [u64; 2], u32) -> u32>(code_bounded_rand)
+    };
+    let mut rng_state: [u64; 2] = [0x853c49e6748fea9b, 0xda3e39cb94b95bdb];
+    dbg!(ptr_bounded_rand(&mut rng_state as *mut [u64; 2], 10));
 }

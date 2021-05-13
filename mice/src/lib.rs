@@ -23,7 +23,7 @@
 //! println!("{}", roll("9d8 + 4d2 - 5 - 8d7")?);
 //! # Ok::<(), Error>(())
 //! ```
-#![forbid(unsafe_code)]
+// #![forbid(unsafe_code)]
 use rand::Rng;
 mod error;
 pub use error::Error;
