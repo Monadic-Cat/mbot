@@ -39,7 +39,11 @@ rand = { version = "0.7.0", features = ["small_rng"] }
 wasm-bindgen-test = "0.2"
 
 [[bench]]
-name = "my_benchmark"
+name = "rolling"
+harness = false
+
+[[bench]]
+name = "formatting"
 harness = false
 
 [features]
