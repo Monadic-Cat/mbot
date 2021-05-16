@@ -231,3 +231,16 @@ impl<'arena> PostorderIter<'arena> {
         <Self as StreamingIterator<'iter>>::next(self)
     }
 }
+
+#[cfg(test)]
+#[test]
+fn it_works() {
+    let program = crate::parse::new::parse_expression("4d6k3 + 2".as_bytes()).unwrap().1;
+    let mut iter = postorder(&program);
+    while let Some((term, ancestors)) = iter.next() {
+        dbg!(term);
+        for term in ancestors {
+            println!("Ancestor: {:?}", term);
+        }
+    }
+}
