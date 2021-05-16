@@ -46,6 +46,10 @@ harness = false
 name = "formatting"
 harness = false
 
+[[bench]]
+name = "tree"
+harness = false
+
 [features]
 default = ["thread_rng"]
 
