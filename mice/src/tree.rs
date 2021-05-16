@@ -110,7 +110,7 @@ impl<'a> PTreeWalker<'a> {
         }
     }
 
-    pub fn ancestors(&self) -> AncestorsIter<'a> {
+    pub fn ancestors(&self) -> AncestorsIter<'_> {
         AncestorsIter {
             terms: self.terms,
             // It makes me sad I can't borrow from this.
@@ -118,7 +118,7 @@ impl<'a> PTreeWalker<'a> {
             // :(
             // This is, presumably, where the extreme iteration overhead comes from.
             // We should Rc this.
-            stack: self.stack.clone(),
+            stack: &*self.stack,
             idx: Some(self.stack.len() - 1),
         }
     }
@@ -131,7 +131,7 @@ fn explosion<T>() -> T {
 
 pub struct AncestorsIter<'a> {
     terms: &'a Arena<Term>,
-    stack: Vec<StackFrame>,
+    stack: &'a [StackFrame],
     idx: Option<usize>,
 }
 impl<'a> AncestorsIter<'a> {
@@ -140,7 +140,7 @@ impl<'a> AncestorsIter<'a> {
     // but I didn't want to bother unwrapping an Option for it.
     fn empty(terms: &'a Arena<Term>) -> AncestorsIter<'a> {
         AncestorsIter {
-            stack: Vec::new(),
+            stack: &[],
             idx: None,
             terms,
         }
@@ -160,11 +160,8 @@ impl<'a> Iterator for AncestorsIter<'a> {
     }
 }
 
-/// Currently has significantly more iteration overhead than [`postorder`](crate::stack::postorder).
-/// Takes ~26 times as long to compile a [`Program`](crate::parse::new::Program) to stack bytecode
-/// as the recursive internal iteration implementation, on my laptop.
-///
-/// Avoid using when possible.
+/// Currently has substantially more iteration overhead than [`postorder`](crate::stack::postorder),
+/// but should running time appears to stay inside an order of magnitude on large trees.
 pub fn postorder(program: &Program) -> PostorderIter<'_> {
     let mut walker = PTreeWalker::new(program);
     while let Ok(()) = walker.descend() {}
@@ -174,11 +171,19 @@ pub fn postorder(program: &Program) -> PostorderIter<'_> {
 pub struct PostorderIter<'a> {
     walker: Option<PTreeWalker<'a>>,
 }
-impl<'a> Iterator for PostorderIter<'a> {
-    type Item = (&'a Term, AncestorsIter<'a>);
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.walker {
-            Some(ref mut walker) => {
+
+// An iterator trait that supports borrowing from the iterator,
+// by allowing the argument lifetime to be named inside the associated type.
+pub trait StreamingIterator<'a> {
+    type Item;
+    fn next(&'a mut self) -> Option<Self::Item>;
+}
+
+impl<'arena, 'iter> StreamingIterator<'iter> for PostorderIter<'arena> where 'arena: 'iter {
+    type Item = (&'arena Term, AncestorsIter<'iter>);
+    fn next(&'iter mut self) -> Option<Self::Item> {
+        match self.walker.as_mut() {
+            Some(walker) => {
                 let current = walker.current();
                 match current {
                     Some(current) => {
@@ -198,7 +203,22 @@ impl<'a> Iterator for PostorderIter<'a> {
                             Err(()) => {
                                 let current = walker.stack_top();
                                 let terms = walker.terms;
-                                self.walker = None;
+                                // let's, uh, just ignore borrowck for a moment
+                                // (this is what happens when I don't forbid unsafe code)
+                                // Safety: `walker` doesn't live to this point.
+                                // Borrowck just isn't smart enough to see that the borrow
+                                // dies sooner in this branch.
+                                // Additionally, Option<PTreeWalker> is guaranteed to have
+                                // the same layout as PTreeWalker, and so the same starting
+                                // address, and so writing None through this pointer cast
+                                // will be valid.
+                                // For extra validation, but not necessarily guarantee,
+                                // Miri doesn't complain about this on
+                                // `miri 0.1.0 (bcae331 2021-05-12)`.
+                                let ptr = walker as *mut PTreeWalker as *mut Option<PTreeWalker>;
+                                unsafe {
+                                    *ptr = None;
+                                }
                                 current.map(|current| (current, AncestorsIter::empty(terms)))
                             },
                         }
@@ -207,5 +227,12 @@ impl<'a> Iterator for PostorderIter<'a> {
             },
             None => None,
         }
+    }
+}
+
+impl<'arena> PostorderIter<'arena> {
+    pub fn next<'iter>(&'iter mut self) -> Option<(&'arena Term, AncestorsIter<'iter>)>
+    where PostorderIter<'arena>: StreamingIterator<'iter, Item = (&'arena Term, AncestorsIter<'iter>)> {
+        <Self as StreamingIterator<'iter>>::next(self)
     }
 }
