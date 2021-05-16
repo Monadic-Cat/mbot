@@ -33,7 +33,10 @@ where
         match term {
             node @ Constant(_) => visit(node, parent),
             node @ DiceRoll(_, _) => visit(node, parent),
-            KeepHigh(roll, _) => visit(&arena[*roll], Some(term)),
+            KeepHigh(roll, _) => {
+                visit(&arena[*roll], Some(term));
+                visit(term, parent);
+            },
             Add(left, right) | Subtract(left, right) => {
                 postorder_term(&arena[*left], Some(term), arena, &mut *visit);
                 postorder_term(&arena[*right], Some(term), arena, &mut *visit);
