@@ -21,7 +21,8 @@ fn postorder_iteration_benchmark(c: &mut Criterion) {
         });
         group.bench_function("Explicit Stack Walker", |b| {
             b.iter(|| {
-                for (term, _ancestors) in ::mice::tree::postorder(&program) {
+                let mut iter = ::mice::tree::postorder(&program);
+                while let Some((term, _ancestors)) = iter.next() {
                     black_box(term);
                 }
             });
@@ -87,7 +88,8 @@ fn stack_compiling_benchmark(c: &mut Criterion) {
         group.bench_function("Explicit Stack Walker", |b| {
             b.iter(|| {
                 let mut instructions = Vec::with_capacity(program.terms().len());
-                for (term, mut ancestors) in ::mice::tree::postorder(&program) {
+                let mut iter = ::mice::tree::postorder(&program);
+                while let Some((term, mut ancestors)) = iter.next() {
                     use ::mice::parse::new::Term::*;
                     let parent = ancestors.next();
                     let next = match term {
