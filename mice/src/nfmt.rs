@@ -343,6 +343,8 @@ fn regenerate_old_compat_cases() {
 
 #[cfg(test)]
 #[test]
+// This fails to run when isolation is enabled on Miri.
+#[cfg_attr(miri, ignore)]
 fn old_compat() {
     let test_cases: Vec<TestCase> = ::serde_json::from_str(
         &::std::fs::read_to_string("compat_cases.json").unwrap()).unwrap();
