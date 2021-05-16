@@ -113,11 +113,6 @@ impl<'a> PTreeWalker<'a> {
     pub fn ancestors(&self) -> AncestorsIter<'_> {
         AncestorsIter {
             terms: self.terms,
-            // It makes me sad I can't borrow from this.
-            // GATs, where are you?
-            // :(
-            // This is, presumably, where the extreme iteration overhead comes from.
-            // We should Rc this.
             stack: &*self.stack,
             idx: Some(self.stack.len() - 1),
         }
