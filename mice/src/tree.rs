@@ -1,0 +1,211 @@
+//! Tree traversal utilities.
+use crate::parse::new::{Program, Term};
+use ::id_arena::{Arena, Id};
+
+#[derive(Copy, Clone)]
+struct TreeIndex(u8);
+
+#[derive(Clone)]
+struct StackFrame {
+    cursor: TreeIndex,
+    id: Id<Term>,
+}
+impl StackFrame {
+    fn new(cursor: TreeIndex, id: Id<Term>) -> Self {
+        Self { cursor, id }
+    }
+}
+
+/// Program tree walker.
+pub struct PTreeWalker<'a> {
+    terms: &'a Arena<Term>,
+    stack: Vec<StackFrame>,
+    cursor: TreeIndex,
+}
+
+impl<'a> PTreeWalker<'a> {
+    pub fn new(program: &Program) -> PTreeWalker<'_> {
+        PTreeWalker {
+            terms: &program.terms,
+            stack: vec![StackFrame::new(TreeIndex(0), program.top)],
+            cursor: TreeIndex(0),
+        }
+    }
+    pub fn stack_top(&self) -> Option<&'a Term> {
+        self.stack.last().map(|StackFrame { id, .. }| &self.terms[*id])
+    }
+
+    fn index_term(&self, term: &Term, index: TreeIndex) -> Option<Id<Term>> {
+        let TreeIndex(index) = index;
+        match (index, term) {
+            (_, Term::Constant(_)) | (_, Term::DiceRoll(_, _)) => None,
+            (0, Term::KeepHigh(a, _)) => Some(*a),
+            (0, Term::Add(a, _)) | (0, Term::Subtract(a, _)) => Some(*a),
+            (0, Term::UnaryAdd(a)) | (0, Term::UnarySubtract(a)) => Some(*a),
+            (1, Term::KeepHigh(_, _)) => None,
+            (1, Term::Add(_, b)) | (1, Term::Subtract(_, b)) => Some(*b),
+            (1, Term::UnaryAdd(_)) | (1, Term::UnarySubtract(_)) => None,
+            (2..=255, _) => None,
+        }
+    }
+
+    pub fn current(&self) -> Option<&'a Term> {
+        self.stack_top().map(|top| self.index_term(top, self.cursor).map(|id| &self.terms[id])).flatten()
+    }
+
+    pub fn descend(&mut self) -> Result<(), ()> {
+        let stack_top = match self.stack_top() {
+            Some(x) => x,
+            None => return Err(()),
+        };
+        let child = match self.index_term(stack_top, self.cursor) {
+            Some(x) => x,
+            None => return Err(()),
+        };
+        self.stack.push(StackFrame::new(self.cursor, child));
+        self.cursor = TreeIndex(0);
+        Ok(())
+    }
+    pub fn ascend(&mut self) -> Result<(), ()> {
+        // No ascending past the top of the tree.
+        if self.stack.len() > 1 {
+            let StackFrame { cursor, id: _ } = match self.stack.pop() {
+                Some(x) => x,
+                None => unreachable!("we just checked the stack's length"),
+            };
+            self.cursor = cursor;
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+
+    pub fn move_left(&mut self) {
+        let TreeIndex(cursor) = self.cursor;
+        self.cursor = TreeIndex(cursor.saturating_sub(1));
+    }
+    pub fn move_right(&mut self) {
+        let TreeIndex(cursor) = self.cursor;
+        self.cursor = TreeIndex(cursor.saturating_add(1));
+    }
+
+    pub fn has_children(&self) -> bool {
+        {
+            // If these variants start having children, this will fail to compile,
+            // which will be a reminder to adjust this function.
+            const _: Term = Term::Constant(0);
+            const _: Term = Term::DiceRoll(0, 0);
+        }
+        let current = match self.current() {
+            Some(x) => x,
+            None => return false,
+        };
+        match current {
+            Term::Constant(_) | Term::DiceRoll(_, _) => false,
+            Term::KeepHigh(_, _)
+            | Term::Add(_, _)
+            | Term::Subtract(_, _)
+            | Term::UnaryAdd(_)
+            | Term::UnarySubtract(_) => true,
+        }
+    }
+
+    pub fn ancestors(&self) -> AncestorsIter<'a> {
+        AncestorsIter {
+            terms: self.terms,
+            // It makes me sad I can't borrow from this.
+            // GATs, where are you?
+            // :(
+            // This is, presumably, where the extreme iteration overhead comes from.
+            // We should Rc this.
+            stack: self.stack.clone(),
+            idx: Some(self.stack.len() - 1),
+        }
+    }
+}
+
+/// Using the principle of explosion, we can synthesize any type.
+fn explosion<T>() -> T {
+    panic!("Boom!")
+}
+
+pub struct AncestorsIter<'a> {
+    terms: &'a Arena<Term>,
+    stack: Vec<StackFrame>,
+    idx: Option<usize>,
+}
+impl<'a> AncestorsIter<'a> {
+    // For an empty iterator, we don't actually need
+    // to hold a reference to a terms arena,
+    // but I didn't want to bother unwrapping an Option for it.
+    fn empty(terms: &'a Arena<Term>) -> AncestorsIter<'a> {
+        AncestorsIter {
+            stack: Vec::new(),
+            idx: None,
+            terms,
+        }
+    }
+}
+impl<'a> Iterator for AncestorsIter<'a> {
+    type Item = &'a Term;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.idx {
+            Some(idx) => {
+                let item = &self.terms[self.stack[idx].id];
+                self.idx = idx.checked_sub(1);
+                Some(item)
+            },
+            None => None,
+        }
+    }
+}
+
+/// Currently has significantly more iteration overhead than [`postorder`](crate::stack::postorder).
+/// Takes ~26 times as long to compile a [`Program`](crate::parse::new::Program) to stack bytecode
+/// as the recursive internal iteration implementation, on my laptop.
+///
+/// Avoid using when possible.
+pub fn postorder(program: &Program) -> PostorderIter<'_> {
+    let mut walker = PTreeWalker::new(program);
+    while let Ok(()) = walker.descend() {}
+    PostorderIter { walker: Some(walker) }
+}
+
+pub struct PostorderIter<'a> {
+    walker: Option<PTreeWalker<'a>>,
+}
+impl<'a> Iterator for PostorderIter<'a> {
+    type Item = (&'a Term, AncestorsIter<'a>);
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.walker {
+            Some(ref mut walker) => {
+                let current = walker.current();
+                match current {
+                    Some(current) => {
+                        walker.move_right();
+                        Some((current, walker.ancestors()))
+                    },
+                    None => {
+                        match walker.ascend() {
+                            // We had a parent. Use it.
+                            Ok(()) => {
+                                let current = walker.current().unwrap();
+                                walker.move_right();
+                                Some((current, walker.ancestors()))
+                            },
+                            // We tried to ascend past the root, which is our current parent.
+                            // Use the root and destroy the walker.
+                            Err(()) => {
+                                let current = walker.stack_top();
+                                let terms = walker.terms;
+                                self.walker = None;
+                                current.map(|current| (current, AncestorsIter::empty(terms)))
+                            },
+                        }
+                    }
+                }
+            },
+            None => None,
+        }
+    }
+}

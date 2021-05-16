@@ -572,6 +572,9 @@ pub mod new {
             write_sexpr(&self.terms, self.top, &mut buf);
             buf
         }
+        pub fn terms(&self) -> &Arena<Term> {
+            &self.terms
+        }
     }
 
     /// The return type of a parser function that returns trailing unparsed input
