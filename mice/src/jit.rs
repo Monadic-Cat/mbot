@@ -1,18 +1,109 @@
+//! JIT compilation, for running a particular dice expression many times as fast as possible.
+use ::core::pin::Pin;
+use ::cranelift::{codegen::{self, ir}, frontend};
+use codegen::settings::Configurable;
+use ::cranelift_jit::{JITBuilder, JITModule};
+use ::cranelift_module::{Module, Linkage};
 use crate::parse::new::Program;
+use crate::stack::Overflow;
 
-fn codegen(program: &Program) -> () {
+// It's conceivable that the dice language will become sufficiently complex
+// that it will become worth it to JIT compile parts of dice programs that are
+// used frequently, but what we do here does not approach that problem.
+
+
+/// A JIT compiled dice program.
+/// Does not permit passing in your own RNG,
+/// to avail aggressive inlining inside generated code.
+/// Currently uses PCG32.
+pub struct CraneliftProgram {
+    
+}
+impl CraneliftProgram {
+    pub fn eval(&self) -> Result<i64, Overflow> {
+        todo!("JIT-ed program execution")
+    }
+}
+
+/// An error type for late caught errors caused by mismatch
+/// between our frontend and backend.
+pub enum CodegenError {
+    /// Since our frontend accepts integers up to [`i64::MAX`],
+    /// and we currently do not support pulling numbers that large
+    /// from our hand written PCG32 implementation in CLIF,
+    /// we reject dice programs that use integers larger than [`i32::MAX`].
+    TooBig,
+}
+
+fn validate_program(program: &Program) -> Result<(), CodegenError> {
+    use crate::stack::postorder;
+    use crate::parse::new::Term;
+    // postorder(program, |term, _parent| {
+    //     match term {
+    //         Term::Constant(n) => 
+    //     }
+    // });
+    todo!()
+}
+
+/// Compile a dice program to native code using Cranelift.
+pub fn codegen(_program: &Program) -> Result<CraneliftProgram, CodegenError> {
+    let mut flag_builder = codegen::settings::builder();
+    // I don't know what this means. I just copied it from the cranelift-jit example.
+    flag_builder.set("use_colocated_libcalls", "false").unwrap();
+    // Apparently the example sets this to false because the x64 backend doesn't support it?
+    flag_builder.set("is_pic", "false").unwrap();
+    let isa_builder = ::cranelift_native::builder().unwrap_or_else(|msg| {
+        panic!("host machine is not supported: {}", msg);
+    });
+    let isa = isa_builder.finish(codegen::settings::Flags::new(flag_builder));
+    let ptr_type = ir::Type::triple_pointer_type(isa.triple());
+    let mut module = JITModule::new(JITBuilder::with_isa(isa, ::cranelift_module::default_libcall_names()));
+
+    let mut ctx = module.make_context();
+    let mut func_ctx = frontend::FunctionBuilderContext::new();
+
+    // Important note: cranelift-jit does not currently support
+    // linking our functions together on ARM64.
+    // So, we're gonna avoid using that functionality for now.
+
+    
     todo!("figure out how codegen with Cranelift works")
+}
+
+struct Sampler<const SAMPLE_SIZE: usize> {
+    // We currently use const generics to specify the size of our sample buffer at compile time,
+    // but I think it's quite likely this will have no impact on performance.
+    // `Pin` is used here to express that the heap allocated array isn't supposed to
+    // move while `entry_point` may be called.
+    // This is because, internally, entry_point may be compiled to use the address of
+    // `heap` as an immediate, if that provides a noticeable performance gain.
+    // Note that `Pin` is not necessary for me to enforce this requirement,
+    // but I'm trying it out as a helper.
+    heap: Pin<Box<[i64; SAMPLE_SIZE]>>,
+    code: JITModule,
+    // Safety: While `fn` references are implicitly 'static,
+    // the code this points to does not live forever. Nor will `heap`.
+    // So, this function reference MUST NOT escape the life
+    // of this struct.
+    // The pointee function is marked `unsafe` as a hint,
+    // and the safety requirement is only calling it while
+    // both `heap` and `code` are alive.
+    entry_point: unsafe extern "C" fn(*mut [u64; 2]),
+}
+
+// Code generation specialized on the task of sampling random data for the purpose of
+// plotting the PDFs of dice programs.
+fn plotting_codegen<const N: usize>(_program: &Program, _heap: Box<[i64; N]>) -> Sampler<N> {
+    // Total permitted time: 3s.
+    todo!("generate highly optimized dice rolling code")
 }
 
 // Gonna be stuff related to doing PCG inside of generated code.
 // Based on mostly hearsay, giving our codegen the opportunity
 // to inline random number generation may be important.
 // For now, though, I'm just dumping experiments in here.
-fn pcg() {
-    use ::cranelift::{codegen::{self, ir}, frontend};
-    use codegen::settings::Configurable;
-    use ::cranelift_jit::{JITBuilder, JITModule};
-    use ::cranelift_module::{Module, Linkage};
+pub fn pcg() {
     let mut flag_builder = codegen::settings::builder();
     // I don't know what this means. I just copied it from the cranelift-jit example.
     flag_builder.set("use_colocated_libcalls", "false").unwrap();
