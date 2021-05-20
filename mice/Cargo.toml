@@ -31,6 +31,7 @@ cranelift-module = "0.73.0"
 cranelift-native = "0.73.0"
 # lol this calls itself "extremely experimental"
 cranelift-jit = "0.73.0"
+derive_more = "0.99.14"
 
 [dev-dependencies]
 criterion = "0.3"

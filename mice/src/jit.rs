@@ -17,7 +17,8 @@ use crate::stack::Overflow;
 /// to avail aggressive inlining inside generated code.
 /// Currently uses PCG32.
 pub struct CraneliftProgram {
-    
+    /// Internal state for a PCG32 PRNG.
+    rng_state: [u64; 2],
 }
 impl CraneliftProgram {
     pub fn eval(&self) -> Result<i64, Overflow> {
@@ -31,23 +32,50 @@ pub enum CodegenError {
     /// Since our frontend accepts integers up to [`i64::MAX`],
     /// and we currently do not support pulling numbers that large
     /// from our hand written PCG32 implementation in CLIF,
-    /// we reject dice programs that use integers larger than [`i32::MAX`].
-    TooBig,
+    /// we reject dice programs that use dice with more than [`i32::MAX`] sides.
+    DieTooBig,
 }
 
-fn validate_program(program: &Program) -> Result<(), CodegenError> {
-    use crate::stack::postorder;
+/// A validated wrapper for [`Program`] that enforces various invariants we
+/// take for granted inside the code generation phase.
+/// These invariants are relied on for safety.
+/// # Safety Requirements for *Construction*.
+/// - There must exist no dice terms with more sides than [`i32::MAX`].
+// This may not remain a direct wrapper. We'll see.
+#[derive(::derive_more::Deref, ::derive_more::DerefMut)]
+#[repr(transparent)]
+pub struct ValidProgram {
+    program: Program,
+}
+fn validate_program(program: &Program) -> Result<&ValidProgram, CodegenError> {
     use crate::parse::new::Term;
-    // postorder(program, |term, _parent| {
-    //     match term {
-    //         Term::Constant(n) => 
-    //     }
-    // });
-    todo!()
+    use crate::tree::postorder;
+    let mut iter = postorder(program);
+    while let Some((term, _ancestors)) = iter.next() {
+        match term {
+            Term::DiceRoll(_count, sides) => if sides > &(i32::MAX as i64) {
+                return Err(CodegenError::DieTooBig)
+            },
+            _ => (),
+        }
+    }
+    // Safety: ValidProgram is a repr(transparent) newtype wrapper around Program,
+    // so this reference cast is safe.
+    // We've also just validated the requirements for construction of `ValidProgram`.
+    // It is known that `Program` contains no internally mutable types,
+    // and so it will remain the same as long as this reference lives.
+    // Therefore, this `&ValidProgram` will remain valid as long as it lives.
+    Ok(unsafe { &*(program as *const Program as *const ValidProgram) })
+}
+
+impl ValidProgram {
+    pub fn validate_ref(program: &Program) -> Result<&ValidProgram, CodegenError> {
+        validate_program(program)
+    }
 }
 
 /// Compile a dice program to native code using Cranelift.
-pub fn codegen(_program: &Program) -> Result<CraneliftProgram, CodegenError> {
+pub fn codegen(program: &ValidProgram) -> CraneliftProgram {
     let mut flag_builder = codegen::settings::builder();
     // I don't know what this means. I just copied it from the cranelift-jit example.
     flag_builder.set("use_colocated_libcalls", "false").unwrap();
@@ -66,6 +94,10 @@ pub fn codegen(_program: &Program) -> Result<CraneliftProgram, CodegenError> {
     // Important note: cranelift-jit does not currently support
     // linking our functions together on ARM64.
     // So, we're gonna avoid using that functionality for now.
+    use crate::tree::for_;
+    for_! { (term, _ancestors) in crate::tree::postorder(program) => {
+        
+    }}
 
     
     todo!("figure out how codegen with Cranelift works")
@@ -81,6 +113,8 @@ struct Sampler<const SAMPLE_SIZE: usize> {
     // Note that `Pin` is not necessary for me to enforce this requirement,
     // but I'm trying it out as a helper.
     heap: Pin<Box<[i64; SAMPLE_SIZE]>>,
+    /// The state for a PCG32 PRNG.
+    rng_state: [u64; 2],
     code: JITModule,
     // Safety: While `fn` references are implicitly 'static,
     // the code this points to does not live forever. Nor will `heap`.
