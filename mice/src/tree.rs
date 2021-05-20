@@ -232,6 +232,49 @@ impl<'arena> PostorderIter<'arena> {
     }
 }
 
+/// This is a module whose contents I will not at all try to keep stable,
+/// consisting entirely of things that are only `pub` so that I can use
+/// them from inside the outputs of macros that I *do* want public.
+#[doc(hidden)]
+pub mod private_for_inside_macro_outputs {
+    pub use ::core::option::Option::Some;
+}
+/// A `for` loop-alike for [`StreamingIterator`].
+/// ```
+/// # use ::mice::tree::for_;
+/// use ::mice::parse::new::parse_expression;
+/// let program = parse_expression("4d6k3 + 2".as_bytes()).unwrap().1;
+/// for_! { (term, _ancestors) in ::mice::tree::postorder(&program) => {
+///     // do stuff with `term` and maybe `_ancestors`
+/// }}
+/// ```
+#[macro_export]
+macro_rules! for_ {
+    ($elem:pat in $iter:expr => $blk:block) => {
+        match $iter {
+            mut iter =>
+                while let $crate::tree::private_for_inside_macro_outputs::Some($elem)
+                = $crate::tree::StreamingIterator::next(&mut iter) $blk
+        }
+    }
+}
+#[doc(inline)]
+pub use for_;
+
+// Convenience impl so we can use normal iterators with our fake `for` loop, too.
+// Also, demonstrates that the only difference between Iterator and our
+// StreamingIterator is that we can name the lifetime of the borrow at `.next()`
+// inside the associated type. In theory, you could implement StreamingIterator
+// with only a few specific lifetimes, but the only lifetime you can name outside
+// of a universal quantifier is the `'static` lifetime.
+impl<'a, Iter, T> StreamingIterator<'a> for Iter
+where Iter: Iterator<Item = T> {
+    type Item = T;
+    fn next(&'a mut self) -> Option<Self::Item> {
+        <Self as Iterator>::next(self)
+    }
+}
+
 #[cfg(test)]
 #[test]
 fn it_works() {
