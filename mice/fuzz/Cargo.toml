@@ -25,3 +25,9 @@ name = "ast_interp"
 path = "fuzz_targets/ast_interp.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "old_interp"
+path = "fuzz_targets/old_interp.rs"
+test = false
+doc = false
