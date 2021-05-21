@@ -94,11 +94,31 @@ pub fn codegen(program: &ValidProgram) -> CraneliftProgram {
     // Important note: cranelift-jit does not currently support
     // linking our functions together on ARM64.
     // So, we're gonna avoid using that functionality for now.
-    use crate::tree::for_;
-    for_! { (term, _ancestors) in crate::tree::postorder(program) => {
-        
-    }}
 
+    // Signature for the dice program's entry point.
+    let mut sig_entry_point = module.make_signature();
+    // I'm considering "hardcoding" the PRNG state pointer.
+    // Currently going with what I've already tested, though.
+    sig_entry_point.params.push(ir::AbiParam::new(ptr_type));
+    sig_entry_point.returns.push(ir::AbiParam::new(ir::types::I64));
+
+    let func_entry_point = module.declare_function("entry_point", Linkage::Local, &sig_entry_point).unwrap();
+
+    ctx.func.signature = sig_entry_point;
+    ctx.func.name = ir::ExternalName::user(0, func_entry_point.as_u32());
+    {
+        use frontend::FunctionBuilder;
+        use ir::InstBuilder;
+        let mut bcx: FunctionBuilder = FunctionBuilder::new(&mut ctx.func, &mut func_ctx);
+        let start_block = bcx.create_block();
+        bcx.switch_to_block(start_block);
+        bcx.append_block_params_for_function_params(start_block);
+        
+        use crate::tree::for_;
+        for_! { (term, _ancestors) in crate::tree::postorder(program) => {
+            
+        }}
+    }
     
     todo!("figure out how codegen with Cranelift works")
 }
