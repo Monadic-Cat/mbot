@@ -1,12 +1,27 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, BenchmarkGroup};
+use ::rand::{RngCore, Rng};
+use ::core::num::Wrapping;
 
 /// Dice expressions we're using for benchmarks.
-const DICE_EXPRESSIONS: &[(&str, &str)] = &[
-    ("Small Expression", "2d6"),
-    ("Medium Expression", "2d6 + 4d4 + 9"),
-    ("Large Expression", "3d9 + 9d4 - 2d1 + 40d7"),
-    ("Absurdly Large Expression", "3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7"),
-    ("Expensive But Short Expression", "10000d100")
+const DICE_EXPRESSIONS: &[(&str, &str, fn(&mut dyn RngCore) -> i64)] = &[
+    ("Small Expression", "2d6", |rng| {
+        (0..2).fold(Wrapping(0i64), |a, _| a + Wrapping(rng.gen_range(0, 6)) + Wrapping(1)).0
+    }),
+    ("Medium Expression", "2d6 + 4d4 + 9", |rng| {
+        let die_2d6 = (0..2).fold(Wrapping(0i64), |a, _| a + Wrapping(rng.gen_range(0, 6)) + Wrapping(1));
+        let die_4d4 = (0..4).fold(Wrapping(0i64), |a, _| a + Wrapping(rng.gen_range(0, 4)) + Wrapping(1));
+        let nine = Wrapping(9);
+        (die_2d6 + die_4d4 + nine).0
+    }),
+    ("Large Expression", "3d9 + 9d4 - 2d1 + 40d7", |rng| {
+        let die_3d9 = (0..3).fold(Wrapping(0i64), |a, _| a + Wrapping(rng.gen_range(0, 9)) + Wrapping(1));
+        let die_9d4 = (0..9).fold(Wrapping(0i64), |a, _| a + Wrapping(rng.gen_range(0, 4)) + Wrapping(1));
+        let die_2d1 = Wrapping(2);
+        let die_40d7 = (0..40).fold(Wrapping(0), |a, _| a + Wrapping(rng.gen_range(0, 7)) + Wrapping(1));
+        (die_3d9 + die_9d4 - die_2d1 + die_40d7).0
+    }),
+    ("Absurdly Large Expression", "3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7 + 3d9 + 9d4 - 2d1 + 40d7", |_| 0),
+    ("Expensive But Short Expression", "10000d100", |_| 0)
 ];
 
 fn roll_startup_benchmark(c: &mut Criterion) {
@@ -30,7 +45,7 @@ fn roll_startup_benchmark(c: &mut Criterion) {
             });
         });
     };
-    for (title, expression) in DICE_EXPRESSIONS {
+    for (title, expression, _rust) in DICE_EXPRESSIONS {
         rollers(c.benchmark_group(format!("Startup - {}", title)), black_box(*expression));
     }
 }
@@ -39,7 +54,7 @@ fn rolling_benchmark(c: &mut Criterion) {
     use ::rand::SeedableRng;
     let mut rng = ::rand::rngs::SmallRng::from_entropy();
 
-    let mut rollers = |mut group: BenchmarkGroup<_>, program_text| {
+    let mut rollers = |mut group: BenchmarkGroup<_>, program_text, rust: fn(&mut dyn RngCore) -> i64| {
         let expression = black_box(mice::parse::Expression::parse(program_text).unwrap().1.unwrap());
         let (_, program) = black_box(mice::parse::new::parse_expression(program_text.as_bytes()).unwrap());
         let stack_program = black_box(mice::stack::compile(&program));
@@ -55,11 +70,16 @@ fn rolling_benchmark(c: &mut Criterion) {
                 let _ = black_box(machine.eval_with(&mut rng, &stack_program));
             });
         });
+        group.bench_function("Rust", |b| {
+            b.iter(|| {
+                let _ = black_box(rust(&mut rng));
+            });
+        });
     };
 
-    let mut wg = |gn, t| rollers(c.benchmark_group(gn), t);
-    for (title, expression) in DICE_EXPRESSIONS {
-        wg(format!("Execution - {}", title), expression);
+    let mut wg = |gn, t, rust| rollers(c.benchmark_group(gn), t, rust);
+    for (title, expression, rust) in DICE_EXPRESSIONS {
+        wg(format!("Execution - {}", title), expression, *rust);
     }
 }
 
@@ -89,7 +109,7 @@ fn end_to_end_rolling_benchmark(c: &mut Criterion) {
         });
     };
 
-    for (title, expression) in DICE_EXPRESSIONS {
+    for (title, expression, _rust) in DICE_EXPRESSIONS {
         rollers(c.benchmark_group(format!("End to End - {}", title)), black_box(expression));
     }
 }
