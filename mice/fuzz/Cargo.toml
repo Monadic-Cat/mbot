@@ -1,0 +1,27 @@
+
+[package]
+name = "mice-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+rand_pcg = "0.2.1"
+
+[dependencies.mice]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "ast_interp"
+path = "fuzz_targets/ast_interp.rs"
+test = false
+doc = false
