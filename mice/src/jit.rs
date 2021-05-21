@@ -294,4 +294,10 @@ pub fn pcg() {
     };
     let mut rng_state: [u64; 2] = [0x853c49e6748fea9b, 0xda3e39cb94b95bdb];
     dbg!(ptr_bounded_rand(&mut rng_state as *mut [u64; 2], 10));
+    let code_rand = dbg!(module.get_finalized_function(func_rand));
+    let ptr_rand = unsafe {
+        ::core::mem::transmute::<_, extern "C" fn(*mut [u64; 2]) -> u32>(code_rand)
+    };
+    let mut rng_state: [u64; 2] = [0x853c49e6748fea9b, 0xda3e39cb94b95bdb];
+    dbg!(ptr_rand(&mut rng_state as *mut [u64; 2]));
 }
