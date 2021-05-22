@@ -23,8 +23,8 @@ fn format_smart(exp: mice::ExpressionResult) -> String {
 }
 
 fuzz_target!(|data: &[u8]| {
-    if let Ok(Ok((_, Ok(dice)))) = ::core::str::from_utf8(data).map(|data| Expression::parse(data)) {
-        if !dice.exceeds_cap(10000) {
+    if let Ok(Ok((input, Ok(dice)))) = ::core::str::from_utf8(data).map(|data| Expression::parse(data)) {
+        if input.is_empty() && !dice.exceeds_cap(10000) {
             let mut rng = Pcg32::new(0xcafef00dd15ea5e5, 0xa02bdbf7bb3c0a7);
             let _ = dice.roll_with(&mut rng).map(|res| format_smart(res));
         }
