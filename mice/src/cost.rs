@@ -14,7 +14,7 @@ pub enum Price {
 // types implementing this trait, where I need to demonstrate bounded cost to avoid being DOSed.
 /// Cost of using a dice program in a given context.
 pub trait Cost<'a, Ctx> {
-    /// A runtime parameter for extra information, should the `Ctx` type argument
+    /// A runtime parameter for extra context information, should the `Ctx` type argument
     /// be insufficient for determining the cost of handling dice expressions
     /// in a given context.
     /// Where unimportant, this should be `()`.
