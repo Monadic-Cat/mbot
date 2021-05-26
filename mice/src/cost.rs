@@ -1,6 +1,14 @@
 //! Approximate cost models for dice programs used in various contexts.
 
 /// Evaluation cost.
+/// This is a context relative measure of how expensive it is to handle something.
+/// In the interpreter contexts, this is most likely an approximation of
+/// the count of the smallest significant step in interpretation evaluating given program
+/// will be equivalent to.
+/// In the formatting contexts, this is most likely a measure of how much allocation
+/// will be performed.
+/// In histogram plotting, this is simply a guessed at indicator of what multiple of the
+/// fastest observed plotting time the generated data will take.
 #[non_exhaustive]
 pub enum Price {
     Bounded(u64),
@@ -84,5 +92,18 @@ impl<'a> Cost<'a, StackInterp> for Program {
             Term::UnaryAdd(_) => (),
         });
         Price::Bounded(price)
+    }
+}
+
+// TODO: being able to implement this would allow us to remove the kludge inside
+// ExpressionExt::evaluation_cost(...) having to do with the size of allocations in formatting.
+/// Context of formatting the output of a dice program as text.
+pub struct TextFormatOutput;
+impl<'a> Cost<'a, TextFormatOutput> for crate::parse::Expression {
+    // TODO: choose a better type for this?
+    // FormatOptions is supposed to be deprecated, so using it in a new API is a little weird.
+    type Param = &'a crate::post::FormatOptions;
+    fn cost(&'a self, _param: Self::Param) -> Price {
+        todo!()
     }
 }
