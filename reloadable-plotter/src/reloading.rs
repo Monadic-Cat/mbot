@@ -15,15 +15,16 @@ macro_rules! decl_module {
 // Like, might handle FFI related type declarations?
 // Point is that decl_module is gonna be somewhat barebones and
 // we may be able to abstract away more.
-macro_rules! link {
-    ($($t:tt)*) => {}
-}
+// macro_rules! link {
+//     ($($t:tt)*) => {}
+// }
 
 // #[cfg(all(feature = "reloadable_plotter", feature = "static_plotter"))]
 // compile_error!("The reloadable_plotter and static_plotter features are mutually exclusive. You must select either one or the other, not both.");
 // #[cfg(not(any(feature = "reloadable_plotter", feature = "static_plotter")))]
 // compile_error!("To enable dice plotting, you must select either the reloadable_plotter or static_plotter feature.");
 
+#[cfg(feature = "plotter")]
 use ::proc_macro_helpers::reloadable;
 
 #[cfg_attr(all(feature = "reloadable_plotter", feature = "static_plotter"), cfg(not(all())))]

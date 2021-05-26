@@ -467,7 +467,7 @@ pub mod new {
                         state = State::Whitespace;
                         cursor = rest;
                     },
-                    [_, rest @ ..] => break,
+                    [_, _rest @ ..] => break,
                     [] => break,
                 },
                 State::Int(start) => match cursor {
@@ -688,7 +688,7 @@ pub mod new {
                     (rest, Term::DiceRoll(1, *faces))
                 },
                 [Token::Int(n), rest @ ..] => (rest, Term::Constant(*n)),
-                [x, ..] => Err(InvalidTokenInExpr)?,
+                [_x, ..] => Err(InvalidTokenInExpr)?,
                 [] => Err(UnexpectedEof)?,
             };
 
@@ -701,7 +701,7 @@ pub mod new {
                         cursor = rest;
                         continue
                     },
-                    [x, ..] => Err(ExprError::InvalidTokenInBinOp)?,
+                    [_x, ..] => Err(ExprError::InvalidTokenInBinOp)?,
                     [] => break,
                 };
                 let (l_bp, r_bp) = infix_binding_power(op);
