@@ -143,7 +143,7 @@ impl Expr {
         if !ignore_sign {
             match self.sign {
                 Sign::Positive => (),
-                Sign::Negative => nstr.push_str("-"),
+                Sign::Negative => nstr.push('-'),
             }
         }
         nstr.push_str(&format!("{}", self.term));
@@ -527,38 +527,38 @@ pub mod new {
     /// This writes out the parse tree starting from `top` as an S-expression.
     fn write_sexpr(terms: &Arena<Term>, top: Id<Term>, buf: &mut String) {
         let mut write_op = |op: &str, lhs, rhs| {
-            buf.push_str("(");
+            buf.push('(');
             buf.push_str(op);
-            buf.push_str(" ");
+            buf.push(' ');
             write_sexpr(terms, lhs, &mut *buf);
-            buf.push_str(" ");
+            buf.push(' ');
             write_sexpr(terms, rhs, &mut *buf);
-            buf.push_str(")");
+            buf.push(')');
         };
         match terms[top] {
             Term::Constant(n) => { itoa::fmt(&mut *buf, n).unwrap(); },
             Term::DiceRoll(count, faces) => {
                 itoa::fmt(&mut *buf, count).unwrap();
-                buf.push_str("d");
+                buf.push('d');
                 itoa::fmt(&mut *buf, faces).unwrap();
             }
             Term::KeepHigh(roll, count) => {
-                buf.push_str("(");
-                buf.push_str("k");
-                buf.push_str(" ");
+                buf.push('(');
+                buf.push('k');
+                buf.push(' ');
                 write_sexpr(terms, roll, &mut *buf);
-                buf.push_str(" ");
+                buf.push(' ');
                 itoa::fmt(&mut *buf, count).unwrap();
-                buf.push_str(")");
+                buf.push(')');
             },
             Term::Add(lhs, rhs) => write_op("+", lhs, rhs),
             Term::Subtract(lhs, rhs) => write_op("-", lhs, rhs),
             Term::UnaryAdd(arg) => {
-                buf.push_str("+");
+                buf.push('+');
                 write_sexpr(terms, arg, &mut *buf);
             }
             Term::UnarySubtract(arg) => {
-                buf.push_str("-");
+                buf.push('-');
                 write_sexpr(terms, arg, &mut *buf);
             }
         }

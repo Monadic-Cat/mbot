@@ -67,9 +67,9 @@ impl ExpressionFormatter<'_> {
                     TermSeparator::Comma => buf.push_str(", "),
                     TermSeparator::Text(ref text) => buf.push_str(text),
                     TermSeparator::Operator => {
-                        buf.push_str(" ");
+                        buf.push(' ');
                         buf.push_str(sign_str(term.0.sign));
-                        buf.push_str(" ");
+                        buf.push(' ');
                     },
                 }
                 let formatter = TermFormatter { buf, term, is_first: false };
@@ -118,11 +118,11 @@ impl TermFormatter<'_> {
                 match directive {
                     PartialSumSignDirective::Plus => buf.push_str(" +"),
                     PartialSumSignDirective::Same => {
-                        buf.push_str(" ");
+                        buf.push(' ');
                         buf.push_str(sign_str(term.1.sign()));
                     },
                 }
-                buf.push_str(" ");
+                buf.push(' ');
                 let _ = itoa::fmt(&mut *buf, *rest);
             }
         }
@@ -135,7 +135,7 @@ impl TermFormatter<'_> {
         match term.0.term {
             Term::Dice(dice) => {
                 let _ = itoa::fmt(&mut *buf, dice.count());
-                buf.push_str("d");
+                buf.push('d');
                 let _ = itoa::fmt(&mut *buf, dice.sides());
             },
             Term::Constant(number) => {

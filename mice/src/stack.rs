@@ -107,6 +107,7 @@ pub enum Overflow {
 }
 
 impl Machine {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             stack: Vec::new(),

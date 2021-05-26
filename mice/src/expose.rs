@@ -61,5 +61,5 @@ pub fn tuple_vec(input: &str) -> Result<Vec<ExprTuple>, ParseError> {
 /// provided by this function's complement: `tuple_vec`
 #[cfg(feature = "thread_rng")]
 pub fn roll_tuples(input: &[ExprTuple]) -> EResult {
-    Ok(RollBuilder::new().with_tuples(input).map_err(|e| Error::from(ParseError::from(e)))?.into_roll().unwrap().roll()?)
+    RollBuilder::new().with_tuples(input).map_err(|e| Error::from(ParseError::from(e)))?.into_roll().unwrap().roll()
 }

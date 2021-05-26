@@ -150,7 +150,7 @@ fn interpret_term<R: Rng>(
                                 InterpError::OverflowNegative
                             }
                         })
-                        .and_then(|total| Ok((total, left, right)))
+                        .map(|total| (total, left, right))
                 })
             })?;
             Ok(term_outputs.alloc(TermOutput::Add(total, left, right)))

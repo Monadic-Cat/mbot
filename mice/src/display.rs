@@ -34,7 +34,7 @@ pub fn format(e: &ExpressionResult, options: FormatOptions) -> String {
         let form = |a, b| format_dice_term(a, b, formatting);
         if let TermSeparator::PlusSign = term_separators {
             if let Sign::Negative = after.sign() {
-                nstr.push_str("-")
+                nstr.push('-')
             }
         }
         nstr.push_str(&form(&before, &after));

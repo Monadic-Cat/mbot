@@ -108,14 +108,14 @@ fn playbook_list_command(playbooks: &[Playbook], sources: &[Source]) -> proc_mac
     });
     let mut body = String::new();
     for (source, vec) in list {
-        write!(body, "**{}**\n", sources[source_keys[source]].name).unwrap();
+        writeln!(body, "**{}**", sources[source_keys[source]].name).unwrap();
         use std::fmt::Write;
         for (idx, book) in vec.iter().enumerate() {
             let book = ::titlecase::titlecase(book);
             if idx < vec.len() - 1 {
                 write!(body, "{}, ", book).unwrap();
             } else {
-                write!(body, "{}\n", book).unwrap();
+                writeln!(body, "{}", book).unwrap();
             }
         }
     }
@@ -152,18 +152,18 @@ fn main() -> anyhow::Result<()> {
     let mut commands: Vec<&str> = Vec::new();
     let mut playbook_moves: HashMap<&str, Vec<&str>> = HashMap::new();
     for mv in data.moves.iter() {
-        write!(maddie, "{}\n", move_command(mv))?;
+        writeln!(maddie, "{}", move_command(mv))?;
         commands.push(&mv.short_name);
 
         let playbook_entry = playbook_moves.entry(&mv.playbook);
-        let cvec: &mut Vec<&str> = playbook_entry.or_insert(Vec::with_capacity(1));
+        let cvec: &mut Vec<&str> = playbook_entry.or_insert_with(|| Vec::with_capacity(1));
         cvec.push(&mv.short_name);
     }
     for (playbook, moves) in playbook_moves.iter() {
-        write!(maddie, "{}\n", playbook_command(playbook, moves))?;
+        writeln!(maddie, "{}", playbook_command(playbook, moves))?;
         commands.push(playbook);
     }
-    write!(maddie, "{}\n", playbook_list_command(&data.playbooks, &data.sources))?;
+    writeln!(maddie, "{}", playbook_list_command(&data.playbooks, &data.sources))?;
     commands.push("playbooks");
     write!(maddie, "{}", command_group("MaddieTools", commands))?;
     Ok(())

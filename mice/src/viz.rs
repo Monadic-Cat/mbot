@@ -18,7 +18,7 @@ impl IdGen {
 }
 impl Id {
     fn fmt(&self, buf: &mut String) {
-        buf.push_str("N");
+        buf.push('N');
         ::itoa::fmt(buf, self.0).unwrap();
     }
 }
@@ -31,7 +31,7 @@ pub fn make_dot(program: &Program) -> String {
     
     fn write_dot(graph: &mut String, gen: &mut IdGen, terms: &Arena<Term>, term: &Term) -> Id {
         let push_node = |graph: &mut String, id: &Id, label: String| {
-            graph.push_str("\t");
+            graph.push('\t');
             id.fmt(graph);
             graph.push_str(" [label = \"");
             graph.push_str(&label);
@@ -39,11 +39,11 @@ pub fn make_dot(program: &Program) -> String {
         };
         // Takes two node ids
         let push_edge = |graph: &mut String, a: &Id, b: &Id| {
-            graph.push_str("\t");
+            graph.push('\t');
             a.fmt(graph);
             graph.push_str(" -> ");
             b.fmt(graph);
-            graph.push_str("\n");
+            graph.push('\n');
         };
         // TODO: consider generalizing to n-ary operators
         let write_op = |graph: &mut String, gen: &mut IdGen, root: String, left: &ArenaId<Term>, right: Option<&ArenaId<Term>>| -> Id {

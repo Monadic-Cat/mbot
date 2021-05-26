@@ -162,7 +162,7 @@ pub(crate) async fn command_loop(ctx: Context, ready: Ready) -> Result<Never, Er
             }
             #[cfg(feature = "plotting")]
             Command::ReloadPlotter => {
-                ::tokio::task::spawn_blocking(|| crate::dist::Plotter::reload()).await.unwrap();
+                ::tokio::task::spawn_blocking(crate::dist::Plotter::reload).await.unwrap();
             },
             Command::Shutdown => crate::shutdown().await,
         };

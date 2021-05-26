@@ -24,6 +24,7 @@
 //! # Ok::<(), Error>(())
 //! ```
 #![forbid(unsafe_code)]
+#![allow(clippy::try_err)]
 use rand::Rng;
 mod error;
 pub use error::Error;
@@ -187,7 +188,7 @@ where
 ///   - Nonsense input
 #[cfg(feature = "thread_rng")]
 pub fn roll(input: &str) -> EResult {
-    Ok(RollBuilder::new().parse(input)?.into_roll().unwrap().roll()?)
+    RollBuilder::new().parse(input)?.into_roll().unwrap().roll()
 }
 
 fn try_roll_expr_iter_with<I, R>(rng: &mut R, input: I) -> EResult

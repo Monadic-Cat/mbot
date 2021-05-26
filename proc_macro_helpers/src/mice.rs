@@ -110,7 +110,7 @@ macro_rules! dsp {
 /// (To go from unary to binary or vice versa, go through the infallible conversion up to All,
 /// then use the fallible conversion back down.)
 pub fn decl_ops(input: ::proc_macro::TokenStream) -> ::proc_macro::TokenStream {
-    let parse_input = input.clone();
+    let parse_input = input;
     let parsed = syn::parse_macro_input!(parse_input as DeclOps);
     let DeclOps { all_attrs, enum_token, sum_attrs, sum_ident, unary_attrs,
                   unary_ident, binary_attrs, binary_ident, variants,
