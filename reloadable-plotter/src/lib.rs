@@ -189,7 +189,7 @@ pub mod plot_impl {
         match ::mice::parse::new::parse_expression(expression.as_bytes()) {
             Ok((input, program)) if input.is_empty() => {
                 use ::mice::cost::{cost, StackInterp, Price};
-                match cost::<StackInterp, _>(&program) {
+                match cost::<StackInterp, _>(&program, ()) {
                     Price::Bounded(price) if price <= 200 => Ok(PreparedProgram {
                         program, caption,
                     }),

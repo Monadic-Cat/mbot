@@ -9,12 +9,20 @@ pub enum Price {
     // Unbounded(u64),
 }
 
+// Technically, this trait is open for use by types other than `Program`.
+// This is intentional. I think it is quite likely I'll end up with a variety of
+// types implementing this trait, where I need to demonstrate bounded cost to avoid being DOSed.
 /// Cost of using a dice program in a given context.
-pub trait Cost<Ctx> {
-    fn cost(&self) -> Price;
+pub trait Cost<'a, Ctx> {
+    /// A runtime parameter for extra information, should the `Ctx` type argument
+    /// be insufficient for determining the cost of handling dice expressions
+    /// in a given context.
+    /// Where unimportant, this should be `()`.
+    type Param;
+    fn cost(&'a self, param: Self::Param) -> Price;
 }
-pub fn cost<Ctx, T: Cost<Ctx>>(thing: &T) -> Price {
-    <T as Cost<Ctx>>::cost(thing)
+pub fn cost<'a, Ctx, T: Cost<'a, Ctx>>(thing: &'a T, param: T::Param) -> Price {
+    <T as Cost<'a, Ctx>>::cost(thing, param)
 }
 
 use crate::parse::new::Program;
@@ -22,8 +30,9 @@ use crate::stack::postorder;
 
 /// Context of AST walking interpreter.
 pub struct AstInterp;
-impl Cost<AstInterp> for Program {
-    fn cost(&self) -> Price {
+impl<'a> Cost<'a, AstInterp> for Program {
+    type Param = ();
+    fn cost(&'a self, _param: Self::Param) -> Price {
         use crate::parse::new::Term;
         let mut price = 0u64;
         postorder(self, |child, _parent| match child {
@@ -47,8 +56,9 @@ impl Cost<AstInterp> for Program {
 
 /// Context of stack bytecode interpreter.
 pub struct StackInterp;
-impl Cost<StackInterp> for Program {
-    fn cost(&self) -> Price {
+impl<'a> Cost<'a, StackInterp> for Program {
+    type Param = ();
+    fn cost(&'a self, _param: Self::Param) -> Price {
         use crate::parse::new::Term;
         let mut price = 0u64;
         postorder(self, |child, parent| match child {
