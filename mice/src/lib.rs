@@ -245,38 +245,38 @@ mod tests {
             Err(_) => (),
         }
     }
-    /// A test of the determinism of `SeededDie`'s partial sums.
-    /// This test ensures that two invocations of `SeededDie::partial_sums`
-    /// will return iterators over identical contents.
-    #[test]
-    fn deterministic_partial_sums() {
-        use super::seed_die_with;
-        use super::DiceTerm;
-        use ::rand::thread_rng;
-        let term = DiceTerm {
-            number: 10,
-            size: 10,
-        };
-        let seeded = seed_die_with(&term, &mut thread_rng()).expect("10 * 10 < i64::MAX");
-        let sums = seeded.partial_sums();
-        let bsums = seeded.partial_sums();
-        for (a, b) in sums.zip(bsums) {
-            assert_eq!(a, b);
-        }
-    }
-    /// A similar test of the determinism of `SeededDie`'s partial sums.
-    /// This test ensures that the precomputed total of a `SeededDie`'s
-    /// partial sums will be correct.
-    #[test]
-    fn correct_total() {
-        use super::seed_die_with;
-        use super::DiceTerm;
-        use ::rand::thread_rng;
-        let term = DiceTerm {
-            number: 10,
-            size: 10,
-        };
-        let seeded = seed_die_with(&term, &mut thread_rng()).expect("10 * 10 < i64::MAX");
-        assert_eq!(seeded.total, seeded.partial_sums().sum::<i64>());
-    }
+    // /// A test of the determinism of `SeededDie`'s partial sums.
+    // /// This test ensures that two invocations of `SeededDie::partial_sums`
+    // /// will return iterators over identical contents.
+    // #[test]
+    // fn deterministic_partial_sums() {
+    //     use super::seed_die_with;
+    //     use super::DiceTerm;
+    //     use ::rand::thread_rng;
+    //     let term = DiceTerm {
+    //         number: 10,
+    //         size: 10,
+    //     };
+    //     let seeded = seed_die_with(&term, &mut thread_rng()).expect("10 * 10 < i64::MAX");
+    //     let sums = seeded.partial_sums();
+    //     let bsums = seeded.partial_sums();
+    //     for (a, b) in sums.zip(bsums) {
+    //         assert_eq!(a, b);
+    //     }
+    // }
+    // /// A similar test of the determinism of `SeededDie`'s partial sums.
+    // /// This test ensures that the precomputed total of a `SeededDie`'s
+    // /// partial sums will be correct.
+    // #[test]
+    // fn correct_total() {
+    //     use super::seed_die_with;
+    //     use super::DiceTerm;
+    //     use ::rand::thread_rng;
+    //     let term = DiceTerm {
+    //         number: 10,
+    //         size: 10,
+    //     };
+    //     let seeded = seed_die_with(&term, &mut thread_rng()).expect("10 * 10 < i64::MAX");
+    //     assert_eq!(seeded.total, seeded.partial_sums().sum::<i64>());
+    // }
 }
