@@ -23,7 +23,6 @@
 //! println!("{}", roll("9d8 + 4d2 - 5 - 8d7")?);
 //! # Ok::<(), Error>(())
 //! ```
-#![forbid(unsafe_code)]
 #![allow(clippy::try_err)]
 use rand::Rng;
 mod error;

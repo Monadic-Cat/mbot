@@ -214,6 +214,11 @@ impl<'arena, 'iter> StreamingIterator<'iter> for PostorderIter<'arena> where 'ar
                                 unsafe {
                                     *ptr = None;
                                 }
+                                // This passes with -Zpolonius:
+                                // self.walker = None;
+                                // So, presumably, we'll be able to remove this hack once full NLL
+                                // makes it into rustc. Which, of course, means that
+                                // it's almost definitely safe to do this thing we're doing here.
                                 current.map(|current| (current, AncestorsIter::empty(terms)))
                             },
                         }
