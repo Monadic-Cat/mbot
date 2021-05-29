@@ -497,7 +497,7 @@ pub mod new {
 
     /// An AST node. This represents an expression as a tree of nodes stored in an [`Arena`].
     #[non_exhaustive]
-    #[derive(Debug)]
+    #[derive(Clone, Debug, ::derive_more::Unwrap)]
     pub enum Term {
         Constant(i64),
         // This could conceivably have its arguments
