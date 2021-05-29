@@ -387,7 +387,7 @@ pub mod new {
         // inside dice terms.
         #[non_exhaustive]
         #[derive(Debug, Clone, Copy)]
-        enum
+        pub enum
         /// Operators
             Op =
         /// Unary operators
@@ -416,7 +416,7 @@ pub mod new {
 
     /// Units of input as segmented by the lexer.
     #[derive(Debug)]
-    enum Token {
+    pub enum Token {
         /// This will never be negative. We use an [`i64`] here so numeric limits line up elsewhere.
         Int(i64),
         D,
@@ -634,7 +634,7 @@ pub mod new {
     /// Dice program parser combinator.
     /// Consumes input until it reaches unrecognizable tokens,
     /// and attempts to build a dice program from the consumed input.
-    pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], Program, ExprError> {
+    pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], (Vec<Token>, Program), ExprError> {
         let mut arena = Arena::<Term>::new();
         let (rest, tokens) = lex(input);
         let tokens = match tokens {
@@ -753,7 +753,7 @@ pub mod new {
             };
         };
         match result {
-            Ok(top) => Ok((rest, Program { tree: Tree { arena, top }})),
+            Ok(top) => Ok((rest, (tokens, Program { tree: Tree { arena, top }}))),
             Err(e) => Err((rest, e)),
         }
     }

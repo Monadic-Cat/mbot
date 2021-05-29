@@ -1,5 +1,5 @@
 use ::derive_syn_parse::Parse;
-use ::syn::{Token, Ident, Attribute, token::{Brace, Paren}, punctuated::Punctuated, Type};
+use ::syn::{Token, Ident, Attribute, token::{Brace, Paren}, punctuated::Punctuated, Type, Visibility};
 
 #[derive(Parse, Debug)]
 struct UnaryPower {
@@ -66,6 +66,7 @@ struct BindingPowerFnDecl {
 struct DeclOps {
     #[call(Attribute::parse_outer)]
     all_attrs: Vec<Attribute>,
+    visibility: Visibility,
     enum_token: Token![enum],
     #[call(Attribute::parse_outer)]
     sum_attrs: Vec<Attribute>,
@@ -112,7 +113,7 @@ macro_rules! dsp {
 pub fn decl_ops(input: ::proc_macro::TokenStream) -> ::proc_macro::TokenStream {
     let parse_input = input;
     let parsed = syn::parse_macro_input!(parse_input as DeclOps);
-    let DeclOps { all_attrs, enum_token, sum_attrs, sum_ident, unary_attrs,
+    let DeclOps { all_attrs, visibility, enum_token, sum_attrs, sum_ident, unary_attrs,
                   unary_ident, binary_attrs, binary_ident, variants,
                   unary_fn_decl: BindingPowerFnDecl {
                       fn_attrs: unary_fn_attrs,
@@ -209,7 +210,7 @@ pub fn decl_ops(input: ::proc_macro::TokenStream) -> ::proc_macro::TokenStream {
     (::quote::quote! {
         #(#all_attrs)*
         #(#sum_attrs)*
-        #enum_token #sum_ident {
+        #visibility #enum_token #sum_ident {
             #(#sum_variant_idents),*
         }
         #(#all_attrs)*

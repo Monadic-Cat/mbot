@@ -306,7 +306,7 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
 #[command]
 async fn dot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
     match ::mice::parse::new::parse_expression(arg.message().as_bytes()) {
-        Ok((input, program)) if input.is_empty() => {
+        Ok((input, (_tokens, program))) if input.is_empty() => {
             let mut dot_ast = String::from("```dot\n");
             dot_ast.push_str(&::mice::viz::make_dot(&program));
             dot_ast.push_str("```");
