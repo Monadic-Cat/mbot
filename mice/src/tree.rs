@@ -267,7 +267,7 @@ pub mod private_for_inside_macro_outputs {
 /// ```
 /// # use ::mice::tree::for_;
 /// use ::mice::parse::new::parse_expression;
-/// let program = parse_expression("4d6k3 + 2".as_bytes()).unwrap().1;
+/// let (_tokens, program) = parse_expression("4d6k3 + 2".as_bytes()).unwrap().1;
 /// for_! { (term, _ancestors) in program.postorder() => {
 ///     // do stuff with `term` and maybe `_ancestors`
 /// }}
@@ -302,7 +302,7 @@ where Iter: Iterator<Item = T> {
 #[cfg(test)]
 #[test]
 fn it_works() {
-    let program = crate::parse::new::parse_expression("4d6k3 + 2".as_bytes()).unwrap().1;
+    let (_tokens, program) = crate::parse::new::parse_expression("4d6k3 + 2".as_bytes()).unwrap().1;
     for_! { (term, ancestors) in program.postorder() => {
         dbg!(term);
         for term in ancestors {
