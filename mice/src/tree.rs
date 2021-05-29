@@ -249,8 +249,8 @@ fn explosion<T>() -> T {
     panic!("Boom!")
 }
 
-// An iterator trait that supports borrowing from the iterator,
-// by allowing the argument lifetime to be named inside the associated type.
+/// An iterator trait that supports borrowing from the iterator,
+/// by allowing the argument lifetime to be named inside the associated type.
 pub trait StreamingIterator<'a> {
     type Item;
     fn next(&'a mut self) -> Option<Self::Item>;
@@ -268,7 +268,7 @@ pub mod private_for_inside_macro_outputs {
 /// # use ::mice::tree::for_;
 /// use ::mice::parse::new::parse_expression;
 /// let program = parse_expression("4d6k3 + 2".as_bytes()).unwrap().1;
-/// for_! { (term, _ancestors) in ::mice::tree::postorder(&program) => {
+/// for_! { (term, _ancestors) in program.postorder() => {
 ///     // do stuff with `term` and maybe `_ancestors`
 /// }}
 /// ```
