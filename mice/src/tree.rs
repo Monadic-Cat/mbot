@@ -13,7 +13,7 @@ impl<T> Tree<T> {
     pub fn walk(&self) -> TreeWalker<'_, T> {
         TreeWalker {
             arena: &self.arena,
-            stack: vec![StackFrameT::new(TreeIndex(0), self.top)],
+            stack: vec![StackFrame::new(TreeIndex(0), self.top)],
             cursor: TreeIndex(0),
         }
     }
@@ -63,11 +63,11 @@ impl IndexNode for Term {
     }
 }
 
-struct StackFrameT<T> {
+struct StackFrame<T> {
     cursor: TreeIndex,
     id: Id<T>,
 }
-impl<T> StackFrameT<T> {
+impl<T> StackFrame<T> {
     fn new(cursor: TreeIndex, id: Id<T>) -> Self {
         Self { cursor, id }
     }
@@ -75,13 +75,13 @@ impl<T> StackFrameT<T> {
 
 pub struct TreeWalker<'a, T> {
     arena: &'a Arena<T>,
-    stack: Vec<StackFrameT<T>>,
+    stack: Vec<StackFrame<T>>,
     cursor: TreeIndex,
 }
 
 impl<'a, T> TreeWalker<'a, T> {
     pub fn stack_top(&self) -> Option<&'a T> {
-        self.stack.last().map(|StackFrameT { id, .. }| &self.arena[*id])
+        self.stack.last().map(|StackFrame { id, .. }| &self.arena[*id])
     }
     pub fn current(&self) -> Option<&'a T>
         where T: IndexNode,
@@ -100,14 +100,14 @@ impl<'a, T> TreeWalker<'a, T> {
             Some(x) => x,
             None => return Err(()),
         };
-        self.stack.push(StackFrameT::new(self.cursor, child));
+        self.stack.push(StackFrame::new(self.cursor, child));
         self.cursor = TreeIndex(0);
         Ok(())
     }
     pub fn ascend(&mut self) -> Result<(), ()> {
         // No ascending past the top of the tree.
         if self.stack.len() > 1 {
-            let StackFrameT { cursor, id: _ } = match self.stack.pop() {
+            let StackFrame { cursor, id: _ } = match self.stack.pop() {
                 Some(x) => x,
                 None => unreachable!("we just checked the stack's length"),
             };
@@ -147,7 +147,7 @@ impl<'a, T> TreeWalker<'a, T> {
 
 pub struct AncestorsIter<'a, T> {
     arena: &'a Arena<T>,
-    stack: &'a [StackFrameT<T>],
+    stack: &'a [StackFrame<T>],
     idx: Option<usize>,
 }
 impl<'a, T> AncestorsIter<'a, T> {
