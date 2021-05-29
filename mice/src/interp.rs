@@ -1,6 +1,7 @@
 //! Interpreter for dice programs. The current design is a basic recursive AST walker.
 //! Not intended to be fast.
 use crate::parse::new::{Program, Term};
+use crate::tree::Tree;
 use ::id_arena::{Arena, Id};
 use ::rand::Rng;
 
@@ -30,10 +31,10 @@ impl ProgramOutput {
 
 pub fn interpret<R: Rng>(
     rng: &mut R,
-    Program { terms, top }: &Program,
+    Program { tree: Tree { arena, top }}: &Program,
 ) -> Result<ProgramOutput, InterpError> {
     let mut outputs = Arena::new();
-    let top = interpret_term(rng, &terms, &mut outputs, *top)?;
+    let top = interpret_term(rng, &arena, &mut outputs, *top)?;
     let total = outputs[top].total();
     Ok(ProgramOutput {
         total,

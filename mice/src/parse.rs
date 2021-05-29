@@ -374,6 +374,7 @@ pub mod new {
     // Note that all byte strings in this module are conventionally UTF-8.
     // TODO: consider using the `bstr` crate
     use ::id_arena::{Arena, Id};
+    use crate::tree::Tree;
     use ::core_extensions::SliceExt;
     use ::core::convert::TryFrom;
     use ::core::convert::TryInto;
@@ -519,8 +520,18 @@ pub mod new {
 
         // We allocate terms inside an arena so we can build trees without
         // allocating for each node.
-        pub(crate) terms: Arena<Term>,
-        pub(crate) top: Id<Term>,
+        pub(crate) tree: Tree<Term>,
+    }
+    impl ::core::ops::Deref for Program {
+        type Target = Tree<Term>;
+        fn deref(&self) -> &Self::Target {
+            &self.tree
+        }
+    }
+    impl ::core::ops::DerefMut for Program {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.tree
+        }
     }
 
     /// For debugging purposes.
@@ -569,11 +580,11 @@ pub mod new {
         /// This writes out the parse tree of a program as an S-expression.
         pub fn fmt_sexpr(&self) -> String {
             let mut buf = String::new();
-            write_sexpr(&self.terms, self.top, &mut buf);
+            write_sexpr(&self.arena, self.top, &mut buf);
             buf
         }
         pub fn terms(&self) -> &Arena<Term> {
-            &self.terms
+            &self.arena
         }
     }
 
@@ -624,7 +635,7 @@ pub mod new {
     /// Consumes input until it reaches unrecognizable tokens,
     /// and attempts to build a dice program from the consumed input.
     pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], Program, ExprError> {
-        let mut terms = Arena::<Term>::new();
+        let mut arena = Arena::<Term>::new();
         let (rest, tokens) = lex(input);
         let tokens = match tokens {
             Ok(x) => x,
@@ -732,17 +743,17 @@ pub mod new {
                 // front of a dice expression. We could be more permissive than this,
                 // but the current goal is identical behavior to the old parser.
                 [Token::Op(op), rest @ ..] => break match (*op).try_into() {
-                    Ok(op) => consume_unary_op(&mut terms, op, rest),
+                    Ok(op) => consume_unary_op(&mut arena, op, rest),
                     Err(()) => Err(ExprError::InvalidTokenInUnaryOp),
                 },
                 [Token::K, ..] => break Err(ExprError::InvalidTokenInUnaryOp),
                 all @ [Token::Int(_), ..] |
-                all @ [Token::D, ..] => break consume_expr(&mut terms, 2, all).map(|(_, x)| x),
+                all @ [Token::D, ..] => break consume_expr(&mut arena, 2, all).map(|(_, x)| x),
                 [] => break Err(ExprError::Eof),
             };
         };
         match result {
-            Ok(top) => Ok((rest, Program { terms, top })),
+            Ok(top) => Ok((rest, Program { tree: Tree { arena, top }})),
             Err(e) => Err((rest, e)),
         }
     }

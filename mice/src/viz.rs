@@ -1,5 +1,6 @@
 //! Generate GraphViz DOT files for ASTs.
 use crate::parse::new::{Program, Term};
+use crate::tree::Tree;
 use ::id_arena::{Arena, Id as ArenaId};
 
 struct IdGen {
@@ -27,7 +28,7 @@ impl Id {
 pub fn make_dot(program: &Program) -> String {
     let mut graph = String::from("strict digraph {\n");
     let mut gen = IdGen::new();
-    let Program { terms, top } = program;
+    let Program { tree: Tree { arena, top }} = program;
     
     fn write_dot(graph: &mut String, gen: &mut IdGen, terms: &Arena<Term>, term: &Term) -> Id {
         let push_node = |graph: &mut String, id: &Id, label: String| {
@@ -91,7 +92,7 @@ pub fn make_dot(program: &Program) -> String {
             Term::UnaryAdd(only) => write_op(graph, gen, String::from("+"), only, None),
         }
     }
-    write_dot(&mut graph, &mut gen, terms, &terms[*top]);
+    write_dot(&mut graph, &mut gen, arena, &arena[*top]);
     graph.push_str("}\n");
     graph
 }

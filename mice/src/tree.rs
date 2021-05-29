@@ -2,42 +2,55 @@
 use crate::parse::new::{Program, Term};
 use ::id_arena::{Arena, Id};
 
-#[derive(Copy, Clone)]
-struct TreeIndex(u8);
-
-#[derive(Clone)]
-struct StackFrame {
-    cursor: TreeIndex,
-    id: Id<Term>,
+/// A generic tree structure, with nodes of type `T`.
+#[derive(Debug)]
+pub struct Tree<T> {
+    pub(crate) arena: Arena<T>,
+    pub(crate) top: Id<T>,
 }
-impl StackFrame {
-    fn new(cursor: TreeIndex, id: Id<Term>) -> Self {
-        Self { cursor, id }
-    }
-}
-
-/// Program tree walker.
-pub struct PTreeWalker<'a> {
-    terms: &'a Arena<Term>,
-    stack: Vec<StackFrame>,
-    cursor: TreeIndex,
-}
-
-impl<'a> PTreeWalker<'a> {
-    pub fn new(program: &Program) -> PTreeWalker<'_> {
-        PTreeWalker {
-            terms: &program.terms,
-            stack: vec![StackFrame::new(TreeIndex(0), program.top)],
+impl<T> Tree<T> {
+    /// Create a tree walker to arbitrarily traverse the tree.
+    pub fn walk(&self) -> TreeWalker<'_, T> {
+        TreeWalker {
+            arena: &self.arena,
+            stack: vec![StackFrameT::new(TreeIndex(0), self.top)],
             cursor: TreeIndex(0),
         }
     }
-    pub fn stack_top(&self) -> Option<&'a Term> {
-        self.stack.last().map(|StackFrame { id, .. }| &self.terms[*id])
-    }
 
-    fn index_term(&self, term: &Term, index: TreeIndex) -> Option<Id<Term>> {
+    /// Perform a postorder depth first traversal of the tree.
+    /// Currently has substantially more iteration overhead than [`postorder`](crate::stack::postorder),
+    /// but running time appears to stay inside an order of magnitude on large trees.
+    pub fn postorder(&self) -> PostorderIterT<'_, T>
+        where T: IndexNode,
+    {
+        let mut walker = self.walk();
+        while let Ok(()) = walker.descend() {}
+        PostorderIterT { walker: Some(walker) }
+    }
+    // TODO: add recursive implementation of the postorder walk
+}
+
+// TODO: possibly rename this something more broad, to more appropriately have
+// `has_children` and `iter` methods.
+pub trait IndexNode: Sized {
+    fn index(&self, index: TreeIndex) -> Option<Id<Self>>;
+    fn has_children(&self) -> bool {
+        self.index(TreeIndex(0)).is_some()
+    }
+    // TODO: add an `iter` method for shallow iteration of a node's children,
+    // with a default implementation in terms of `index`.
+}
+impl IndexNode for Term {
+    fn index(&self, index: TreeIndex) -> Option<Id<Self>> {
+        {
+            // If these variants start having children, this will fail to compile,
+            // which will be a reminder to adjust this function.
+            const _: Term = Term::Constant(0);
+            const _: Term = Term::DiceRoll(0, 0);
+        }
         let TreeIndex(index) = index;
-        match (index, term) {
+        match (index, self) {
             (_, Term::Constant(_)) | (_, Term::DiceRoll(_, _)) => None,
             (0, Term::KeepHigh(a, _)) => Some(*a),
             (0, Term::Add(a, _)) | (0, Term::Subtract(a, _)) => Some(*a),
@@ -48,28 +61,53 @@ impl<'a> PTreeWalker<'a> {
             (2..=255, _) => None,
         }
     }
+}
 
-    pub fn current(&self) -> Option<&'a Term> {
-        self.stack_top().map(|top| self.index_term(top, self.cursor).map(|id| &self.terms[id])).flatten()
+struct StackFrameT<T> {
+    cursor: TreeIndex,
+    id: Id<T>,
+}
+impl<T> StackFrameT<T> {
+    fn new(cursor: TreeIndex, id: Id<T>) -> Self {
+        Self { cursor, id }
+    }
+}
+
+pub struct TreeWalker<'a, T> {
+    arena: &'a Arena<T>,
+    stack: Vec<StackFrameT<T>>,
+    cursor: TreeIndex,
+}
+
+impl<'a, T> TreeWalker<'a, T> {
+    pub fn stack_top(&self) -> Option<&'a T> {
+        self.stack.last().map(|StackFrameT { id, .. }| &self.arena[*id])
+    }
+    pub fn current(&self) -> Option<&'a T>
+        where T: IndexNode,
+    {
+        self.stack_top().map(|top| top.index(self.cursor).map(|id| &self.arena[id])).flatten()
     }
 
-    pub fn descend(&mut self) -> Result<(), ()> {
+    pub fn descend(&mut self) -> Result<(), ()>
+        where T: IndexNode,
+    {
         let stack_top = match self.stack_top() {
             Some(x) => x,
             None => return Err(()),
         };
-        let child = match self.index_term(stack_top, self.cursor) {
+        let child = match stack_top.index(self.cursor) {
             Some(x) => x,
             None => return Err(()),
         };
-        self.stack.push(StackFrame::new(self.cursor, child));
+        self.stack.push(StackFrameT::new(self.cursor, child));
         self.cursor = TreeIndex(0);
         Ok(())
     }
     pub fn ascend(&mut self) -> Result<(), ()> {
         // No ascending past the top of the tree.
         if self.stack.len() > 1 {
-            let StackFrame { cursor, id: _ } = match self.stack.pop() {
+            let StackFrameT { cursor, id: _ } = match self.stack.pop() {
                 Some(x) => x,
                 None => unreachable!("we just checked the stack's length"),
             };
@@ -89,64 +127,47 @@ impl<'a> PTreeWalker<'a> {
         self.cursor = TreeIndex(cursor.saturating_add(1));
     }
 
-    pub fn has_children(&self) -> bool {
-        {
-            // If these variants start having children, this will fail to compile,
-            // which will be a reminder to adjust this function.
-            const _: Term = Term::Constant(0);
-            const _: Term = Term::DiceRoll(0, 0);
-        }
-        let current = match self.current() {
-            Some(x) => x,
-            None => return false,
-        };
-        match current {
-            Term::Constant(_) | Term::DiceRoll(_, _) => false,
-            Term::KeepHigh(_, _)
-            | Term::Add(_, _)
-            | Term::Subtract(_, _)
-            | Term::UnaryAdd(_)
-            | Term::UnarySubtract(_) => true,
+    pub fn has_children(&self) -> bool
+        where T: IndexNode,
+    {
+        match self.current() {
+            Some(x) => x.has_children(),
+            None => false,
         }
     }
 
-    pub fn ancestors(&self) -> AncestorsIter<'_> {
-        AncestorsIter {
-            terms: self.terms,
+    pub fn ancestors(&self) -> AncestorsIterT<'_, T> {
+        AncestorsIterT {
+            arena: self.arena,
             stack: &*self.stack,
-            idx: Some(self.stack.len() - 1),
+            idx: Some(self.stack.len() - 1)
         }
     }
 }
 
-/// Using the principle of explosion, we can synthesize any type.
-fn explosion<T>() -> T {
-    panic!("Boom!")
-}
-
-pub struct AncestorsIter<'a> {
-    terms: &'a Arena<Term>,
-    stack: &'a [StackFrame],
+pub struct AncestorsIterT<'a, T> {
+    arena: &'a Arena<T>,
+    stack: &'a [StackFrameT<T>],
     idx: Option<usize>,
 }
-impl<'a> AncestorsIter<'a> {
+impl<'a, T> AncestorsIterT<'a, T> {
     // For an empty iterator, we don't actually need
     // to hold a reference to a terms arena,
     // but I didn't want to bother unwrapping an Option for it.
-    fn empty(terms: &'a Arena<Term>) -> AncestorsIter<'a> {
-        AncestorsIter {
+    fn empty(arena: &'a Arena<T>) -> AncestorsIterT<'a, T> {
+        AncestorsIterT {
             stack: &[],
             idx: None,
-            terms,
+            arena,
         }
     }
 }
-impl<'a> Iterator for AncestorsIter<'a> {
-    type Item = &'a Term;
+impl<'a, T> Iterator for AncestorsIterT<'a, T> {
+    type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
         match self.idx {
             Some(idx) => {
-                let item = &self.terms[self.stack[idx].id];
+                let item = &self.arena[self.stack[idx].id];
                 self.idx = idx.checked_sub(1);
                 Some(item)
             },
@@ -155,27 +176,14 @@ impl<'a> Iterator for AncestorsIter<'a> {
     }
 }
 
-/// Currently has substantially more iteration overhead than [`postorder`](crate::stack::postorder),
-/// but should running time appears to stay inside an order of magnitude on large trees.
-pub fn postorder(program: &Program) -> PostorderIter<'_> {
-    let mut walker = PTreeWalker::new(program);
-    while let Ok(()) = walker.descend() {}
-    PostorderIter { walker: Some(walker) }
+pub struct PostorderIterT<'a, T> {
+    walker: Option<TreeWalker<'a, T>>,
 }
-
-pub struct PostorderIter<'a> {
-    walker: Option<PTreeWalker<'a>>,
-}
-
-// An iterator trait that supports borrowing from the iterator,
-// by allowing the argument lifetime to be named inside the associated type.
-pub trait StreamingIterator<'a> {
-    type Item;
-    fn next(&'a mut self) -> Option<Self::Item>;
-}
-
-impl<'arena, 'iter> StreamingIterator<'iter> for PostorderIter<'arena> where 'arena: 'iter {
-    type Item = (&'arena Term, AncestorsIter<'iter>);
+impl<'arena, 'iter, T> StreamingIterator<'iter> for PostorderIterT<'arena, T>
+where 'arena: 'iter,
+      T: IndexNode,
+{
+    type Item = (&'arena T, AncestorsIterT<'iter, T>);
     fn next(&'iter mut self) -> Option<Self::Item> {
         match self.walker.as_mut() {
             Some(walker) => {
@@ -197,7 +205,7 @@ impl<'arena, 'iter> StreamingIterator<'iter> for PostorderIter<'arena> where 'ar
                             // Use the root and destroy the walker.
                             Err(()) => {
                                 let current = walker.stack_top();
-                                let terms = walker.terms;
+                                let terms = walker.arena;
                                 // let's, uh, just ignore borrowck for a moment
                                 // (this is what happens when I don't forbid unsafe code)
                                 // Safety: `walker` doesn't live to this point.
@@ -210,7 +218,7 @@ impl<'arena, 'iter> StreamingIterator<'iter> for PostorderIter<'arena> where 'ar
                                 // For extra validation, but not necessarily guarantee,
                                 // Miri doesn't complain about this on
                                 // `miri 0.1.0 (bcae331 2021-05-12)`.
-                                let ptr = walker as *mut PTreeWalker as *mut Option<PTreeWalker>;
+                                let ptr = walker as *mut TreeWalker<T> as *mut Option<TreeWalker<T>>;
                                 unsafe {
                                     *ptr = None;
                                 }
@@ -219,7 +227,7 @@ impl<'arena, 'iter> StreamingIterator<'iter> for PostorderIter<'arena> where 'ar
                                 // So, presumably, we'll be able to remove this hack once full NLL
                                 // makes it into rustc. Which, of course, means that
                                 // it's almost definitely safe to do this thing we're doing here.
-                                current.map(|current| (current, AncestorsIter::empty(terms)))
+                                current.map(|current| (current, AncestorsIterT::empty(terms)))
                             },
                         }
                     }
@@ -230,11 +238,22 @@ impl<'arena, 'iter> StreamingIterator<'iter> for PostorderIter<'arena> where 'ar
     }
 }
 
-impl<'arena> PostorderIter<'arena> {
-    pub fn next<'iter>(&'iter mut self) -> Option<(&'arena Term, AncestorsIter<'iter>)>
-    where PostorderIter<'arena>: StreamingIterator<'iter, Item = (&'arena Term, AncestorsIter<'iter>)> {
-        <Self as StreamingIterator<'iter>>::next(self)
-    }
+// TODO: make TreeIndex generic over node type,
+// such that the index width is decided by the maximum number
+// of children a tree node may have
+#[derive(Copy, Clone)]
+pub struct TreeIndex(u8);
+
+/// Using the principle of explosion, we can synthesize any type.
+fn explosion<T>() -> T {
+    panic!("Boom!")
+}
+
+// An iterator trait that supports borrowing from the iterator,
+// by allowing the argument lifetime to be named inside the associated type.
+pub trait StreamingIterator<'a> {
+    type Item;
+    fn next(&'a mut self) -> Option<Self::Item>;
 }
 
 /// This is a module whose contents I will not at all try to keep stable,
@@ -284,11 +303,10 @@ where Iter: Iterator<Item = T> {
 #[test]
 fn it_works() {
     let program = crate::parse::new::parse_expression("4d6k3 + 2".as_bytes()).unwrap().1;
-    let mut iter = postorder(&program);
-    while let Some((term, ancestors)) = iter.next() {
+    for_! { (term, ancestors) in program.postorder() => {
         dbg!(term);
         for term in ancestors {
             println!("Ancestor: {:?}", term);
         }
-    }
+    }}
 }

@@ -1,6 +1,7 @@
 //! A stack machine for dice programs. Currently just interprets the stack machine bytecode,
 //! but is already faster than the other two interpreters in all benchmarks.
 use crate::parse::new::{Program, Term};
+use crate::tree::Tree;
 use ::id_arena::Arena;
 use ::rand::Rng;
 
@@ -23,7 +24,7 @@ pub fn postorder<F>(program: &Program, mut visit: F)
 where
     F: FnMut(&Term, Option<&Term>),
 {
-    let Program { top, terms } = program;
+    let Program { tree: Tree { top, arena }} = program;
     fn postorder_term<F>(term: &Term, parent: Option<&Term>, arena: &Arena<Term>, visit: &mut F)
     where
         F: FnMut(&Term, Option<&Term>),
@@ -48,7 +49,7 @@ where
             },
         }
     }
-    postorder_term(&terms[*top], None, terms, &mut visit);
+    postorder_term(&arena[*top], None, arena, &mut visit);
 }
 
 pub struct StackProgram(Vec<Instruction>);
@@ -70,7 +71,7 @@ enum Instruction {
 
 /// Compile a dice program to run on the stack machine.
 pub fn compile(program: &Program) -> StackProgram {
-    let mut instructions = Vec::with_capacity(program.terms.len());
+    let mut instructions = Vec::with_capacity(program.arena.len());
     postorder(program, |term, parent| {
         use Term::*;
         let next = match term {

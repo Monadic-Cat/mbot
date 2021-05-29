@@ -1,4 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, BenchmarkGroup};
+use ::mice::tree::for_;
 
 // TODO: factor this out into a shared file
 /// Dice expressions we're using for benchmarks.
@@ -21,10 +22,9 @@ fn postorder_iteration_benchmark(c: &mut Criterion) {
         });
         group.bench_function("Explicit Stack Walker", |b| {
             b.iter(|| {
-                let mut iter = ::mice::tree::postorder(&program);
-                while let Some((term, _ancestors)) = iter.next() {
+                for_! { (term, _ancestors) in program.postorder() => {
                     black_box(term);
-                }
+                }}
             });
         });
     };
@@ -88,8 +88,7 @@ fn stack_compiling_benchmark(c: &mut Criterion) {
         group.bench_function("Explicit Stack Walker", |b| {
             b.iter(|| {
                 let mut instructions = Vec::with_capacity(program.terms().len());
-                let mut iter = ::mice::tree::postorder(&program);
-                while let Some((term, mut ancestors)) = iter.next() {
+                for_! { (term, mut ancestors) in program.postorder() => {
                     use ::mice::parse::new::Term::*;
                     let parent = ancestors.next();
                     let next = match term {
@@ -115,7 +114,7 @@ fn stack_compiling_benchmark(c: &mut Criterion) {
                         _ => unsafe { ::core::hint::unreachable_unchecked() },
                     };
                     instructions.push(next);
-                }
+                }}
                 black_box(instructions);
             });
         });
