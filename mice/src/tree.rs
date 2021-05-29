@@ -1,5 +1,5 @@
 //! Tree traversal utilities.
-use crate::parse::new::{Program, Term};
+use crate::parse::new::Term;
 use ::id_arena::{Arena, Id};
 
 /// A generic tree structure, with nodes of type `T`.
@@ -21,12 +21,12 @@ impl<T> Tree<T> {
     /// Perform a postorder depth first traversal of the tree.
     /// Currently has substantially more iteration overhead than [`postorder`](crate::stack::postorder),
     /// but running time appears to stay inside an order of magnitude on large trees.
-    pub fn postorder(&self) -> PostorderIterT<'_, T>
+    pub fn postorder(&self) -> PostorderIter<'_, T>
         where T: IndexNode,
     {
         let mut walker = self.walk();
         while let Ok(()) = walker.descend() {}
-        PostorderIterT { walker: Some(walker) }
+        PostorderIter { walker: Some(walker) }
     }
     // TODO: add recursive implementation of the postorder walk
 }
@@ -136,8 +136,8 @@ impl<'a, T> TreeWalker<'a, T> {
         }
     }
 
-    pub fn ancestors(&self) -> AncestorsIterT<'_, T> {
-        AncestorsIterT {
+    pub fn ancestors(&self) -> AncestorsIter<'_, T> {
+        AncestorsIter {
             arena: self.arena,
             stack: &*self.stack,
             idx: Some(self.stack.len() - 1)
@@ -145,24 +145,24 @@ impl<'a, T> TreeWalker<'a, T> {
     }
 }
 
-pub struct AncestorsIterT<'a, T> {
+pub struct AncestorsIter<'a, T> {
     arena: &'a Arena<T>,
     stack: &'a [StackFrameT<T>],
     idx: Option<usize>,
 }
-impl<'a, T> AncestorsIterT<'a, T> {
+impl<'a, T> AncestorsIter<'a, T> {
     // For an empty iterator, we don't actually need
     // to hold a reference to a terms arena,
     // but I didn't want to bother unwrapping an Option for it.
-    fn empty(arena: &'a Arena<T>) -> AncestorsIterT<'a, T> {
-        AncestorsIterT {
+    fn empty(arena: &'a Arena<T>) -> AncestorsIter<'a, T> {
+        AncestorsIter {
             stack: &[],
             idx: None,
             arena,
         }
     }
 }
-impl<'a, T> Iterator for AncestorsIterT<'a, T> {
+impl<'a, T> Iterator for AncestorsIter<'a, T> {
     type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
         match self.idx {
@@ -176,14 +176,14 @@ impl<'a, T> Iterator for AncestorsIterT<'a, T> {
     }
 }
 
-pub struct PostorderIterT<'a, T> {
+pub struct PostorderIter<'a, T> {
     walker: Option<TreeWalker<'a, T>>,
 }
-impl<'arena, 'iter, T> StreamingIterator<'iter> for PostorderIterT<'arena, T>
+impl<'arena, 'iter, T> StreamingIterator<'iter> for PostorderIter<'arena, T>
 where 'arena: 'iter,
       T: IndexNode,
 {
-    type Item = (&'arena T, AncestorsIterT<'iter, T>);
+    type Item = (&'arena T, AncestorsIter<'iter, T>);
     fn next(&'iter mut self) -> Option<Self::Item> {
         match self.walker.as_mut() {
             Some(walker) => {
@@ -227,7 +227,7 @@ where 'arena: 'iter,
                                 // So, presumably, we'll be able to remove this hack once full NLL
                                 // makes it into rustc. Which, of course, means that
                                 // it's almost definitely safe to do this thing we're doing here.
-                                current.map(|current| (current, AncestorsIterT::empty(terms)))
+                                current.map(|current| (current, AncestorsIter::empty(terms)))
                             },
                         }
                     }
