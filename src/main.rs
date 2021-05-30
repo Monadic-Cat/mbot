@@ -167,7 +167,11 @@ async fn roll(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
         } else {
             if is_cheap_enough(&program) {
                 let output = handle_proggy_uwu!(&program);
-                let dice_msg = ast_format_smart(&program, &output);
+                let dice_msg = if !program.is_single() {
+                    ast_format_smart(&program, &output)
+                } else {
+                    format!("{}", output.total())
+                };
                 let response = format!("{} {}", dice_msg, reason);
                 if response.len() > MAX_REPLY_LENGTH {
                     reply(ctx, msg, &dice_msg).await?;
@@ -181,7 +185,11 @@ async fn roll(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
         },
         Ok(MaybeReasonedDice::Unreasoned(program)) => if is_cheap_enough(&program) {
             let output = handle_proggy_uwu!(&program);
-            reply(ctx, msg, &ast_format_smart(&program, &output)).await
+            if program.is_single() {
+                reply(ctx, msg, &format!("{}", output.total())).await
+            } else {
+                reply(ctx, msg, &ast_format_smart(&program, &output)).await
+            }
         } else {
             reply(ctx, msg, "tried to DOS me.").await
         },

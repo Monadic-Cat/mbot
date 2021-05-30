@@ -586,6 +586,16 @@ pub mod new {
         pub fn terms(&self) -> &Arena<Term> {
             &self.arena
         }
+        pub fn is_single(&self) -> bool {
+            let mut count = 0;
+            crate::tree::for_! { (term, _) in self.postorder() => {
+                match term {
+                    Term::DiceRoll(dice_count, _sides) => count += dice_count,
+                    _ => count += 1,
+                }
+            }}
+            count == 1
+        }
     }
 
     /// The return type of a parser function that returns trailing unparsed input
