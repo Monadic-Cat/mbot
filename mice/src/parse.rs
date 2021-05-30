@@ -528,11 +528,6 @@ pub mod new {
             &self.tree
         }
     }
-    impl ::core::ops::DerefMut for Program {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.tree
-        }
-    }
 
     /// For debugging purposes.
     /// This writes out the parse tree starting from `top` as an S-expression.
