@@ -1,4 +1,5 @@
 //! Approximate cost models for dice programs used in various contexts.
+use crate::tree::for_;
 
 /// Evaluation cost.
 /// This is a context relative measure of how expensive it is to handle something.
@@ -105,5 +106,30 @@ impl<'a> Cost<'a, TextFormatOutput> for crate::parse::Expression {
     type Param = &'a crate::post::FormatOptions;
     fn cost(&'a self, _param: Self::Param) -> Price {
         todo!()
+    }
+}
+
+/// `mbot`(::mbot) centric cost calculations.
+pub mod mbot {
+    use ::core::marker::PhantomData;
+    pub struct TextFormatOutput<T> { _priv: PhantomData<T> }
+    pub struct Default;
+    pub struct Short;
+    pub struct Shortest;
+    pub struct Combined;
+}
+impl<'a> Cost<'a, mbot::TextFormatOutput<mbot::Default>> for Program {
+    type Param = ();
+    fn cost(&'a self, _param: Self::Param) -> Price {
+        use crate::parse::new::Term;
+        let mut price = 0u64;
+        // This doesn't need to be postorder- that's just what's most convenient.
+        for_! { (term, _ancestors) in self.postorder() => {
+            match term {
+                Term::DiceRoll(count, _sides) => price = price.saturating_add(*count as u64),
+                _ => price = price.saturating_add(1),
+            }
+        }}
+        Price::Bounded(price)
     }
 }

@@ -1,6 +1,4 @@
 #![cfg_attr(not(feature = "reloadable_plotter"), forbid(unsafe_code))]
-use mice::FormatOptions as MiceFormat;
-use ::mice::util::ExpressionExt;
 mod initiative;
 use initiative::pathfinder_initiative;
 #[cfg(feature = "internal_rolls")]
@@ -83,107 +81,110 @@ async fn gargamel(ctx: &Context, msg: &Message) -> CommandResult {
 
 const MAX_REPLY_LENGTH: usize = 1900;
 
-fn format_smart(exp: mice::ExpressionResult) -> String {
-    let first = exp.format(MiceFormat::new().total_right());
+fn ast_format_smart(input: &::mice::parse::new::Program, output: &::mice::interp::ProgramOutput) -> String {
+    use ::mice::interp;
+    let first = interp::fmt::mbot_format_default(input.terms(), output);
     let second;
     #[allow(clippy::blocks_in_if_conditions)]
     if first.len() < MAX_REPLY_LENGTH {
         first
     } else if {
-        second = exp.format(MiceFormat::new().concise().total_right());
+        second = interp::fmt::mbot_format_short(input.terms(), output);
         second.len() < MAX_REPLY_LENGTH
     } {
         second
     } else {
-        exp.total().to_string()
+        output.total().to_string()
     }
 }
 
 #[derive(Debug)]
-enum MaybeReasonedDice {
-    Reasoned(mice::parse::Expression),
-    Unreasoned(mice::parse::Expression),
+enum MaybeReasonedDice<'a> {
+    Reasoned(::mice::parse::new::Program, &'a str),
+    Unreasoned(::mice::parse::new::Program),
 }
 
-macro_rules! tript {
-    ($tup:expr) => {
-        match $tup {
-            Ok((i, Ok(x))) => (i, x),
-            Ok((i, Err(e))) => return Ok((i, Err(e))),
-            Err(e) => return Err(e),
+enum ReasonedDiceError {
+    Expr(::mice::parse::new::ExprError),
+    UnknownTrailing,
+}
+
+fn reasoned_dice(input: &str) -> Result<MaybeReasonedDice<'_>, ReasonedDiceError> {
+    use ::mice::parse::new::{parse_expression, Token};
+    let (inp, (tokens, program)) = match parse_expression(input.as_bytes()) {
+        Ok((input, x)) => (input, x),
+        Err((_, e)) => return Err(ReasonedDiceError::Expr(e)),
+    };
+
+    if !inp.is_empty() {
+        match tokens.last() {
+            Some(Token::Whitespace) => match inp {
+                [b't', b'o', ..] | [b'f', b'o', b'r', ..] |
+                [b'b', b'e', b'c', b'a', b'u', b's', b'e', ..] |
+                [b'#', ..] => Ok(MaybeReasonedDice::Reasoned(program, ::core::str::from_utf8(inp).unwrap())),
+                _ => Err(ReasonedDiceError::UnknownTrailing),
+            },
+            Some(_) | None => todo!(),
         }
+    } else {
+        Ok(MaybeReasonedDice::Unreasoned(program))
     }
 }
 
-fn reasoned_dice(input: &str) -> nom::IResult<&str, Result<MaybeReasonedDice, mice::parse::InvalidDie>> {
-    use mice::parse;
-    use nom::{branch::alt, bytes::complete::tag, multi::many1};
-    let (i, dice) = tript!(parse::dice(input));
-    let a = many1(parse::whitespace)(i).and_then(|(i, _)| {
-        let _ = alt((tag("to"), tag("for"), tag("because"), tag("#")))(i)?;
-        Ok((i, ()))
-    });
-    match a {
-        Ok((i, _)) => Ok((i, Ok(MaybeReasonedDice::Reasoned(dice)))),
-        Err(_) => Ok((i, Ok(MaybeReasonedDice::Unreasoned(dice)))),
-    }
-}
-
-const ROLL_CAP: i64 = 10000;
+const ROLL_CAP: u64 = 10000;
 
 #[command]
 #[aliases("r")]
 async fn roll(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
-    // mice::parse::new::parse_expression(arg.message().as_bytes()).iter()
-    //     .for_each(|(_, program)| {
-    //         dbg!(program.fmt_sexpr());
-    //         let _ = dbg!(mice::interp::interpret(&mut ::rand::thread_rng(), program));
-    //     });
-    let dice = match reasoned_dice(arg.message()) {
-        Ok((_, Err(e))) => return reply(ctx, msg, &format!("{}", e)).await,
-        Ok((i, Ok(x))) => Ok((i, x)),
-        Err(e) => Err(e),
+    use ::mice::interp;
+    let is_cheap_enough = |program: &::mice::parse::new::Program| -> bool {
+        use ::mice::cost::{cost, Price, AstInterp, mbot::{self, TextFormatOutput}};
+        match (cost::<AstInterp, _>(program, ()), cost::<TextFormatOutput<mbot::Default>, _>(program, ())) {
+            (Price::Bounded(exec), Price::Bounded(fmt)) => exec <= ROLL_CAP && fmt <= ROLL_CAP,
+            _ => false,
+        }
     };
-    match dice {
-        Ok((reason, MaybeReasonedDice::Reasoned(dice))) => {
-            if reason.len() > MAX_REPLY_LENGTH {
-                reply(ctx, msg, "reason given is too long.").await
-            } else {
-                let res = if !dice.exceeds_cap(ROLL_CAP) {
-                    dice.roll()
-                } else {
-                    return reply(ctx, msg, "tried to DOS me.").await
-                };
-                match res {
-                    Ok(x) => {
-                        let dice_msg = format_smart(x);
-                        let resp = format!("{} {}", dice_msg, reason);
-                        if resp.len() > MAX_REPLY_LENGTH {
-                            reply(ctx, msg, &dice_msg).await?;
-                            reply(ctx, msg, &reason).await
-                        } else {
-                            reply(ctx, msg, &resp).await
-                        }
-                    }
-                    Err(x) => reply(ctx, msg, &format!("{}", x)).await,
+    macro_rules! handle_proggy_uwu {
+        ($program:expr) => {{
+            // Due to temporary lifetime extension, we can't put this directly in the match,
+            // since `&mut ThreadRng` is not allowed to cross an `.await` point where a
+            // `Send` future is required.
+            let res = interp::interpret(&mut ::rand::thread_rng(), $program);
+            match res {
+                Ok(output) => output,
+                Err(interp::InterpError::OverflowPositive) => {
+                    return reply(ctx, msg, "sum is too high for `i64`").await
+                },
+                Err(interp::InterpError::OverflowNegative) => {
+                    return reply(ctx, msg, "sum is too low for `i64`").await
                 }
             }
-        }
-        Ok((post_text, MaybeReasonedDice::Unreasoned(dice))) => {
-            if post_text.trim() != "" {
-                reply(ctx, msg, "you've specified an invalid dice expression").await
-            } else {
-                let res = if !dice.exceeds_cap(ROLL_CAP) {
-                    dice.roll()
+        }}
+    }
+    match reasoned_dice(arg.message()) {
+        Ok(MaybeReasonedDice::Reasoned(program, reason)) => if reason.len() > MAX_REPLY_LENGTH {
+            reply(ctx, msg, "reason given is too long.").await
+        } else {
+            if is_cheap_enough(&program) {
+                let output = handle_proggy_uwu!(&program);
+                let dice_msg = ast_format_smart(&program, &output);
+                let response = format!("{} {}", dice_msg, reason);
+                if response.len() > MAX_REPLY_LENGTH {
+                    reply(ctx, msg, &dice_msg).await?;
+                    reply(ctx, msg, reason).await
                 } else {
-                    return reply(ctx, msg, "tried to DOS me.").await
-                };
-                match res {
-                    Ok(x) => reply(ctx, msg, &format_smart(x)).await,
-                    Err(x) => reply(ctx, msg, &format!("{}", x)).await,
+                    reply(ctx, msg, &response).await
                 }
+            } else {
+                reply(ctx, msg, "tried to DOS me.").await
             }
-        }
+        },
+        Ok(MaybeReasonedDice::Unreasoned(program)) => if is_cheap_enough(&program) {
+            let output = handle_proggy_uwu!(&program);
+            reply(ctx, msg, &ast_format_smart(&program, &output)).await
+        } else {
+            reply(ctx, msg, "tried to DOS me.").await
+        },
         Err(_) => reply(ctx, msg, "you've specified an invalid dice expression").await,
     }
 }
