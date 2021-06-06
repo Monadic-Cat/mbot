@@ -144,7 +144,7 @@ pub mod ffi {
         // Safety: This is the same type as provided by `prep_expr`,
         // and the other side of the FFI is obligated to give us what we hand out.
         let expression: plot_impl::PreparedProgram = unsafe { prepared.into() };
-        use ::mice::prelude::MiceError;
+        use ::mice::Error as MiceError;
         match plot_impl::draw(&expression) {
             Ok(buffer) => DrawRet::Ok(FfiVecU8::from_vec(buffer)),
             Err(MiceError::OverflowPositive(_)) => DrawRet::OverflowPositive,
@@ -158,7 +158,7 @@ pub mod ffi {
 
 #[cfg(feature = "actual_plotter")]
 pub mod plot_impl {
-    use ::mice::prelude::MiceError;
+    use ::mice::Error as MiceError;
     use ::std::collections::HashMap;
     use ::core::iter;
     use ::plotters::prelude::*;

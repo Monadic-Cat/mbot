@@ -11,3 +11,4 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 mice = { path = "../mice" }
+rand = "0.7.3"

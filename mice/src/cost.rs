@@ -117,15 +117,15 @@ impl<'a> Cost<'a, StackInterp> for Program {
 // TODO: being able to implement this would allow us to remove the kludge inside
 // ExpressionExt::evaluation_cost(...) having to do with the size of allocations in formatting.
 /// Context of formatting the output of a dice program as text.
-pub struct TextFormatOutput;
-impl<'a> Cost<'a, TextFormatOutput> for crate::parse::Expression {
-    // TODO: choose a better type for this?
-    // FormatOptions is supposed to be deprecated, so using it in a new API is a little weird.
-    type Param = &'a crate::post::FormatOptions;
-    fn cost(&'a self, _param: Self::Param) -> Price {
-        todo!()
-    }
-}
+// pub struct TextFormatOutput;
+// impl<'a> Cost<'a, TextFormatOutput> for crate::parse::Expression {
+//     // TODO: choose a better type for this?
+//     // FormatOptions is supposed to be deprecated, so using it in a new API is a little weird.
+//     type Param = &'a crate::post::FormatOptions;
+//     fn cost(&'a self, _param: Self::Param) -> Price {
+//         todo!()
+//     }
+// }
 
 /// `mbot`(::mbot) centric cost calculations.
 pub mod mbot {

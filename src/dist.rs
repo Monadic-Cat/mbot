@@ -258,7 +258,7 @@ mod nonreloadable {
             }
         }
         pub fn draw(&self, prepared: Prepared<'a>) -> Result<FfiVecU8<'a>, Overflow> {
-            use ::mice::prelude::MiceError;
+            use ::mice::Error as MiceError;
             let Prepared { program, .. } = prepared;
             match plot_impl::draw(&program) {
                 Ok(vec) => Ok(FfiVecU8 {
