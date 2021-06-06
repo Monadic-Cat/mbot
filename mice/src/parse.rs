@@ -18,18 +18,6 @@ pub enum ParseError {
     InvalidExpression,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub(crate) struct ConstantTerm {
-    /// This is not allowed to exceed what would be the u63 max,
-    /// and is not allowed to be less than zero.
-    value: i64,
-}
-impl Display for ConstantTerm {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.value)
-    }
-}
-
 #[cfg_attr(test, derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy)]
 pub enum Sign {
