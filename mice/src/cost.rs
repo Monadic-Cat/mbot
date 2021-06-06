@@ -18,6 +18,24 @@ pub enum Price {
     // Unbounded(u64),
 }
 
+impl ::core::ops::Add<Price> for Price {
+    type Output = Price;
+    fn add(self, rhs: Price) -> Self::Output {
+        match (self, rhs) {
+            (Price::Bounded(lhs), Price::Bounded(rhs)) => Price::Bounded(lhs.saturating_add(rhs)),
+        }
+    }
+}
+impl ::core::iter::Sum<Price> for Price {
+    fn sum<I>(iter: I) -> Self
+        where I: Iterator<Item = Price>,
+    {
+        // Since `Price` addition is saturating, we don't need to
+        // worry about overflow checking here.
+        iter.fold(Price::Bounded(0), |a, b| a + b)
+    }
+}
+
 // Technically, this trait is open for use by types other than `Program`.
 // This is intentional. I think it is quite likely I'll end up with a variety of
 // types implementing this trait, where I need to demonstrate bounded cost to avoid being DOSed.

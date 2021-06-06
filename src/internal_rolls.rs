@@ -1,25 +1,51 @@
 //! Parsing roll commands from normal messages,
 //! 
 //! in the form of "...normal text...(roll: &lt;dice expression>)...normal text..."
-use ::mice::parse::{dice, whitespace, Expression, InvalidDie};
-use ::mice::ExpressionResult;
-use ::nom::{bytes::complete::tag, multi::many0, sequence::tuple, branch::alt, IResult};
+use ::core::convert::TryInto;
 use pulldown_cmark as cmark;
+use ::mice::parse::new::{Program, ExprError, parse_expression};
 
-fn internal_roll(input: &str) -> IResult<&str, Result<Expression, InvalidDie>> {
-    let (input, (_, _, res, _, _)) = tuple((
-        alt((tag("(roll:"), tag("(r:"))),
-        many0(whitespace),
-        dice,
-        many0(whitespace),
-        tag(")"),
-    ))(input)?;
-    Ok((input, res))
+enum InlineRollError {
+    TooLarge,
+    InvalidDie,
+    /// Any error or condition which we do not report.
+    Silent,
+}
+
+#[derive(Debug)]
+enum ReportedError {
+    TooLarge,
+    InvalidDie,
+}
+impl ::core::convert::TryFrom<InlineRollError> for ReportedError {
+    type Error = ();
+    fn try_from(e: InlineRollError) -> Result<Self, Self::Error> {
+        match e {
+            InlineRollError::TooLarge => Ok(Self::TooLarge),
+            InlineRollError::InvalidDie => Ok(Self::InvalidDie),
+            _ => Err(()),
+        }
+    }
+}
+
+fn inline_roll(input: &[u8]) -> Result<(&[u8], Program), (&[u8], InlineRollError)> {
+    match input {
+        [b'(', b'r', b'o', b'l', b'l', b':', rest @ ..] | [b'(', b'r', b':', rest @ ..] => {
+            match parse_expression(rest) {
+                Ok(([b')', rest @ ..], (_tokens, proggy))) => Ok((rest, proggy)),
+                Ok((rest, _)) => Err((rest, InlineRollError::Silent)),
+                Err(([b')', rest @ ..], ExprError::TooLarge)) => Err((rest, InlineRollError::TooLarge)),
+                Err(([b')', rest @ ..], ExprError::InvalidDie)) => Err((rest, InlineRollError::InvalidDie)),
+                Err((rest, _)) => Err((rest, InlineRollError::Silent)),
+            }
+        },
+        _ => Err((input, InlineRollError::Silent)),
+    }
 }
 
 #[derive(Debug)]
 pub(crate) struct ParsedMessage {
-    rolls: Vec<Result<Expression, InvalidDie>>,
+    rolls: Vec<Result<Program, ReportedError>>,
 }
 impl ParsedMessage {
     fn new() -> Self {
@@ -52,12 +78,12 @@ pub(crate) fn message(input: &str) -> ParsedMessage {
     let mut paragraph = |mut place: &str| {
         // Time to scroll across the thing uwu
         while place.len() > 1 {
-            match internal_roll(place) {
+            match inline_roll(place.as_bytes()).map_err(|(r, e)| (r, e.try_into().ok())) {
                 // The current place is a valid internal roll command.
                 // Store the parsed result of that, and scroll past.
                 Ok((input, res)) => {
-                    info.rolls.push(res);
-                    place = input;
+                    info.rolls.push(Ok(res));
+                    place = &place[(input.as_ptr() as usize) - (place.as_ptr() as usize) ..];
                 }
                 // The current place is not a syntactically valid internal roll command.
                 // That does not make this message invalid.
@@ -72,14 +98,14 @@ pub(crate) fn message(input: &str) -> ParsedMessage {
                 // (As opposed to making mice::dice more tolerant of these errors.)
                 // If we ever want to report the error in more detail, though,
                 // we'll want to consume the whole thing and keep spans.
-                Err(::nom::Err::Failure((_, ::nom::error::ErrorKind::TooLarge))) => {
-                    info.rolls.push(Err(InvalidDie));
+                Err((_rest, Some(e))) => {
+                    info.rolls.push(Err(e));
                     place = match shrunk_slice(place) {
                         Some(x) => x,
                         None => break,
                     };
                 },
-                _ => place = match shrunk_slice(place) {
+                Err((_rest, None)) => place = match shrunk_slice(place) {
                     Some(x) => x,
                     None => break,
                 },
@@ -103,61 +129,30 @@ pub(crate) fn message(input: &str) -> ParsedMessage {
 }
 
 pub(crate) fn response_for(input: &str) -> Option<String> {
+    use ::mice::{interp::{interpret, InterpError, fmt::mbot_format_default}, cost::{cost, Price, AstInterp, mbot::{self, TextFormatOutput}}};
     let info = message(input);
     if !info.rolls.is_empty() {
-        use ::mice::util::ExpressionExt;
-        let cost: i64 = info.rolls.iter()
+        let cost: Price = info.rolls.iter()
             .filter_map(|x| x.as_ref().ok())
-            .map(|x| x.evaluation_cost(Some(10000)))
+            .map(|x| cost::<AstInterp, _>(x, ()) + cost::<TextFormatOutput<mbot::Default>, _>(x, ()))
             .sum();
-        if cost > 10000 {
-            return None;
+        match cost {
+            Price::Bounded(cost) if cost <= 10000 => (),
+            _ => return None,
         }
-        let results: Vec<Result<ExpressionResult, _>> =
-            info.rolls.into_iter().map(|x| match x.map(|x| x.roll()) {
-                Ok(Ok(x)) => Ok(x),
-                Ok(Err(e)) => Err(e),
-                Err(InvalidDie) => Err(::mice::Error::InvalidDie),
-            }).collect();
-        Some(results.into_iter().map(|x| match x {
-            Ok(x) => {
-                use ::mice::nfmt;
-                use ::mice::nfmt::{TermKind, TermSeparator, PartialSumSignDirective};
-                use ::mice::parse::Sign;
-                use ::core::cell::Cell;
-                let mut buf = String::with_capacity(2000);
-                nfmt::format_result(&x, &mut buf, |mut f| {
-                    f.for_many(|f, many| {
-                        let kind = Cell::new(TermKind::Constant);
-                        f.terms(TermSeparator::Operator, |mut f| {
-                            if f.is_first() {
-                                match f.get_sign() {
-                                    Sign::Negative => { f.text("-"); },
-                                    Sign::Positive => (),
-                                }
-                            }
-                            f.for_kind(|f, k| {
-                                match k {
-                                    TermKind::Dice => {
-                                        f.text("(").expression().text(" → ")
-                                            .partial_sums(PartialSumSignDirective::Plus)
-                                            .text(")");
-                                    },
-                                    TermKind::Constant => { f.total(); }
-                                }
-                                kind.replace(k);
-                            });
-                        });
-                        if many || matches!(kind.into_inner(), TermKind::Dice) {
-                            f.text(" = ").total();
-                        }
-                    });
-                });
-                buf
+        let response = info.rolls.iter().map(|report| {
+            match report {
+                Ok(proggy) => Ok(interpret(&mut ::rand::thread_rng(), proggy).map(|output| (proggy, output))),
+                Err(e) => Err(e),
             }
-            // x.format(FormatOptions::new().total_right()),
-            Err(e) => format!("{}", e),
-        }).collect::<Vec<_>>().join("\n"))
+        }).map(|result| match result {
+            Ok(Ok((proggy, output))) => mbot_format_default(proggy.terms(), &output),
+            Ok(Err(InterpError::OverflowPositive)) => String::from("sum is too high for `i64`"),
+            Ok(Err(InterpError::OverflowNegative)) => String::from("sum is too low for `i64`"),
+            Err(ReportedError::TooLarge) => String::from("Invalid die"),
+            Err(ReportedError::InvalidDie) => String::from("Invalid die"),
+        }).collect::<Vec<_>>().join("\n");
+        Some(response)
     } else {
         None
     }
