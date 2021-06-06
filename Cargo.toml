@@ -104,4 +104,4 @@ lto = true # Link Time Optimization
 codegen-units = 1 # Make less parallel permit more optimizations. Default is 16.
 
 [workspace]
-members = ["slash", "mice", "proc_macro_helpers", "reloadable-plotter", "cmice"]
+members = ["mice", "proc_macro_helpers", "reloadable-plotter", "cmice"]
