@@ -191,6 +191,8 @@ where 'arena: 'iter,
                 match current {
                     Some(current) => {
                         walker.move_right();
+                        // Attempt to move downward when moving right.
+                        while let Ok(()) = walker.descend() {}
                         Some((current, walker.ancestors()))
                     },
                     None => {
@@ -199,6 +201,8 @@ where 'arena: 'iter,
                             Ok(()) => {
                                 let current = walker.current().unwrap();
                                 walker.move_right();
+                                // Attempt to move downward when moving right.
+                                while let Ok(()) = walker.descend() {}
                                 Some((current, walker.ancestors()))
                             },
                             // We tried to ascend past the root, which is our current parent.
@@ -309,4 +313,48 @@ fn it_works() {
             println!("Ancestor: {:?}", term);
         }
     }}
+}
+
+#[cfg(test)]
+#[test]
+fn postorder() {
+    macro_rules! decl_consts {
+        ($arena:ident => {
+            $($name:ident($val:expr)),* $(,)?
+        }) => {
+            $(let $name: Id<Term> = $arena.alloc(Term::Constant($val));)*
+        }
+    }
+    macro_rules! decl_adds {
+        ($arena:ident => {
+            $($name:ident($first:expr, $second:expr)),* $(,)?
+        }) => {
+            $(let $name: Id<Term> = $arena.alloc(Term::Add($first, $second));)*
+        }
+    }
+    let mut arena = Arena::<_, id_arena::DefaultArenaBehavior<Term>>::new();
+    decl_consts!(arena => {
+        a(10),
+        b(11),
+        c(12),
+        d(13),
+    });
+    decl_adds!(arena => {
+        first(a, b),
+        second(c, d),
+        third(first, second),
+    });
+    let tree = Tree {
+        arena, top: third,
+    };
+    let mut iter_walker_output = Vec::new();
+    for_! { (term, _ancestors) in tree.postorder() => {
+        iter_walker_output.push(term.clone());
+    }}
+    let proggy = crate::parse::new::Program { tree };
+    let mut recursive_walker_output = Vec::new();
+    crate::stack::postorder(&proggy, |term, _parent| {
+        recursive_walker_output.push(term.clone());
+    });
+    assert_eq!(iter_walker_output, recursive_walker_output);
 }
