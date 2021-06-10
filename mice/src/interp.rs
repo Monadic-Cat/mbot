@@ -173,7 +173,7 @@ fn interpret_term<R: Rng>(
             let (left_total, right_total) =
                 (term_outputs[left].1.total(), term_outputs[right].1.total());
             Ok(term_outputs.alloc((term, TermOutput::Subtract(
-                left_total.checked_add(right_total).ok_or_else(|| {
+                left_total.checked_sub(right_total).ok_or_else(|| {
                     if left_total > 0 || right_total < 0 {
                         InterpError::OverflowPositive
                     } else {
