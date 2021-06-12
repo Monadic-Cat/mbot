@@ -166,7 +166,7 @@ impl Machine {
             }
             Subtract => {
                 // Note: These are guaranteed to exist due to how the tree is constructed.
-                let (left, right) = (self.stack.pop().unwrap(), self.stack.pop().unwrap());
+                let (right, left) = (self.stack.pop().unwrap(), self.stack.pop().unwrap());
                 self.stack.push(match left.checked_sub(right) {
                     Some(x) => x,
                     None => {
