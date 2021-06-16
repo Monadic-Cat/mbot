@@ -33,13 +33,13 @@ fn roll_startup_benchmark(c: &mut Criterion) {
         });
         group.bench_function("New AST Parser", |b| {
             b.iter(|| {
-                let _ = black_box(::mice::parse::new::parse_expression(program_text.as_bytes()).unwrap());
+                let _ = black_box(::mice::parse::parse_expression(program_text.as_bytes()).unwrap());
             });
         });
         group.bench_function("New Stack Machine Compiler", |b| {
             b.iter(|| {
                 let _ = black_box({
-                    let (_, ast) = ::mice::parse::new::parse_expression(program_text.as_bytes()).unwrap();
+                    let (_, ast) = ::mice::parse::parse_expression(program_text.as_bytes()).unwrap();
                     ::mice::stack::compile(&ast)
                 });
             });
@@ -56,7 +56,7 @@ fn rolling_benchmark(c: &mut Criterion) {
 
     let mut rollers = |mut group: BenchmarkGroup<_>, program_text, rust: fn(&mut dyn RngCore) -> i64| {
         let expression = black_box(mice::parse::Expression::parse(program_text).unwrap().1.unwrap());
-        let (_, program) = black_box(mice::parse::new::parse_expression(program_text.as_bytes()).unwrap());
+        let (_, program) = black_box(mice::parse::parse_expression(program_text.as_bytes()).unwrap());
         let stack_program = black_box(mice::stack::compile(&program));
         group.bench_function("Old Roller", |b| {
             b.iter(|| black_box(expression.roll_with(&mut rng)));
@@ -95,13 +95,13 @@ fn end_to_end_rolling_benchmark(c: &mut Criterion) {
         });
         group.bench_function("New AST Roller", |b| {
             b.iter(|| {
-                let (_, program) = mice::parse::new::parse_expression(program_text.as_bytes()).unwrap();
+                let (_, program) = mice::parse::parse_expression(program_text.as_bytes()).unwrap();
                 black_box(mice::interp::interpret(&mut rng, &program))
             });
         });
         group.bench_function("New Stack Machine Roller", |b| {
             b.iter(|| {
-                let (_, program) = mice::parse::new::parse_expression(program_text.as_bytes()).unwrap();
+                let (_, program) = mice::parse::parse_expression(program_text.as_bytes()).unwrap();
                 let stack_program = mice::stack::compile(&program);
                 let mut machine = ::mice::stack::Machine::new();
                 let _ = black_box(machine.eval_with(&mut rng, &stack_program));

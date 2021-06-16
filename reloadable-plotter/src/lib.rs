@@ -170,7 +170,7 @@ pub mod plot_impl {
 
     #[derive(Debug)]
     pub struct PreparedProgram {
-        program: ::mice::parse::new::Program,
+        program: ::mice::parse::Program,
         // We heap allocate here because the input message string slice is not enforced to live
         // as long as this loaded module. (Nor would it make sense for it to be.)
         caption: String,
@@ -184,7 +184,7 @@ pub mod plot_impl {
 
     pub fn prepare_expression(expression: &str) -> Result<PreparedProgram, PreparationError> {
         let caption = String::from(expression);
-        match ::mice::parse::new::parse_expression(expression.as_bytes()) {
+        match ::mice::parse::parse_expression(expression.as_bytes()) {
             Ok((input, (_tokens, program))) if input.is_empty() => {
                 use ::mice::cost::{cost, StackInterp, Price};
                 match cost::<StackInterp, _>(&program, ()) {

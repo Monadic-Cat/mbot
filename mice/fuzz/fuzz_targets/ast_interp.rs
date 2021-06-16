@@ -1,7 +1,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use ::mice::parse::new::parse_expression;
+use ::mice::parse::parse_expression;
 use ::mice::interp::interpret;
 use ::rand_pcg::Pcg32;
 

@@ -52,7 +52,7 @@ pub fn cost<'a, Ctx, T: Cost<'a, Ctx>>(thing: &'a T, param: T::Param) -> Price {
     <T as Cost<'a, Ctx>>::cost(thing, param)
 }
 
-use crate::parse::new::Program;
+use crate::parse::Program;
 use crate::stack::postorder;
 
 /// Context of AST walking interpreter.
@@ -60,7 +60,7 @@ pub struct AstInterp;
 impl<'a> Cost<'a, AstInterp> for Program {
     type Param = ();
     fn cost(&'a self, _param: Self::Param) -> Price {
-        use crate::parse::new::Term;
+        use crate::parse::Term;
         let mut price = 0u64;
         postorder(self, |child, _parent| match child {
             Term::Constant(_) => price = price.saturating_add(1),
@@ -86,7 +86,7 @@ pub struct StackInterp;
 impl<'a> Cost<'a, StackInterp> for Program {
     type Param = ();
     fn cost(&'a self, _param: Self::Param) -> Price {
-        use crate::parse::new::Term;
+        use crate::parse::Term;
         let mut price = 0u64;
         postorder(self, |child, parent| match child {
             Term::Constant(_) => price = price.saturating_add(1),
@@ -139,7 +139,7 @@ pub mod mbot {
 impl<'a> Cost<'a, mbot::TextFormatOutput<mbot::Default>> for Program {
     type Param = ();
     fn cost(&'a self, _param: Self::Param) -> Price {
-        use crate::parse::new::Term;
+        use crate::parse::Term;
         let mut price = 0u64;
         // This doesn't need to be postorder- that's just what's most convenient.
         for_! { (term, _ancestors) in self.postorder() => {

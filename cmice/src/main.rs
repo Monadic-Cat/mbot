@@ -13,7 +13,7 @@ fn main() {
     let mut a = args();
     a.next();
     let input = a.fold(String::new(), |a, x| a + " " + &x);
-    let program = match ::mice::parse::new::parse_expression(input.as_bytes()) {
+    let program = match ::mice::parse::parse_expression(input.as_bytes()) {
         Ok((_input, (_tokens, proggy))) => proggy,
         Err(_) => {
             println!("That's an invalid dice expression.");

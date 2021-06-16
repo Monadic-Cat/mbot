@@ -1,5 +1,5 @@
 //! Tree traversal utilities.
-use crate::parse::new::Term;
+use crate::parse::Term;
 use ::id_arena::{Arena, Id};
 
 /// A generic tree structure, with nodes of type `T`.
@@ -270,7 +270,7 @@ pub mod private_for_inside_macro_outputs {
 /// A `for` loop-alike for [`StreamingIterator`].
 /// ```
 /// # use ::mice::tree::for_;
-/// use ::mice::parse::new::parse_expression;
+/// use ::mice::parse::parse_expression;
 /// let (_tokens, program) = parse_expression("4d6k3 + 2".as_bytes()).unwrap().1;
 /// for_! { (term, _ancestors) in program.postorder() => {
 ///     // do stuff with `term` and maybe `_ancestors`
@@ -306,7 +306,7 @@ where Iter: Iterator<Item = T> {
 #[cfg(test)]
 #[test]
 fn it_works() {
-    let (_tokens, program) = crate::parse::new::parse_expression("4d6k3 + 2".as_bytes()).unwrap().1;
+    let (_tokens, program) = crate::parse::parse_expression("4d6k3 + 2".as_bytes()).unwrap().1;
     for_! { (term, ancestors) in program.postorder() => {
         dbg!(term);
         for term in ancestors {
@@ -351,7 +351,7 @@ fn postorder() {
     for_! { (term, _ancestors) in tree.postorder() => {
         iter_walker_output.push(term.clone());
     }}
-    let proggy = crate::parse::new::Program { tree };
+    let proggy = crate::parse::Program { tree };
     let mut recursive_walker_output = Vec::new();
     crate::stack::postorder(&proggy, |term, _parent| {
         recursive_walker_output.push(term.clone());

@@ -81,7 +81,7 @@ async fn gargamel(ctx: &Context, msg: &Message) -> CommandResult {
 
 const MAX_REPLY_LENGTH: usize = 1900;
 
-fn ast_format_smart(input: &::mice::parse::new::Program, output: &::mice::interp::ProgramOutput) -> String {
+fn ast_format_smart(input: &::mice::parse::Program, output: &::mice::interp::ProgramOutput) -> String {
     use ::mice::interp;
     let first = interp::fmt::mbot_format_default(input.terms(), output);
     let second;
@@ -100,17 +100,17 @@ fn ast_format_smart(input: &::mice::parse::new::Program, output: &::mice::interp
 
 #[derive(Debug)]
 enum MaybeReasonedDice<'a> {
-    Reasoned(::mice::parse::new::Program, &'a str),
-    Unreasoned(::mice::parse::new::Program),
+    Reasoned(::mice::parse::Program, &'a str),
+    Unreasoned(::mice::parse::Program),
 }
 
 enum ReasonedDiceError {
-    Expr(::mice::parse::new::ExprError),
+    Expr(::mice::parse::ExprError),
     UnknownTrailing,
 }
 
 fn reasoned_dice(input: &str) -> Result<MaybeReasonedDice<'_>, ReasonedDiceError> {
-    use ::mice::parse::new::{parse_expression, Token};
+    use ::mice::parse::{parse_expression, Token};
     let (inp, (tokens, program)) = match parse_expression(input.as_bytes()) {
         Ok((input, x)) => (input, x),
         Err((_, e)) => return Err(ReasonedDiceError::Expr(e)),
@@ -137,7 +137,7 @@ const ROLL_CAP: u64 = 10000;
 #[aliases("r")]
 async fn roll(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
     use ::mice::interp;
-    let is_cheap_enough = |program: &::mice::parse::new::Program| -> bool {
+    let is_cheap_enough = |program: &::mice::parse::Program| -> bool {
         use ::mice::cost::{cost, Price, AstInterp, mbot::{self, TextFormatOutput}};
         match (cost::<AstInterp, _>(program, ()), cost::<TextFormatOutput<mbot::Default>, _>(program, ())) {
             (Price::Bounded(exec), Price::Bounded(fmt)) => exec <= ROLL_CAP && fmt <= ROLL_CAP,
@@ -314,7 +314,7 @@ async fn plot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
 
 #[command]
 async fn dot(ctx: &Context, msg: &Message, arg: Args) -> CommandResult {
-    match ::mice::parse::new::parse_expression(arg.message().as_bytes()) {
+    match ::mice::parse::parse_expression(arg.message().as_bytes()) {
         Ok((input, (_tokens, program))) if input.is_empty() => {
             let mut dot_ast = String::from("```dot\n");
             dot_ast.push_str(&::mice::viz::make_dot(&program));

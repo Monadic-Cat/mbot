@@ -3,7 +3,7 @@
 //! in the form of "...normal text...(roll: &lt;dice expression>)...normal text..."
 use ::core::convert::TryInto;
 use pulldown_cmark as cmark;
-use ::mice::parse::new::{Program, ExprError, parse_expression};
+use ::mice::parse::{Program, ExprError, parse_expression};
 
 enum InlineRollError {
     TooLarge,

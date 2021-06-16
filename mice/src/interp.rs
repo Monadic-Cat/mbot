@@ -1,6 +1,6 @@
 //! Interpreter for dice programs. The current design is a basic recursive AST walker.
 //! Not intended to be fast.
-use crate::parse::new::{Program, Term};
+use crate::parse::{Program, Term};
 use crate::tree::Tree;
 use ::id_arena::{Arena, Id};
 use ::rand::Rng;
@@ -208,7 +208,7 @@ pub mod fmt {
     use super::KeepHigh;
     use super::TermOutput;
     use super::Out;
-    use crate::parse::new::Term;
+    use crate::parse::Term;
 
     fn fmt_default_impl(buf: &mut String, current: Id<Out>, arena: &Arena<Out>, terms: &Arena<Term>) {
         let (term, out) = &arena[current];

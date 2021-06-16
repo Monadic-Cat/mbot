@@ -1,5 +1,5 @@
 //! Generate GraphViz DOT files for ASTs.
-use crate::parse::new::{Program, Term};
+use crate::parse::{Program, Term};
 use crate::tree::Tree;
 use ::id_arena::{Arena, Id as ArenaId};
 

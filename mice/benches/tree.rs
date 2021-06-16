@@ -30,13 +30,13 @@ fn postorder_iteration_benchmark(c: &mut Criterion) {
     };
     for (title, expression) in DICE_EXPRESSIONS {
         walkers(c.benchmark_group(format!("Postorder Tree Iteration - {}", title)), black_box({
-            ::mice::parse::new::parse_expression(expression.as_bytes()).unwrap().1
+            ::mice::parse::parse_expression(expression.as_bytes()).unwrap().1
         }));
     }
 }
 
 fn stack_compiling_benchmark(c: &mut Criterion) {
-    let walkers = |mut group: BenchmarkGroup<_>, program: ::mice::parse::new::Program| {
+    let walkers = |mut group: BenchmarkGroup<_>, program: ::mice::parse::Program| {
         pub struct StackProgram(Vec<Instruction>);
         #[derive(Copy, Clone)]
         enum Instruction {
@@ -57,7 +57,7 @@ fn stack_compiling_benchmark(c: &mut Criterion) {
             b.iter(|| {
                 let mut instructions = Vec::with_capacity(program.terms().len());
                 ::mice::stack::postorder(&program, |term, parent| {
-                    use ::mice::parse::new::Term::*;
+                    use ::mice::parse::Term::*;
                     let next = match term {
                         Constant(value) => Instruction::Value(*value),
                         DiceRoll(count, sides) => match parent {
@@ -89,7 +89,7 @@ fn stack_compiling_benchmark(c: &mut Criterion) {
             b.iter(|| {
                 let mut instructions = Vec::with_capacity(program.terms().len());
                 for_! { (term, mut ancestors) in program.postorder() => {
-                    use ::mice::parse::new::Term::*;
+                    use ::mice::parse::Term::*;
                     let parent = ancestors.next();
                     let next = match term {
                         Constant(value) => Instruction::Value(*value),
@@ -121,7 +121,7 @@ fn stack_compiling_benchmark(c: &mut Criterion) {
     };
     for (title, expression) in DICE_EXPRESSIONS {
         walkers(c.benchmark_group(format!("Stack Compiling - {}", title)), black_box({
-            ::mice::parse::new::parse_expression(expression.as_bytes()).unwrap().1
+            ::mice::parse::parse_expression(expression.as_bytes()).unwrap().1
         }));
     }
 }

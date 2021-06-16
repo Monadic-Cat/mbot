@@ -1,6 +1,6 @@
 //! A stack machine for dice programs. Currently just interprets the stack machine bytecode,
 //! but is already faster than the other two interpreters in all benchmarks.
-use crate::parse::new::{Program, Term};
+use crate::parse::{Program, Term};
 use crate::tree::Tree;
 use ::id_arena::Arena;
 use ::rand::Rng;
@@ -15,7 +15,7 @@ macro_rules! assert_dice_roll_terminal {
         // operator in the future, we ensure there will be a type
         // error here as a reminder to fix up the tree traveral
         // code when the time comes.
-        const _: $crate::parse::new::Term = $crate::parse::new::Term::DiceRoll(0i64, 0i64);
+        const _: $crate::parse::Term = $crate::parse::Term::DiceRoll(0i64, 0i64);
     }};
 }
 
