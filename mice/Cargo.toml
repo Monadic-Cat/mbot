@@ -14,7 +14,6 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-nom = "5.0.0"
 rand = "0.7.0"
 thiserror = "1.0.6"
 wasm-bindgen  = { version = "0.2.50", optional = true }

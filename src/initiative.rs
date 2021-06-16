@@ -1,4 +1,3 @@
-use mice::parse::{integer, sign, whitespace, Sign};
 use nom::{
     bytes::complete::{tag, take_while1},
     combinator::opt,
@@ -14,6 +13,106 @@ use rand::{thread_rng, Rng};
 ...
 
  */
+
+mod parse {
+    use nom::{
+        branch::alt,
+        bytes::complete::{tag, take_while1},
+        error::ErrorKind::TooLarge,
+        Err::Failure,
+        IResult,
+    };
+    use std::fmt::Display;
+    use std::fmt::Formatter;
+    use std::ops::{Mul, Neg};
+
+    #[derive(Debug, Clone, Copy)]
+    pub enum Sign {
+        Positive,
+        Negative,
+    }
+    impl Neg for Sign {
+        type Output = Sign;
+        fn neg(self) -> Self::Output {
+            match self {
+                Sign::Positive => Sign::Negative,
+                Sign::Negative => Sign::Positive,
+            }
+        }
+    }
+    impl<T: Neg<Output = T>> Mul<T> for Sign {
+        type Output = T;
+        fn mul(self, rhs: T) -> Self::Output {
+            match self {
+                Sign::Positive => rhs,
+                Sign::Negative => -rhs,
+            }
+        }
+    }
+    impl Display for Sign {
+        fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+            write!(
+                f,
+                "{}",
+                match self {
+                    Sign::Positive => "+",
+                    Sign::Negative => "-",
+                }
+            )
+        }
+    }
+
+
+    fn addition(input: &str) -> IResult<&str, Sign> {
+        let (input, _) = tag("+")(input)?;
+        Ok((input, Sign::Positive))
+    }
+    fn subtraction(input: &str) -> IResult<&str, Sign> {
+        let (input, _) = tag("-")(input)?;
+        Ok((input, Sign::Negative))
+    }
+
+    /// Parser for a `+` or `-` sign.
+    pub fn sign(input: &str) -> IResult<&str, Sign> {
+        // While currently equivalent to `operator`,
+        // the idea of a sign will never change, whilst `operator`
+        // may be extended to recognize other operators,
+        // which would break someone who just wants
+        // a positive or negative sign.
+        // TL;DR: Arithmetic != Sign
+        alt((addition, subtraction))(input)
+    }
+
+    fn is_dec_digit(c: char) -> bool {
+        c.is_digit(10)
+    }
+
+    /// Parser for an effectively 63-bit unsigned integer.
+    ///
+    /// This is useful because we represent signs separately
+    /// from the dice they might be seen as attached to.
+    /// This is due to a semantic difference.
+    /// e.g., In the real world, you don't have negative four dice.
+    /// You subtract the result of four dice.
+    pub fn integer(input: &str) -> IResult<&str, i64> {
+        let (input, int) = take_while1(is_dec_digit)(input)?;
+        // Pretend to be a 63 bit unsigned integer.
+        let i = match int.parse::<i64>() {
+            // The only error possible here is
+            // integer overflow.
+            // This should emit a nom Failure
+            Err(_) => return Err(Failure((input, TooLarge))),
+            Ok(x) => x,
+        };
+        Ok((input, i))
+    }
+
+    /// Nom parser for whitespace
+    pub fn whitespace(input: &str) -> IResult<&str, &str> {
+        alt((tag(" "), tag("\t")))(input)
+    }
+}
+use parse::{sign, Sign, integer, whitespace};
 
 #[derive(Debug)]
 struct CharName<'a>(&'a str);
