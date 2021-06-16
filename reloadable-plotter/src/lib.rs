@@ -144,13 +144,11 @@ pub mod ffi {
         // Safety: This is the same type as provided by `prep_expr`,
         // and the other side of the FFI is obligated to give us what we hand out.
         let expression: plot_impl::PreparedProgram = unsafe { prepared.into() };
-        use ::mice::Error as MiceError;
+        use ::mice::stack::Overflow;
         match plot_impl::draw(&expression) {
             Ok(buffer) => DrawRet::Ok(FfiVecU8::from_vec(buffer)),
-            Err(MiceError::OverflowPositive(_)) => DrawRet::OverflowPositive,
-            Err(MiceError::OverflowNegative(_)) => DrawRet::OverflowNegative,
-            Err(MiceError::InvalidExpression(_)) => unreachable!("we check for this inside prep_expr"),
-            Err(MiceError::InvalidDie) => unreachable!("the current mice parser cannot produce dice with negative sides"),
+            Err(Overflow::Positive) => DrawRet::OverflowPositive,
+            Err(Overflow::Negative) => DrawRet::OverflowNegative,
         }
     }
 }
@@ -158,7 +156,7 @@ pub mod ffi {
 
 #[cfg(feature = "actual_plotter")]
 pub mod plot_impl {
-    use ::mice::Error as MiceError;
+    use ::mice::stack::Overflow;
     use ::std::collections::HashMap;
     use ::core::iter;
     use ::plotters::prelude::*;
@@ -200,7 +198,7 @@ pub mod plot_impl {
         }
     }
 
-    pub fn draw(exp: &PreparedProgram) -> Result<Vec<u8>, MiceError> {
+    pub fn draw(exp: &PreparedProgram) -> Result<Vec<u8>, Overflow> {
         let PreparedProgram { program, caption } = exp;
         // This is FAR too expensive computationally right now.
         let mut counts = HashMap::new();
@@ -213,15 +211,11 @@ pub mod plot_impl {
         // explosions will be annoying here.
         // perhaps we should enable more precise handling and higher caps
         // when misbehaving things like explosions aren't present.
-        use ::mice::stack::Overflow;
         let stack_program = ::mice::stack::compile(&program);
         let mut machine = ::mice::stack::Machine::new();
         let sample = iter::repeat_with(|| machine.eval_with(&mut rng, &stack_program))
             .inspect(|x| x.iter().for_each(|x| *counts.entry(*x).or_insert(0) += 1))
-            .take(SAMPLE_SIZE).collect::<Result<Vec<_>, _>>().map_err(|e| match e {
-                Overflow::Positive => MiceError::OverflowPositive(::mice::OverflowPositive),
-                Overflow::Negative => MiceError::OverflowNegative(::mice::OverflowNegative),
-            })?;
+            .take(SAMPLE_SIZE).collect::<Result<Vec<_>, _>>()?;
         let max = *counts.values().max().unwrap() * 4 / 3;
         // Note: We could *definitely* reuse this buffer.
         let mut buffer = vec!(0u8; BUFFER_WIDTH);

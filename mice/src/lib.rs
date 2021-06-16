@@ -4,8 +4,6 @@
 //! usage, and will likely obtain extensions related
 //! to games that I play.
 #![allow(clippy::try_err)]
-mod error;
-pub use error::Error;
 #[cfg(feature = "thread_rng")]
 pub mod parse;
 pub use parse::ParseError;
@@ -27,24 +25,6 @@ enum Overflow {
     Positive(#[from] OverflowPositive),
     #[error(transparent)]
     Negative(#[from] OverflowNegative),
-}
-impl From<Overflow> for Error {
-    fn from(o: Overflow) -> Self {
-        match o {
-            Overflow::Positive(x) => Self::OverflowPositive(x),
-            Overflow::Negative(x) => Self::OverflowNegative(x),
-        }
-    }
-}
-impl ::core::ops::Neg for Overflow {
-    type Output = Overflow;
-    fn neg(self) -> Self::Output {
-        use Overflow::*;
-        match self {
-            Positive(x) => Negative(-x),
-            Negative(x) => Positive(-x),
-        }
-    }
 }
 
 // TODO: seeded dice representation for reduced heap allocation?

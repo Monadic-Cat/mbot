@@ -258,17 +258,15 @@ mod nonreloadable {
             }
         }
         pub fn draw(&self, prepared: Prepared<'a>) -> Result<FfiVecU8<'a>, Overflow> {
-            use ::mice::Error as MiceError;
+            use ::mice::stack;
             let Prepared { program, .. } = prepared;
             match plot_impl::draw(&program) {
                 Ok(vec) => Ok(FfiVecU8 {
                     vec,
                     _lifetime: PhantomData,
                 }),
-                Err(MiceError::OverflowPositive(_)) => Err(Overflow::Positive),
-                Err(MiceError::OverflowNegative(_)) => Err(Overflow::Negative),
-                Err(MiceError::InvalidExpression(_)) => unreachable!("we check for this inside prep"),
-                Err(MiceError::InvalidDie) => unreachable!("the current mice parser cannot produce dice with negative sides"),
+                Err(stack::Overflow::Positive) => Err(Overflow::Positive),
+                Err(stack::Overflow::Negative) => Err(Overflow::Negative),
             }
         }
     }
