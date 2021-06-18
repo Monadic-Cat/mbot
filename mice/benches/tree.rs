@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, BenchmarkGroup};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkGroup};
 use ::mice::tree::for_;
 
 // TODO: factor this out into a shared file
@@ -30,7 +30,7 @@ fn postorder_iteration_benchmark(c: &mut Criterion) {
     };
     for (title, expression) in DICE_EXPRESSIONS {
         walkers(c.benchmark_group(format!("Postorder Tree Iteration - {}", title)), black_box({
-            ::mice::parse::parse_expression(expression.as_bytes()).unwrap().1
+            ::mice::parse::parse_expression(expression.as_bytes()).unwrap().1.1
         }));
     }
 }
@@ -121,7 +121,7 @@ fn stack_compiling_benchmark(c: &mut Criterion) {
     };
     for (title, expression) in DICE_EXPRESSIONS {
         walkers(c.benchmark_group(format!("Stack Compiling - {}", title)), black_box({
-            ::mice::parse::parse_expression(expression.as_bytes()).unwrap().1
+            ::mice::parse::parse_expression(expression.as_bytes()).unwrap().1.1
         }));
     }
 }

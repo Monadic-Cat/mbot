@@ -1,27 +1,18 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, BenchmarkGroup};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-fn compare_formatting(c: &mut Criterion) {
-    let dice_result = black_box(mice::roll("2d6").unwrap());
-    let format_cfg = mice::FormatOptions::new().total_right();
-    let mut group = c.benchmark_group("FormatOptions");
-    group.bench_function("Old Backend", |b| {
-        b.iter(|| mice::nfmt::benching::old_format(&dice_result, format_cfg))
+fn formatting(c: &mut Criterion) {
+    let program = ::mice::parse::parse_expression("2d6".as_bytes()).unwrap().1.1;
+    let dice_output = ::mice::interp::interpret(&mut ::rand::thread_rng(), &program).unwrap();
+    let dice_output = black_box(dice_output);
+    let mut group = c.benchmark_group("Formatting");
+    group.bench_function("mbot default", |b| {
+        b.iter(|| black_box(::mice::interp::fmt::mbot_format_default(program.terms(), &dice_output)));
     });
-    group.bench_function("Simple New Backend", |b| {
-        b.iter(|| {
-            mice::nfmt::format_compat(&dice_result, format_cfg);
-        });
-    });
-    let mut buf = String::with_capacity(2000);
-    group.bench_function("Simple New Backend - With Reusing", |b| {
-        b.iter(|| {
-            mice::nfmt::format_compat_with(&dice_result, &mut buf, format_cfg);
-            black_box(&buf);
-            buf.clear();
-        });
+    group.bench_function("mbot short", |b| {
+        b.iter(|| black_box(::mice::interp::fmt::mbot_format_short(program.terms(), &dice_output)));
     });
     group.finish();
 }
 
-criterion_group!(formatting_benches, compare_formatting);
+criterion_group!(formatting_benches, formatting);
 criterion_main!(formatting_benches);

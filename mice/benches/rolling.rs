@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, BenchmarkGroup};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkGroup};
 use ::rand::{RngCore, Rng};
 use ::core::num::Wrapping;
 
@@ -25,12 +25,7 @@ const DICE_EXPRESSIONS: &[(&str, &str, fn(&mut dyn RngCore) -> i64)] = &[
 ];
 
 fn roll_startup_benchmark(c: &mut Criterion) {
-    let rollers = |mut group: BenchmarkGroup<_>, program_text| {
-        group.bench_function("Old Parser", |b| {
-            b.iter(|| {
-                let _ = black_box(::mice::parse::Expression::parse(program_text).unwrap().1.unwrap());
-            });
-        });
+    let rollers = |mut group: BenchmarkGroup<_>, program_text: &str| {
         group.bench_function("New AST Parser", |b| {
             b.iter(|| {
                 let _ = black_box(::mice::parse::parse_expression(program_text.as_bytes()).unwrap());
@@ -39,7 +34,7 @@ fn roll_startup_benchmark(c: &mut Criterion) {
         group.bench_function("New Stack Machine Compiler", |b| {
             b.iter(|| {
                 let _ = black_box({
-                    let (_, ast) = ::mice::parse::parse_expression(program_text.as_bytes()).unwrap();
+                    let (_, (_, ast)) = ::mice::parse::parse_expression(program_text.as_bytes()).unwrap();
                     ::mice::stack::compile(&ast)
                 });
             });
@@ -54,13 +49,9 @@ fn rolling_benchmark(c: &mut Criterion) {
     use ::rand::SeedableRng;
     let mut rng = ::rand::rngs::SmallRng::from_entropy();
 
-    let mut rollers = |mut group: BenchmarkGroup<_>, program_text, rust: fn(&mut dyn RngCore) -> i64| {
-        let expression = black_box(mice::parse::Expression::parse(program_text).unwrap().1.unwrap());
-        let (_, program) = black_box(mice::parse::parse_expression(program_text.as_bytes()).unwrap());
+    let mut rollers = |mut group: BenchmarkGroup<_>, program_text: &str, rust: fn(&mut dyn RngCore) -> i64| {
+        let (_, (_, program)) = black_box(mice::parse::parse_expression(program_text.as_bytes()).unwrap());
         let stack_program = black_box(mice::stack::compile(&program));
-        group.bench_function("Old Roller", |b| {
-            b.iter(|| black_box(expression.roll_with(&mut rng)));
-        });
         group.bench_function("New AST Roller", |b| {
             b.iter(|| black_box(mice::interp::interpret(&mut rng, &program)));
         });
@@ -87,21 +78,15 @@ fn end_to_end_rolling_benchmark(c: &mut Criterion) {
     use ::rand::SeedableRng;
     let mut rng = ::rand::rngs::SmallRng::from_entropy();
     let mut rollers = |mut group: BenchmarkGroup<_>, program_text: &str| {
-        group.bench_function("Old Roller", |b| {
-            b.iter(|| {
-                let expression = mice::parse::Expression::parse(program_text).unwrap().1.unwrap();
-                black_box(expression.roll_with(&mut rng))
-            });
-        });
         group.bench_function("New AST Roller", |b| {
             b.iter(|| {
-                let (_, program) = mice::parse::parse_expression(program_text.as_bytes()).unwrap();
+                let (_, (_, program)) = mice::parse::parse_expression(program_text.as_bytes()).unwrap();
                 black_box(mice::interp::interpret(&mut rng, &program))
             });
         });
         group.bench_function("New Stack Machine Roller", |b| {
             b.iter(|| {
-                let (_, program) = mice::parse::parse_expression(program_text.as_bytes()).unwrap();
+                let (_, (_, program)) = mice::parse::parse_expression(program_text.as_bytes()).unwrap();
                 let stack_program = mice::stack::compile(&program);
                 let mut machine = ::mice::stack::Machine::new();
                 let _ = black_box(machine.eval_with(&mut rng, &stack_program));
