@@ -17,4 +17,26 @@ fn test_expr(dice_expr: &str) -> Result<String, String> {
 #[test]
 fn test_basic_expressions() {
     println!("{}", test_expr("1d20+1d6+8").unwrap());
+    println!("{}", test_expr("2d20+5").unwrap());
+    println!("{}", test_expr("32d2").unwrap());
+}
+
+#[test]
+fn test_leading_whitespace() {
+    println!("{}", test_expr("                   1d20+1d6").unwrap());
+}
+
+#[test]
+fn test_trailing_whitespace() {
+    println!("{}", test_expr("1d20+1d6                     ").unwrap());
+}
+
+#[test]
+fn test_mixed_whitespace() {
+    println!("{}", test_expr("1d20       +         1d6").unwrap());
+}
+
+#[test]
+fn test_maturity() {
+    println!("{}", test_expr("69d420   +    13d37").unwrap());
 }
