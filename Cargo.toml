@@ -50,8 +50,6 @@ titlecase = "1.1.0"
 default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools", "plotting", "static_plotter"]
 bot_commands = []
 db = []
-# This feature is incomplete.
-control_socket = []
 internal_rolls  = ["pulldown-cmark"]
 # This feature implies the bot_commands feature,
 # because all it does is provide bot commands.

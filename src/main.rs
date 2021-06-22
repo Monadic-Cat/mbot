@@ -7,8 +7,6 @@ mod internal_rolls;
 mod cmd;
 #[cfg(feature = "cli_control")]
 use cmd::command_loop;
-#[cfg(feature = "control_socket")]
-mod control_socket;
 #[cfg(feature = "maddie_tools")]
 mod masks;
 #[cfg(feature = "plotting")]
