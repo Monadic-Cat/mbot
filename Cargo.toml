@@ -38,18 +38,6 @@ optional = true
 default-features = false
 features = ["bitmap_encoder", "histogram", "ttf"]
 
-[dependencies.sqlx]
-version = "0.4.0-beta.1"
-default-features = false
-features = ["runtime-tokio", "macros", "sqlite"]
-optional = true
-# [dependencies.sqlx]
-# git = "https://github.com/Monadic-Cat/sqlx.git"
-# branch = "sqlite-code-owo"
-# default-features = false
-# features = [ "runtime-tokio", "macros", "sqlite" ]
-# optional = true
-
 [build-dependencies]
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
@@ -61,10 +49,7 @@ titlecase = "1.1.0"
 [features]
 default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools", "plotting", "static_plotter"]
 bot_commands = []
-db = ["sqlx"]
-# This feature is incomplete.
-# This feature has been intentionally broken.
-turns_db = ["db", "fehler", "comfy-table"]
+db = []
 # This feature is incomplete.
 control_socket = []
 internal_rolls  = ["pulldown-cmark"]
@@ -91,9 +76,6 @@ static_plotter = ["plotting", "reloadable-plotter/actual_plotter"]
 # the Discord Terms of Service, so tread with care.
 # However, configuration at runtime is in no way disallowed,
 # so I believe this feature to have some merit.
-# In addition, this and the pending control_socket feature
-# will likely be the only ways to cleanly shutdown the SQLx
-# database connection pool run by the turns_db feature.
 cli_control = []
 static_token = []
 

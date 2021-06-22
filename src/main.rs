@@ -9,17 +9,11 @@ mod cmd;
 use cmd::command_loop;
 #[cfg(feature = "control_socket")]
 mod control_socket;
-#[cfg(feature = "turns_db")]
-mod turns;
-#[cfg(feature = "db")]
-mod db;
 #[cfg(feature = "maddie_tools")]
 mod masks;
 #[cfg(feature = "plotting")]
 mod dist;
 
-#[cfg(feature = "turns_db")]
-use serenity::model::{channel::GuildChannel, id::MessageId, guild::{PartialGuild, Guild}};
 use serenity::{
     framework::standard::{
         macros::{command, group},
@@ -427,7 +421,7 @@ impl EventHandler for Handler {
         #[cfg(feature = "control_socket")]
         control_socket::control_loop("/home/jmn/mbot.socket").await;
     }
-    #[cfg(any(feature = "internal_rolls", feature = "turns_db"))]
+    #[cfg(feature = "internal_rolls")]
     async fn message(&self, ctx: Context, msg: Message) {
         #[cfg(feature = "internal_rolls")] {
             #[allow(clippy::single_match)]
@@ -439,82 +433,6 @@ impl EventHandler for Handler {
                 None => (),
             }
         }
-        // for turn tracking
-        #[cfg(feature = "turns_db")] {
-            let guild_id = msg.guild_id.unwrap().0 as i64;
-            match turns::attempt_turn(
-                msg.author.id.0 as i64,
-                msg.channel_id.0 as i64,
-                msg.timestamp.into(),
-            ).await
-            {
-                Ok(_) => (),
-                Err(e @ turns::TurnError::NotInGame(_))
-                    | Err(e @ turns::TurnError::NotInRound(_))
-                    | Err(e @ turns::TurnError::WrongTurn(_)) => match e.notify_channel() {
-                        Some(c) => match c
-                            .say(ctx.http, format!("{}: {}", msg.author.mention(), e))
-                            .await
-                        {
-                            Ok(_) => (),
-                            Err(e2) => log::error!("{} AFTER {}", e2, e),
-                        },
-                        None => log::error!("{}", e),
-                    },
-                // This isn't really an error.
-                // It's just someone posting in a channel we see that
-                // has no games associated with it.
-                // Therefore, do no response and no logging.
-                Err(turns::TurnError::NoGameHere) => (),
-                // TODO: suppress SQLx errors from when we don't find a server/game/channel
-                Err(turns::TurnError::SqlxError(e)) => log::error!("sqlx: {}", e),
-            }
-        }
-    }
-    // for turn tracking
-    #[cfg(feature = "turns_db")]
-    async fn message_delete(&self, ctx: Context, channel_id: ChannelId, deleted_msg_id: MessageId) {
-        let pmsgs = match channel_id
-            .messages(ctx.http, |b| b.after(deleted_msg_id).limit(1))
-            .await
-        {
-            Ok(x) => x,
-            Err(e) => {
-                println!("failed to fetch succeeding messages");
-                return;
-            }
-        };
-        if pmsgs.len() == 0 {
-            unimplemented!("turn rollbacks")
-        }
-    }
-    #[cfg(feature = "turns_db")]
-    async fn channel_delete(&self, ctx: Context, channel: &GuildChannel) {
-        use foretry::async_try;
-        use sqlx::query;
-        let channel_id = channel.id.0 as i64;
-        async_try! { _, sqlx::Error | {
-            let mut transaction = POOL.begin().await?;
-            query!("DELETE FROM Channels WHERE ID = ?", channel_id)
-                .fetch_one(&mut transaction)
-                .await?;
-            transaction.commit().await?
-        } catch (e) {
-            log::error!("sqlx error: {}", e);
-        }};
-    }
-    #[cfg(feature = "turns_db")]
-    async fn guild_delete(&self, ctx: Context, incomplete: PartialGuild, full: Option<Guild>) {
-        use sqlx::query;
-        use foretry::async_try;
-        let guild_id = incomplete.id.0 as i64;
-        async_try! { _, sqlx::Error | {
-            let mut transaction = POOL.begin().await.unwrap();
-            query!("DELETE FROM Servers WHERE ID = ?", guild_id)
-                .execute(&mut transaction).await.unwrap();
-        } catch (e) {
-            log::error!("sqlx error: {}", e);
-        }}
     }
 }
 
@@ -522,15 +440,6 @@ impl EventHandler for Handler {
 const TOKEN_NAME: &str = "MBOT_TOKEN";
 #[cfg(feature = "static_token")]
 const TOKEN: &str = env!("MBOT_TOKEN");
-
-#[cfg(feature = "turns_db")]
-use sqlx::SqlitePool;
-
-#[cfg(feature = "turns_db")]
-use once_cell::sync::Lazy;
-
-#[cfg(feature = "turns_db")]
-use db::POOL;
 
 use once_cell::sync::OnceCell;
 static SHARDS: OnceCell<Arc<Mutex<ShardManager>>> = OnceCell::new();
@@ -543,8 +452,6 @@ pub(crate) async fn shutdown() {
     if let Some(shards) = SHARDS.get() {
         shards.lock().await.shutdown_all().await
     }
-    #[cfg(feature = "db")]
-    db::shutdown().await;
     std::process::exit(0);
 }
 
@@ -567,14 +474,7 @@ async fn main() {
         let f = f.group(&masks::MADDIETOOLS_GROUP);
         #[cfg(feature = "plotting")]
         let f = f.group(&PLOTTING_GROUP);
-        #[cfg(feature = "turns_db")]
-        {
-            f.group(&turns::GMTOOLS_GROUP).group(&turns::PLAYERTOOLS_GROUP)
-        }
-        #[cfg(not(feature = "turns_db"))]
-        {
-            f
-        }
+        f
     };
     let client = Client::builder(&token).event_handler(Handler);
 
@@ -586,14 +486,6 @@ async fn main() {
     let mut client = client.await.expect("Error starting client.");
     // We store this because we need it to shut everything down.
     SHARDS.set(client.shard_manager.clone()).expect("error setting up shutdown handler");
-
-    #[cfg(feature = "db")]
-    if let Ok(()) = db::initialize().await {
-        println!("sqlite connection initialized");
-    } else {
-        println!("Failure to initialize database connection.");
-        ::std::process::exit(1);
-    }
 
     if let Err(reason) = client.start().await {
         println!("Client error {:#?}", reason);
