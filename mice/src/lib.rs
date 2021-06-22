@@ -11,3 +11,6 @@ pub mod stack;
 pub mod viz;
 pub mod cost;
 pub mod tree;
+
+#[cfg(test)]
+mod tests;
