@@ -12,9 +12,10 @@ fn stack_roll(expr: &str) -> i64 {
 
 #[test]
 fn test_arithmetic() {
+    #[track_caller]
     fn assert_total(expr: &str, total: i64) {
-        assert_eq!(ast_roll(expr).1.total(), total);
-        assert_eq!(stack_roll(expr), total);
+        assert_eq!(ast_roll(expr).1.total(), total, "AST walker");
+        assert_eq!(stack_roll(expr), total, "Stack interpreter");
     }
     assert_total("2 + 2", 4);
     assert_total("2 - 2", 0);
