@@ -102,6 +102,7 @@ pub struct Machine {
     stack: Vec<i64>,
 }
 
+#[derive(Debug)]
 pub enum Overflow {
     Positive,
     Negative,

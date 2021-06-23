@@ -1,4 +1,25 @@
+fn ast_roll(expr: &str) -> (crate::parse::Program, crate::interp::ProgramOutput) {
+    let (_input, (_tokens, program)) = crate::parse::parse_expression(expr.as_bytes()).unwrap();
+    let output = crate::interp::interpret(&mut ::rand::thread_rng(), &program).unwrap();
+    (program, output)
+}
+fn stack_roll(expr: &str) -> i64 {
+    let (_input, (_tokens, program)) = crate::parse::parse_expression(expr.as_bytes()).unwrap();
+    let stack_program = crate::stack::compile(&program);
+    let mut machine = crate::stack::Machine::new();
+    machine.eval_with(&mut ::rand::thread_rng(), &stack_program).unwrap()
+}
 
+#[test]
+fn test_arithmetic() {
+    fn assert_total(expr: &str, total: i64) {
+        assert_eq!(ast_roll(expr).1.total(), total);
+        assert_eq!(stack_roll(expr), total);
+    }
+    assert_total("2 + 2", 4);
+    assert_total("2 - 2", 0);
+    assert_total("5 - 3", 2);
+}
 
 fn test_expr(dice_expr: &str) -> Result<String, String> {
     let program = match crate::parse::parse_expression(dice_expr.as_bytes()) {
