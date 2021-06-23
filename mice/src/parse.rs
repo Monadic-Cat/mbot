@@ -92,7 +92,7 @@ fn lex(input: &[u8]) -> (&[u8], Result<Vec<Token>, TooLarge>) {
                     tokens.push(Token::Op(Op::Minus));
                     cursor = rest;
                 },
-                [b'\t', rest @ ..] | [b' ', rest @ ..] => {
+                [b'\t' | b' ', rest @ ..] => {
                     tokens.push(Token::Whitespace);
                     state = State::Whitespace;
                     cursor = rest;
@@ -116,7 +116,7 @@ fn lex(input: &[u8]) -> (&[u8], Result<Vec<Token>, TooLarge>) {
                 }
             },
             State::Whitespace => match cursor {
-                [b'\t', rest @ ..] | [b' ', rest @ ..] => cursor = rest,
+                [b'\t' | b' ', rest @ ..] => cursor = rest,
                 [..] => state = State::Normal,
             }
         }
@@ -381,8 +381,7 @@ pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], (Vec<Token>, Program
                 Err(()) => Err(ExprError::InvalidTokenInUnaryOp),
             },
             [Token::K, ..] => break Err(ExprError::InvalidTokenInUnaryOp),
-            all @ [Token::Int(_), ..] |
-            all @ [Token::D, ..] => break consume_expr(&mut arena, 2, all).map(|(_, x)| x),
+            all @ [Token::Int(_) | Token::D, ..] => break consume_expr(&mut arena, 2, all).map(|(_, x)| x),
             [] => break Err(ExprError::Eof),
         };
     };
