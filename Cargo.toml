@@ -25,6 +25,8 @@ plotters-bitmap = { version = "0.3.0", optional = true }
 png = { version = "0.16.8", optional = true }
 libc = { version = "0.2.93", optional = true }
 parking_lot = { version = "0.11.1", features = ["send_guard"] }
+httparse = { version = "1.4.1", optional = true }
+rust-embed = { version = "5.9.0", optional = true }
 
 [dependencies.reloadable-plotter]
 path = "./reloadable-plotter"
@@ -47,7 +49,7 @@ proc-macro2 = "1"
 titlecase = "1.1.0"
 
 [features]
-default = ["bot_commands", "cli_control", "internal_rolls", "maddie_tools", "plotting", "static_plotter"]
+default = ["bot_commands", "cli_control", "controller", "internal_rolls", "maddie_tools", "plotting", "static_plotter"]
 bot_commands = []
 db = []
 internal_rolls  = ["pulldown-cmark"]
@@ -75,6 +77,8 @@ static_plotter = ["plotting", "reloadable-plotter/actual_plotter"]
 # However, configuration at runtime is in no way disallowed,
 # so I believe this feature to have some merit.
 cli_control = []
+controller = ["httparse", "rust-embed", "cli_control"]
+
 static_token = []
 
 [profile.release]

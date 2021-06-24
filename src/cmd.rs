@@ -16,7 +16,7 @@ fn whitespace(input: &str) -> IResult<&str, &str> {
     alt((tag(" "), tag("\t"), tag("\n")))(input)
 }
 
-enum Command<'a> {
+pub(crate) enum Command<'a> {
     // Say(ChannelId, &'a str),
     SayImplicitChannel(&'a str),
     SelectChannel(ChannelId),
@@ -26,11 +26,11 @@ enum Command<'a> {
     Shutdown,
 }
 
-enum ParseError {
+pub(crate) enum ParseError {
     InvalidCommand,
 }
 
-fn parse_command(input: &str) -> Result<Command<'_>, ParseError> {
+pub(crate) fn parse_command(input: &str) -> Result<Command<'_>, ParseError> {
     use nom::error::ErrorKind::TooLarge;
     use nom::Err::Failure;
     alt((

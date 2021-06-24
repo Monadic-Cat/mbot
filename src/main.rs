@@ -11,6 +11,8 @@ use cmd::command_loop;
 mod masks;
 #[cfg(feature = "plotting")]
 mod dist;
+#[cfg(feature = "controller")]
+mod controller;
 
 use serenity::{
     framework::standard::{
@@ -405,12 +407,28 @@ async fn anon_msg(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
 #[only_in(dm)]
 struct DMCommands;
 
+#[cfg(feature = "controller")]
+struct ReadyJarSender;
+#[cfg(feature = "controller")]
+impl ::serenity::prelude::TypeMapKey for ReadyJarSender {
+    type Value = controller::JarSender<(Context, Ready)>;
+}
+
 struct Handler;
 #[serenity::async_trait]
 impl EventHandler for Handler {
     #[allow(unused_variables)]
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
+
+        #[cfg(feature = "controller")] {
+            let jar = {
+                let mut lock = ctx.data.write().await;
+                lock.remove::<ReadyJarSender>().unwrap()
+            };
+            jar.fill((ctx.clone(), ready.clone()));
+        }
+
         #[cfg(feature = "cli_control")]
         match command_loop(ctx, ready).await {
             Ok(_) => (),
@@ -480,6 +498,14 @@ async fn main() {
     let client = client.framework(framework);
     #[cfg(not(feature = "bot_commands"))]
     let client = client.framework(StandardFramework::new());
+
+    // TODO: consider using ::tokio::task::unconstrained?
+    #[cfg(feature = "controller")]
+    let client = {
+        let (sender, receiver) = controller::Jar::new();
+        ::tokio::spawn(controller::listen(5673, receiver));
+        client.type_map_insert::<ReadyJarSender>(sender)
+    };
 
     let mut client = client.await.expect("Error starting client.");
     // We store this because we need it to shut everything down.
