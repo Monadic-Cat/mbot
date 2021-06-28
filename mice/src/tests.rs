@@ -20,6 +20,7 @@ fn test_arithmetic() {
     assert_total("2 + 2", 4);
     assert_total("2 - 2", 0);
     assert_total("5 - 3", 2);
+    assert_total("-4 + 3", -1);
 }
 
 fn test_expr(dice_expr: &str) -> Result<String, String> {

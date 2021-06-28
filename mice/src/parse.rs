@@ -6,7 +6,6 @@ use ::id_arena::{Arena, Id};
 use crate::tree::Tree;
 use ::core_extensions::SliceExt;
 use ::core::convert::TryFrom;
-use ::core::convert::TryInto;
 
 use ::proc_macro_helpers::decl_ops;
 decl_ops! {
@@ -24,9 +23,9 @@ decl_ops! {
     /// Binary operators
         BinOp {
             /// Addition
-            Plus { unary: 3, binary: (3, 4) },
+            Plus { unary: 4, binary: (3, 4) },
             /// Subtraction
-            Minus { unary: 3, binary: (3, 4) },
+            Minus { unary: 4, binary: (3, 4) },
             // /// Multiplication
             // Times { binary: (5, 6) },
             // In order to have general operators that work on
@@ -275,19 +274,6 @@ pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], (Vec<Token>, Program
         Ok(x) => x,
         Err(TooLarge) => return Err((rest, ExprError::TooLarge)),
     };
-    // To be used where we already know to expect a unary op.
-    fn consume_unary_op(terms: &mut Arena<Term>, op: UnaryOp, input: &[Token]) -> Result<Id<Term>, ExprError>  {
-        match op {
-            UnaryOp::Plus => {
-                let term = Term::UnaryAdd(consume_expr(&mut *terms, unary_binding_power(op), input)?.1);
-                Ok(terms.alloc(term))
-            },
-            UnaryOp::Minus => {
-                let term = Term::UnarySubtract(consume_expr(&mut *terms, unary_binding_power(op), input)?.1);
-                Ok(terms.alloc(term))
-            }
-        }
-    }
 
     /// Scroll past whitespace.
     fn ignore_whitespace(input: &[Token]) -> &[Token] {
@@ -336,6 +322,25 @@ pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], (Vec<Token>, Program
                 (rest, Term::DiceRoll(1, *faces))
             },
             [Token::Int(n), rest @ ..] => (rest, Term::Constant(*n)),
+            [Token::Op(op), rest @ ..] => {
+                // We currently only permit prefix operators at the front
+                // of a dice expression. We could be more permissive than this,
+                // but we're currently maintaining identical behavior here
+                // to the old parser.
+                if terms.len() > 0 {
+                    Err(InvalidTokenInExpr)?
+                }
+                let op = UnaryOp::try_from(*op).map_err(|()| {
+                    ExprError::InvalidTokenInUnaryOp
+                })?;
+                let r_bp = unary_binding_power(op);
+                let (rest, expr) = consume_expr(&mut *terms, r_bp, rest)?;
+                let term = match op {
+                    UnaryOp::Plus => Term::UnaryAdd(expr),
+                    UnaryOp::Minus => Term::UnarySubtract(expr),
+                };
+                (rest, term)
+            }
             [_x, ..] => Err(InvalidTokenInExpr)?,
             [] => Err(UnexpectedEof)?,
         };
@@ -373,15 +378,10 @@ pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], (Vec<Token>, Program
         match cursor {
             // Ignore preceding whitespace.
             [Token::Whitespace, rest @ ..] => cursor = rest,
-            // Note that unary operations are currently only permitted at the
-            // front of a dice expression. We could be more permissive than this,
-            // but the current goal is identical behavior to the old parser.
-            [Token::Op(op), rest @ ..] => break match (*op).try_into() {
-                Ok(op) => consume_unary_op(&mut arena, op, rest),
-                Err(()) => Err(ExprError::InvalidTokenInUnaryOp),
-            },
             [Token::K, ..] => break Err(ExprError::InvalidTokenInUnaryOp),
-            all @ [Token::Int(_) | Token::D, ..] => break consume_expr(&mut arena, 2, all).map(|(_, x)| x),
+            all @ [Token::Int(_) | Token::D | Token::Op(_), ..] => {
+                break consume_expr(&mut arena, 2, all).map(|(_, x)| x)
+            },
             [] => break Err(ExprError::Eof),
         };
     };
