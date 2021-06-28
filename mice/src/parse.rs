@@ -327,7 +327,7 @@ pub fn parse_expression(input: &[u8]) -> ParseResult<&[u8], (Vec<Token>, Program
                 // of a dice expression. We could be more permissive than this,
                 // but we're currently maintaining identical behavior here
                 // to the old parser.
-                if terms.len() > 0 {
+                if terms.len() > 0 || min_bp != 2 {
                     Err(InvalidTokenInExpr)?
                 }
                 let op = UnaryOp::try_from(*op).map_err(|()| {
