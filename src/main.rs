@@ -118,7 +118,8 @@ fn reasoned_dice(input: &str) -> Result<MaybeReasonedDice<'_>, ReasonedDiceError
                 [b'#', ..] => Ok(MaybeReasonedDice::Reasoned(program, ::core::str::from_utf8(inp).unwrap())),
                 _ => Err(ReasonedDiceError::UnknownTrailing),
             },
-            Some(_) | None => todo!(),
+            Some(_) => Err(ReasonedDiceError::UnknownTrailing),
+            None => unreachable!("successfully parsed dice expression from empty token stream"),
         }
     } else {
         Ok(MaybeReasonedDice::Unreasoned(program))
