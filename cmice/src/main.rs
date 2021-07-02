@@ -25,4 +25,6 @@ fn main() {
         Ok(output) => println!("{}", ::mice::interp::fmt::mbot_format_default(program.terms(), &output)),
         Err(e) => eprintln!("{:?}", e),
     }
+    let mir = ::mice::mir::lower(&program);
+    println!("{}", ::mice::mir::dot(&mir));
 }
