@@ -131,12 +131,23 @@ pub enum Term {
     // This could conceivably have its arguments
     // replaced by terms, and be turned into an operator
     // in its own right. This could then allow strange expressions like `3d(d8)`.
+    /// A roll of the dice- what someone would do by shaking the set of dice
+    /// in their hands and throwing it.
     DiceRoll(i64, i64),
+    /// Filter the results of a dice roll, keeping only the highest N results in the total.
     KeepHigh(Id<Term>, i64),
+    /// Addition.
     Add(Id<Term>, Id<Term>),
+    /// Subtraction.
     Subtract(Id<Term>, Id<Term>),
+    /// Unary negation, flipping the sign of an integer.
     UnarySubtract(Id<Term>),
+    /// A no-op, for symmetry with [`UnarySubtract`](Term::UnarySubtract).
     UnaryAdd(Id<Term>),
+    // Unimplemented for now:
+    // /// Exploding dice, like `20d6!`, where dice that meet a condition are rolled an extra time.
+    // /// Typically, the condition is hitting the maximum for the die in question.
+    // Explode(Id<Term>, i64),
 }
 
 /// A parsed dice program. The result of invoking `parse_expression` on something like `"3d6 + 4"`.
