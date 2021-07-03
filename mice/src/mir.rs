@@ -119,17 +119,10 @@ impl FilterKind {
 /// Coercions, left implicit in the AST but explicit in MIR.
 #[derive(Debug)]
 enum Coercion {
-    FromRollToOutput,
     FromOutputToInt,
-    // This fused coercion is not strictly necessary,
-    // but permits a relatively simple interpreter to
-    // avoid allocating unnecessarily for partial sums.
-    // If this turns out unhelpful, it will be easy to strip out.
-    FromRollToInt,
 }
 
 enum Type {
-    Roll,
     Output,
     Integer,
 }
@@ -157,17 +150,15 @@ pub struct Mir {
 fn mir_type_of(graph: &MirGraph, node: NodeIndex) -> Type {
     match graph[node] {
         MirNode::Integer(_) => Type::Integer,
-        MirNode::Coerce(Coercion::FromRollToOutput) => Type::Output,
         MirNode::Coerce(Coercion::FromOutputToInt) => Type::Integer,
-        MirNode::Coerce(Coercion::FromRollToInt) => Type::Integer,
-        // TODO: determine whether to lazily roll or not,
-        // and whether to surface that in MIR semantics
-        MirNode::Roll => Type::Roll,
+        MirNode::Roll => Type::Output,
         MirNode::BinOp(BinaryOp::Add | BinaryOp::Subtract) => Type::Integer,
         MirNode::Filter(_) => Type::Output,
         MirNode::Apply => todo!("type of function application"),
         MirNode::Loop(_) => todo!("type of loops"),
         MirNode::Lambda(_) => todo!("type of function declaration"),
+        MirNode::Entry => todo!("type of entry point"),
+        MirNode::End => todo!("type of region end")
     }
 }
 
@@ -182,13 +173,9 @@ fn mir_coerce_to(graph: &mut MirGraph, node: NodeIndex, ty: Type) -> Option<Node
         }}
     }
     match (ty, mir_type_of(&*graph, node)) {
-        (Type::Roll, Type::Roll) => Some(node),
-        (Type::Roll, _) => None,
-        (Type::Output, Type::Roll) => Some(coerce!(FromRollToOutput)),
         (Type::Output, Type::Output) => Some(node),
         // There is no way to coerce an integer back into a collection of dice output.
         (Type::Output, Type::Integer) => None,
-        (Type::Integer, Type::Roll) => Some(coerce!(FromRollToInt)),
         (Type::Integer, Type::Output) => Some(coerce!(FromOutputToInt)),
         (Type::Integer, Type::Integer) => Some(node),
     }
@@ -299,11 +286,6 @@ pub fn lower(ast: &crate::parse::Program) -> Mir {
                   current: Id<Term>) -> NodeIndex {
         fn coerce_to_int(graph: &mut MirGraph, term: NodeIndex) -> NodeIndex {
             match mir_type_of(&*graph, term) {
-                Type::Roll => {
-                    let coercion = graph.add_node(MirNode::Coerce(Coercion::FromRollToInt));
-                    graph.add_edge(coercion, term, MirEdge::DataDependency { port: 0 });
-                    coercion                        
-                },
                 Type::Output => {
                     let coercion = graph.add_node(MirNode::Coerce(Coercion::FromOutputToInt));
                     graph.add_edge(coercion, term, MirEdge::DataDependency { port: 0 });
@@ -327,11 +309,6 @@ pub fn lower(ast: &crate::parse::Program) -> Mir {
                 // At least for now, the parser doesn't permit other things in here.
                 assert!(matches!(&terms[*term], Term::DiceRoll(_, _)));
                 let roll = lower_node(terms, &mut *graph, &mut *state, *term);
-                let roll = {
-                    let coercion = graph.add_node(MirNode::Coerce(Coercion::FromRollToOutput));
-                    graph.add_edge(coercion, roll, MirEdge::DataDependency { port: 0 });
-                    coercion
-                };
                 let keep_count = graph.add_node(MirNode::Integer(*keep_count));
                 let keep_high = graph.add_node(MirNode::Filter(Filter {
                     filter: FilterKind::KeepHigh,
