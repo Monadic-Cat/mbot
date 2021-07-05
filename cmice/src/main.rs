@@ -27,4 +27,5 @@ fn main() {
     }
     let mir = ::mice::mir::lower(&program);
     println!("{}", ::mice::mir::dot(&mir));
+    println!("Mir Interp: {}", ::mice::mir::interp::interpret(&mir));
 }

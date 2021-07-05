@@ -44,6 +44,7 @@ impl FateDie {
 // Coercions `a -> b` occur when an operator that accepts `b`, but not `a`, is given
 // an argument of type `a`.
 
+#[derive(Debug)]
 struct DiceRollOutput {
     sides: i64,
     dice: Vec<i64>,
@@ -211,6 +212,8 @@ enum MirNode {
     // TODO: Both of these need to have an explicit type attached.
     Loop(Region),
     Lambda(Region),
+    Entry,
+    End,
 }
 
 /// A dummy macro so I can write example snippets with full editor support.
@@ -368,6 +371,171 @@ macro_rules! defops {
         }
     )*) => {
         
+    }
+}
+
+/// A basic interpreter for the MIR.
+/// Not usable yet.
+pub mod interp {
+    use super::{Mir, MirNode, MirEdge, Coercion, DiceRollOutput, BinaryOp, Filter, FilterKind};
+    use ::petgraph::{Direction, visit::DfsPostOrder};
+    use ::rand::Rng;
+    use ::std::cmp;
+
+    #[derive(::derive_more::Unwrap, Debug)]
+    enum Value {
+        Integer(i64),
+        Output(i64, DiceRollOutput),
+    }
+
+    #[derive(Debug)]
+    struct StackVar {
+        port: u8,
+        value: Value,
+    }
+
+    // This is non-optional because MIR construction and checking should move all
+    // possible errors to prior to interpretation.
+    // So therefore, any failures are due to programming mistakes.
+    fn pop_arguments<const N: usize>(stack: &mut Vec<StackVar>) -> [Value; N] {
+        use ::core::mem::{MaybeUninit, transmute_copy};
+        const MAYBE_VALUE: MaybeUninit<Value> = MaybeUninit::uninit();
+        let mut buf = [MAYBE_VALUE; N];
+        // We only keep track of initialization here so we don't have ambient unsafety.
+        // If MIR is constructed and verified right and we make a
+        // mistake in the interpreter, this will never be necessary.
+        let mut inited = [false; N];
+        for _ in 0..N {
+            // TODO: consider moving all popping to the front by instead using
+            // drain or split_off.
+            let StackVar { port, value } = stack.pop().unwrap();
+            assert!(!inited[port as usize]);
+            inited[port as usize] = true;
+            // Safety: Writing through a raw pointer immediately after
+            // obtaining it from MaybeUninit is perfectly safe.
+            unsafe { buf[port as usize].as_mut_ptr().write(value); }
+        }
+        // Safety: We have ensured the whole buffer is initialized.
+        // Since either stack.pop().unwrap() or `assert!(!inited[port as usize])`
+        // would otherwise have panicked, due to insufficient arguments or overlapping ports,
+        // respectively.
+        unsafe { transmute_copy::<[MaybeUninit<Value>; N], [Value; N]>(&buf) }
+    }
+
+    pub fn interpret(mir: &Mir) -> i64 {
+        let mut postorder = DfsPostOrder::new(&mir.graph, mir.top);
+        let mut priors: Vec<StackVar> = Vec::with_capacity(2);
+        let mut rng = ::rand::thread_rng();
+        // TODO: we rely on MIR being tree-like for data dependencies,
+        // for discovering argument port numbers.
+        // This is due to DfsPostOrder not giving us quite enough information.
+        // Fortunately, MIR *is* tree-like.
+        // It won't be forever, though, if/when we add common subexpression elimination.
+        // It *will* always be acyclic, at least.
+        let get_self_arg_number = |node| {
+            if mir.graph.edges_directed(node, Direction::Incoming).count() == 0 {
+                // In this case, we're looking at the entry node.
+                0
+            } else {
+                mir.graph.edges_directed(node, Direction::Incoming).filter_map(|e| {
+                    match e.weight() {
+                        &MirEdge::DataDependency { port } => Some(port),
+                        _ => None
+                    }
+                }).next().unwrap()
+            }
+        };
+        while let Some(node) = postorder.next(&mir.graph) {
+            match &mir.graph[node] {
+                &MirNode::Integer(val) => {
+                    priors.push(StackVar {
+                        port: get_self_arg_number(node),
+                        value: Value::Integer(val)
+                    });
+                },
+                MirNode::Coerce(Coercion::FromOutputToInt) => {
+                    let (total, _output) = priors.pop().unwrap().value.unwrap_output();
+                    priors.push(StackVar {
+                        port: get_self_arg_number(node),
+                        value: Value::Integer(total)
+                    });
+                },
+                MirNode::Roll => {
+                    let [count, sides] = pop_arguments(&mut priors);
+                    let count = count.unwrap_integer();
+                    let sides = sides.unwrap_integer();
+                    if sides == 1 {
+                        priors.push(StackVar {
+                            port: get_self_arg_number(node),
+                            value: Value::Output(count, DiceRollOutput {
+                                sides, dice: Vec::new(),
+                            })
+                        });
+                    } else {
+                        let mut total: i64 = 0;
+                        let mut parts = Vec::with_capacity(count as usize);
+                        for _ in 0..count {
+                            let random = rng.gen_range(0, sides) + 1;
+                            total = total.checked_add(random).unwrap();
+                            parts.push(random);
+                        }
+                        priors.push(StackVar {
+                            port: get_self_arg_number(node),
+                            value: Value::Output(total, DiceRollOutput {
+                                sides, dice: parts
+                            })
+                        });
+                    }
+                },
+                MirNode::BinOp(BinaryOp::Add) => {
+                    let [left, right] = pop_arguments(&mut priors);
+                    let left = left.unwrap_integer();
+                    let right = right.unwrap_integer();
+                    priors.push(StackVar {
+                        port: get_self_arg_number(node),
+                        value: Value::Integer(left + right),
+                    });
+                },
+                MirNode::BinOp(BinaryOp::Subtract) => {
+                    let [left, right] = pop_arguments(&mut priors);
+                    let left = left.unwrap_integer();
+                    let right = right.unwrap_integer();
+                    priors.push(StackVar {
+                        port: get_self_arg_number(node),
+                        value: Value::Integer(left - right)
+                    });
+                },
+                MirNode::Filter(Filter { filter: FilterKind::KeepHigh }) => {
+                    let [output, keep_count] = pop_arguments(&mut priors);
+                    let (total, output) = output.unwrap_output();
+                    let keep_count = keep_count.unwrap_integer();
+                    if output.sides == 1 {
+                        priors.push(StackVar {
+                            port: get_self_arg_number(node),
+                            value: Value::Output(cmp::min(keep_count, total), DiceRollOutput {
+                                sides: 1,
+                                dice: Vec::new(),
+                            })
+                        });
+                    } else {
+                        let mut dice = output.dice;
+                        dice.sort_unstable_by(|a, b| b.cmp(a));
+                        dice.truncate(keep_count as usize);
+                        let total = dice.iter().sum();
+                        priors.push(StackVar {
+                            port: get_self_arg_number(node),
+                            value: Value::Output(total, DiceRollOutput {
+                                sides: output.sides,
+                                dice,
+                            })
+                        });
+                    }
+                }
+                _ => todo!()
+            }
+        }
+        dbg!(&priors);
+        todo!()
     }
 }
 
