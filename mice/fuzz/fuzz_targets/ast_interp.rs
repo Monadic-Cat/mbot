@@ -6,7 +6,7 @@ use ::mice::interp::interpret;
 use ::rand_pcg::Pcg32;
 
 fuzz_target!(|data: &[u8]| {
-    if let Ok((_, (_, program))) = parse_expression(data) {
+    if let Ok((input, (_, program))) = parse_expression(data) {
         use ::mice::cost::{cost, AstInterp, Price};
         if !input.is_empty() { return }
         match cost::<AstInterp, _>(&program, ()) {
