@@ -402,7 +402,7 @@ pub mod interp {
         const MAYBE_VALUE: MaybeUninit<Value> = MaybeUninit::uninit();
         let mut buf = [MAYBE_VALUE; N];
         // We only keep track of initialization here so we don't have ambient unsafety.
-        // If MIR is constructed and verified right and we make a
+        // If MIR is constructed and verified right and we don't make a
         // mistake in the interpreter, this will never be necessary.
         let mut inited = [false; N];
         for _ in 0..N {
