@@ -116,6 +116,7 @@ impl Machine {
         }
     }
     fn exec_with<R: Rng>(&mut self, rng: &mut R, instruction: Instruction) -> Result<(), Overflow> {
+        use ::core::cmp;
         use Instruction::*;
         match instruction {
             Value(value) => self.stack.push(value),
@@ -137,9 +138,9 @@ impl Machine {
                 if keep_count == 0 {
                     self.stack.push(0);
                 } else if sides == 1 {
-                    self.stack.push(::core::cmp::min(count, keep_count));
+                    self.stack.push(cmp::min(count, keep_count));
                 } else {
-                    let mut partials = Vec::<i64>::with_capacity(keep_count as _);
+                    let mut partials = Vec::<i64>::with_capacity(cmp::min(count, keep_count) as _);
                     for _ in 0..count {
                         // TODO: have way to save partial sums
                         let random = rng.gen_range(0, sides) + 1;
@@ -147,7 +148,9 @@ impl Machine {
                         partials.sort_unstable_by(|a, b| b.cmp(a));
                         partials.truncate(keep_count as _);
                     }
-                    let total: i64 = partials.iter().sum();
+                    let total: i64 = partials.iter().try_fold(0i64, |a, &x| {
+                        a.checked_add(x)
+                    }).ok_or(Overflow::Positive)?;
                     self.stack.push(total);
                 }
             },
