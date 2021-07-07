@@ -128,7 +128,7 @@ pub(crate) fn message(input: &str) -> ParsedMessage {
     info
 }
 
-pub(crate) fn response_for(input: &str) -> Option<String> {
+pub fn response_for(input: &str) -> Option<String> {
     use ::mice::{interp::{interpret, InterpError, fmt::mbot_format_default}, cost::{cost, Price, AstInterp, mbot::{self, TextFormatOutput}}};
     let info = message(input);
     if !info.rolls.is_empty() {

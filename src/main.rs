@@ -14,6 +14,13 @@ mod dist;
 #[cfg(feature = "controller")]
 mod controller;
 
+#[cfg(fuzzing)]
+pub mod fuzz {
+    pub mod internal_rolls {
+        pub use crate::internal_rolls::response_for;
+    }
+}
+
 use serenity::{
     framework::standard::{
         macros::{command, group},

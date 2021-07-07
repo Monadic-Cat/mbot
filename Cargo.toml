@@ -5,6 +5,18 @@ authors = ["Monadic Cat <greenmonadcat@gmail.com>"]
 edition = "2018"
 license = "AGPL-3.0-or-later"
 
+
+# Using the same path for both library and binary targets
+# is intentional, as `mbot` is primarily a binary crate.
+# I only want to use it as a library for the purpose
+# of fuzzing it.
+[lib]
+path = "src/main.rs"
+
+[[bin]]
+name = "mbot"
+path = "src/main.rs"
+
 [dependencies]
 serenity = { version = "0.10.5", features = ["framework", "standard_framework"] }
 tokio = { version = "1", features = ["full"] }

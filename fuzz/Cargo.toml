@@ -1,0 +1,27 @@
+
+[package]
+name = "mbot-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.mbot]
+path = ".."
+features = ["internal_rolls"]
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "internal_rolls"
+path = "fuzz_targets/internal_rolls.rs"
+test = false
+doc = false
