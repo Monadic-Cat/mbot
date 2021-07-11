@@ -20,7 +20,7 @@ wasm-bindgen  = { version = "0.2.50", optional = true }
 itoa = "0.4.7"
 core_extensions = { version = "1.3.3", features = ["slices"] }
 id-arena = "2.2.1"
-proc_macro_helpers = { path = "../proc_macro_helpers" }
+proc_macro_helpers = { path = "../proc_macro_helpers", version = "0.0.1", package = "mbot_proc_macro_helpers" }
 checked = "0.5.0"
 once_cell = "1.7.2"
 derive_more = "0.99.16"
