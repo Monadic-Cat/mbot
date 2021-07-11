@@ -1220,16 +1220,11 @@ dependencies = [
  "criterion",
  "derive_more",
  "id-arena",
- "itertools 0.10.0",
  "itoa",
- "js-sys",
  "mbot_proc_macro_helpers",
  "once_cell",
  "rand",
- "serde",
- "serde_json",
  "thiserror",
- "wasm-bindgen",
  "wasm-bindgen-test",
 ]
 

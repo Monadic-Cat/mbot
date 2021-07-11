@@ -20,7 +20,7 @@ path = "src/main.rs"
 [dependencies]
 serenity = { version = "0.10.5", features = ["framework", "standard_framework"] }
 tokio = { version = "1", features = ["full"] }
-mice = { path = "./mice", features = ["format_use_nfmt"] }
+mice = { path = "./mice", features = [] }
 nom = "5.0"
 rand = "0.7"
 once_cell = "1.7.2"

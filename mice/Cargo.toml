@@ -16,7 +16,6 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 rand = "0.7.0"
 thiserror = "1.0.6"
-wasm-bindgen  = { version = "0.2.50", optional = true }
 itoa = "0.4.7"
 core_extensions = { version = "1.3.3", features = ["slices"] }
 id-arena = "2.2.1"
@@ -27,11 +26,6 @@ derive_more = "0.99.16"
 
 [dev-dependencies]
 criterion = "0.3"
-wasm-bindgen = "0.2.50"
-js-sys = "0.3.27"
-itertools = "0.10.0"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 rand = { version = "0.7.0", features = ["small_rng"] }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
@@ -57,17 +51,3 @@ default = ["thread_rng"]
 # on certain platforms.
 # For example, it is not available in WebAssembly.
 thread_rng = []
-
-wasm = ["wasm-bindgen"]
-# Features:
-#  - wasm
-
-# WIP.
-# Switch out the old FormatOptions backend
-# to use nfmt through a compatibility layer.
-# Likely much faster, but not necessarily exactly
-# compatible yet.
-# Note that this feature is not additive,
-# so using this may go wrong if any of your dependencies use `mice`
-# and depend very specifically on formatter output.
-format_use_nfmt = []
