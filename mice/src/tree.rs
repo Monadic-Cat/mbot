@@ -248,10 +248,10 @@ where 'arena: 'iter,
 #[derive(Copy, Clone)]
 pub struct TreeIndex(u8);
 
-/// Using the principle of explosion, we can synthesize any type.
-fn explosion<T>() -> T {
-    panic!("Boom!")
-}
+// /// Using the principle of explosion, we can synthesize any type.
+// fn explosion<T>() -> T {
+//     panic!("Boom!")
+// }
 
 /// An iterator trait that supports borrowing from the iterator,
 /// by allowing the argument lifetime to be named inside the associated type.
