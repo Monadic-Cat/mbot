@@ -1197,7 +1197,7 @@ dependencies = [
 
 [[package]]
 name = "mice"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "checked",
  "core_extensions",
