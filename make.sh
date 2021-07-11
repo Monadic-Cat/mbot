@@ -30,6 +30,10 @@ else
         if [ "$1" = "vendor-data" ] ; then
             curl "https://raw.githubusercontent.com/harkano/maddie/master/language_files/en.json" \
                  -o "$project_root/data/maddie.json"
+        elif ["$1" = "musl-release" ] ; then
+            # We've got a dependency, servo-fontconfig-sys, which requires these variables be set
+            # for musl builds, as it uses CMake to build C dependencies.
+            CC="$(which musl-gcc)" AR="$(which ar)" cargo build --release --target=x86_64-unknown-linux-musl
         else
             cargo $@
         fi
