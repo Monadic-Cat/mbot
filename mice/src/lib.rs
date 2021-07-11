@@ -4,7 +4,6 @@
 //! usage, and will likely obtain extensions related
 //! to games that I play.
 #![allow(clippy::try_err)]
-#[cfg(feature = "thread_rng")]
 pub mod parse;
 pub mod interp;
 pub mod stack;

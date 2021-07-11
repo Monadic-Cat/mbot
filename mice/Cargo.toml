@@ -28,9 +28,6 @@ derive_more = "0.99.16"
 criterion = "0.3"
 rand = { version = "0.7.0", features = ["small_rng"] }
 
-[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-wasm-bindgen-test = "0.2"
-
 [[bench]]
 name = "rolling"
 harness = false
@@ -44,10 +41,4 @@ name = "tree"
 harness = false
 
 [features]
-default = ["thread_rng"]
-
-# The default of the thread RNG
-# is very convenient, but unavailable
-# on certain platforms.
-# For example, it is not available in WebAssembly.
-thread_rng = []
+default = []
