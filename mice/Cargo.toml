@@ -1,6 +1,6 @@
 [package]
 name = "mice"
-version = "0.10.1"
+version = "0.10.2"
 authors = ["Monadic Cat <greenmonadcat@gmail.com>"]
 repository = "https://github.com/Monadic-Cat/mbot/mice"
 documentation = "https://docs.rs/mice"
