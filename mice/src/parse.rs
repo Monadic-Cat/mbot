@@ -7,7 +7,7 @@ use crate::tree::Tree;
 use ::core_extensions::SliceExt;
 use ::core::convert::TryFrom;
 
-use ::proc_macro_helpers::decl_ops;
+use ::mbot_proc_macro_helpers::decl_ops;
 decl_ops! {
     // TODO: if Token::D becomes an operator,
     // we may wish to encode whitespace sensitivity here,
