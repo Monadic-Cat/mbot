@@ -5,7 +5,7 @@ authors = ["Monadic Cat <greenmonadcat@gmail.com>"]
 edition = "2018"
 description = "Procedural macro helpers used by mbot"
 documentation = "https://docs.rs/mbot_proc_macro_helpers"
-license = "none"
+license = "AGPL-3.0-only"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
