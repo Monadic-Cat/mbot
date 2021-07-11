@@ -2,7 +2,7 @@
 name = "mice"
 version = "0.10.0"
 authors = ["Monadic Cat <greenmonadcat@gmail.com>"]
-repository = "https://github.com/Monadic-Cat/mice"
+repository = "https://github.com/Monadic-Cat/mbot/mice"
 documentation = "https://docs.rs/mice"
 description = "messing with dice"
 readme = "README.md"
@@ -23,8 +23,7 @@ id-arena = "2.2.1"
 proc_macro_helpers = { path = "../proc_macro_helpers" }
 checked = "0.5.0"
 once_cell = "1.7.2"
-fixed-str = { git = "https://github.com/Monadic-Cat/fixed-str", branch = "melo" }
-derive_more = { git = "https://github.com/Monadic-Cat/derive_more.git", branch = "add-unwrap" }
+derive_more = "0.99.16"
 
 [dev-dependencies]
 criterion = "0.3"
